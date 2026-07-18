@@ -37,4 +37,11 @@
         <property name="checks" value="RegexpSinglelineJava"/>
         <property name="id" value="NoFQNInCode"/>
     </module>
+    <!-- Annotation-processor tests embed Java source (with fully-qualified imports) as string
+         literals / text blocks for compile-testing; the FQN rule cannot see those are source. -->
+    <module name="SuppressionSingleFilter">
+        <property name="files" value="[\\/]inject-processor[\\/]src[\\/]test[\\/]"/>
+        <property name="checks" value="RegexpSinglelineJava"/>
+        <property name="id" value="NoFQNInCode"/>
+    </module>
 </module>
