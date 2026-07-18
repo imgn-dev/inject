@@ -11,6 +11,9 @@ import org.jspecify.annotations.Nullable;
  *
  * @param <T> the bound type
  */
+// T is a phantom parameter carried for call-site type-safety (getInstance/getProvider); it is intentionally
+// not referenced by the class body, which stores the type as a java.lang.reflect.Type.
+@SuppressWarnings("UnusedTypeParameter")
 public final class Key<T> {
     private final Type type;
     private final @Nullable Qualifier qualifier;

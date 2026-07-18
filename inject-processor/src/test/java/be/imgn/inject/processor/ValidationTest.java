@@ -66,4 +66,54 @@ class ValidationTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("Dependency cycle");
     }
+
+    @Test
+    void providerDependencyBreaksCycle() {
+        JavaFileObject a = JavaFileObjects.forSourceString("example.A", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Provider;
+
+                public class A {
+                    @Inject
+                    public A(Provider<B> b) {}
+                }
+                """);
+        JavaFileObject b = JavaFileObjects.forSourceString("example.B", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class B {
+                    @Inject
+                    public B(A a) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(a, b);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation).generatedSourceFile("example.$A$$Factory");
+        assertThat(compilation).generatedSourceFile("example.$B$$Factory");
+    }
+
+    @Test
+    void rejectsPrivateInjectField() {
+        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Bad {
+                    @Inject
+                    private String value;
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bad);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("must not be private");
+    }
 }

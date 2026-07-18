@@ -53,8 +53,8 @@ import be.imgn.inject.processor.spi.PlanContext;
 /**
  * Annotation processor that generates one zero-reflection {@code Factory} subclass per injectable class. Handles
  * {@code @Inject} constructors, fields, and methods, qualifying and scoping annotations, {@code Provider<T>} injection,
- * default factories for undeclared in-compilation dependencies, and compile-time cycle/missing-dependency validation.
- * {@code @Provides} and service registration are added in later tasks.
+ * default factories for undeclared in-compilation dependencies, {@code @Provides} methods, compile-time
+ * cycle/missing-dependency/accessibility validation, {@code ServiceLoader} registration, and a plugin SPI.
  */
 @SupportedAnnotationTypes("*")
 public final class InjectProcessor extends AbstractProcessor {
@@ -93,17 +93,23 @@ public final class InjectProcessor extends AbstractProcessor {
 
         Map<TypeElement, BeanModel> toGenerate = new LinkedHashMap<>();
         Map<TypeElement, List<TypeElement>> edges = new LinkedHashMap<>();
+        List<TypeElement> seeds = new ArrayList<>();
         for (TypeElement bean : beanTypes) {
+            if (!validateBean(bean)) {
+                continue;
+            }
             toGenerate.put(bean, buildModel(bean));
-            edges.put(bean, dependencyTypes(bean, types));
+            // Cycle edges exclude Provider-wrapped dependencies: a Provider is injected un-resolved, so it
+            // legitimately breaks a cycle at runtime and must not be reported as one at compile time.
+            edges.put(bean, collectDependencies(bean, types, false));
+            seeds.addAll(collectDependencies(bean, types, true));
         }
 
         plugins.forEach(plugin -> plugin.onGather(new GatherContext(processingEnv, roundEnv)));
 
         List<ProvidesModel> providesModels = gatherProvides(roundEnv);
-        planDefaultFactories(toGenerate, edges, roundEnv, providesDependencies(roundEnv, types));
-
-        plugins.forEach(plugin -> plugin.onPlan(new PlanContext(processingEnv, roundEnv)));
+        seeds.addAll(providesDependencies(roundEnv, types));
+        planDefaultFactories(toGenerate, edges, roundEnv, seeds);
 
         List<TypeElement> cycle = findCycle(toGenerate.keySet(), edges);
         if (cycle != null) {
@@ -116,6 +122,10 @@ public final class InjectProcessor extends AbstractProcessor {
             return false;
         }
 
+        // Duplicate bindings that arise WITHIN one compilation fall through to the runtime
+        // DuplicateBindingException. Cross-module duplicates are undetectable at compile time under the
+        // ServiceLoader architecture, so runtime detection is the single, consistent safety net.
+        plugins.forEach(plugin -> plugin.onPlan(new PlanContext(processingEnv, roundEnv)));
         plugins.forEach(plugin -> plugin.onGenerate(new GenerateContext(processingEnv, roundEnv)));
 
         List<String> factoryNames = new ArrayList<>();
@@ -222,7 +232,7 @@ public final class InjectProcessor extends AbstractProcessor {
                     && method.getEnclosingElement() instanceof TypeElement host) {
                 dependencies.add(host);
             }
-            addParameterDependencies(method, types, dependencies);
+            addParameterDependencies(method, types, dependencies, true);
         }
         return dependencies;
     }
@@ -242,9 +252,7 @@ public final class InjectProcessor extends AbstractProcessor {
             Map<TypeElement, List<TypeElement>> edges,
             RoundEnvironment roundEnv,
             Collection<TypeElement> extraRoots) {
-        Deque<TypeElement> queue = new ArrayDeque<>();
-        edges.values().forEach(queue::addAll);
-        queue.addAll(extraRoots);
+        Deque<TypeElement> queue = new ArrayDeque<>(extraRoots);
         Set<TypeElement> seen = new HashSet<>();
         while (!queue.isEmpty()) {
             TypeElement dependency = queue.poll();
@@ -333,35 +341,80 @@ public final class InjectProcessor extends AbstractProcessor {
                 .toString();
     }
 
-    private List<TypeElement> dependencyTypes(TypeElement bean, Types types) {
+    private List<TypeElement> collectDependencies(TypeElement bean, Types types, boolean includeProviderTargets) {
         List<TypeElement> result = new ArrayList<>();
-        injectConstructor(bean).ifPresent(constructor -> addParameterDependencies(constructor, types, result));
+        injectConstructor(bean)
+                .ifPresent(constructor -> addParameterDependencies(constructor, types, result, includeProviderTargets));
         for (Element enclosed : bean.getEnclosedElements()) {
             if (enclosed.getAnnotation(Inject.class) == null) {
                 continue;
             }
             if (enclosed.getKind() == ElementKind.FIELD) {
-                dependencyElement(enclosed.asType(), types).ifPresent(result::add);
+                dependencyElement(enclosed.asType(), types, includeProviderTargets)
+                        .ifPresent(result::add);
             } else if (enclosed.getKind() == ElementKind.METHOD) {
-                addParameterDependencies((ExecutableElement) enclosed, types, result);
+                addParameterDependencies((ExecutableElement) enclosed, types, result, includeProviderTargets);
             }
         }
         return result;
     }
 
-    private static void addParameterDependencies(ExecutableElement executable, Types types, List<TypeElement> result) {
+    private static void addParameterDependencies(
+            ExecutableElement executable, Types types, List<TypeElement> result, boolean includeProviderTargets) {
         for (VariableElement parameter : executable.getParameters()) {
-            dependencyElement(parameter.asType(), types).ifPresent(result::add);
+            dependencyElement(parameter.asType(), types, includeProviderTargets).ifPresent(result::add);
         }
     }
 
-    private static Optional<TypeElement> dependencyElement(TypeMirror type, Types types) {
-        TypeMirror effective = providerInner(type).orElse(type);
+    private static Optional<TypeElement> dependencyElement(
+            TypeMirror type, Types types, boolean includeProviderTargets) {
+        Optional<TypeMirror> inner = providerInner(type);
+        if (inner.isPresent() && !includeProviderTargets) {
+            return Optional.empty();
+        }
+        TypeMirror effective = inner.orElse(type);
         if (types.erasure(effective) instanceof DeclaredType declared
                 && declared.asElement() instanceof TypeElement typeElement) {
             return Optional.of(typeElement);
         }
         return Optional.empty();
+    }
+
+    private boolean validateBean(TypeElement bean) {
+        boolean valid = true;
+        Optional<ExecutableElement> constructor = injectConstructor(bean);
+        if (constructor.isPresent() && constructor.get().getModifiers().contains(Modifier.PRIVATE)) {
+            error("@Inject constructor of " + bean.getQualifiedName() + " must not be private.", constructor.get());
+            valid = false;
+        }
+        if (constructor.isEmpty() && !hasAccessibleNoArgConstructor(bean)) {
+            error(
+                    bean.getQualifiedName()
+                            + " has @Inject members but no @Inject constructor and no accessible no-argument"
+                            + " constructor.",
+                    bean);
+            valid = false;
+        }
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getAnnotation(Inject.class) == null) {
+                continue;
+            }
+            boolean member = enclosed.getKind() == ElementKind.FIELD || enclosed.getKind() == ElementKind.METHOD;
+            if (member
+                    && (enclosed.getModifiers().contains(Modifier.PRIVATE)
+                            || enclosed.getModifiers().contains(Modifier.STATIC))) {
+                error(
+                        "@Inject " + enclosed.getSimpleName() + " in " + bean.getQualifiedName()
+                                + " must not be private or static.",
+                        enclosed);
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private void error(String message, Element element) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, element);
     }
 
     private static Optional<ExecutableElement> injectConstructor(TypeElement bean) {
