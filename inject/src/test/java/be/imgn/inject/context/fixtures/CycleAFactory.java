@@ -2,10 +2,11 @@ package be.imgn.inject.context.fixtures;
 
 import java.util.List;
 
-import be.imgn.inject.Key;
+import be.imgn.inject.context.AnnotationMetadata;
 import be.imgn.inject.context.ConstructorInjectionPoint;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
+import be.imgn.inject.context.Parameter;
 
 /** Half of a two-bean cycle: A depends on B. */
 public final class CycleAFactory extends Factory<CycleAFactory.A> {
@@ -18,7 +19,8 @@ public final class CycleAFactory extends Factory<CycleAFactory.A> {
 
     @Override
     protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return new ConstructorInjectionPoint(List.of(Key.of(CycleBFactory.B.class)));
+        return new ConstructorInjectionPoint(
+                this, List.of(new Parameter("b", CycleBFactory.B.class)), AnnotationMetadata.empty());
     }
 
     @Override

@@ -4,11 +4,12 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Optional;
 
-import be.imgn.inject.Key;
 import be.imgn.inject.Singleton;
+import be.imgn.inject.context.AnnotationMetadata;
 import be.imgn.inject.context.ConstructorInjectionPoint;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
+import be.imgn.inject.context.Parameter;
 
 /** Singleton-scoped bean depending on the leaf {@code String}. */
 public final class RootFactory extends Factory<RootFactory.Root> {
@@ -21,7 +22,8 @@ public final class RootFactory extends Factory<RootFactory.Root> {
 
     @Override
     protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return new ConstructorInjectionPoint(List.of(Key.of(String.class)));
+        return new ConstructorInjectionPoint(
+                this, List.of(new Parameter("leaf", String.class)), AnnotationMetadata.empty());
     }
 
     @Override

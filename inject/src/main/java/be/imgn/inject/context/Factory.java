@@ -67,7 +67,7 @@ public abstract class Factory<T> {
 
     /** {@return the constructor injection point; no-arg by default} */
     protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return ConstructorInjectionPoint.none();
+        return new ConstructorInjectionPoint(this, List.of(), AnnotationMetadata.empty());
     }
 
     /** {@return the method injection points; none by default} */
@@ -98,7 +98,10 @@ public abstract class Factory<T> {
      * @param <D> the dependency type
      */
     protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Context context) {
-        return providerFor(constructorInjectionPoint().keys(), paramIndex, context, "constructor");
+        Objects.requireNonNull(context, "context");
+        ConstructorInjectionPoint point = constructorInjectionPoint();
+        checkIndex(paramIndex, point.parameters().size(), "constructor");
+        return providerFor(point.<D>keyForParameter(paramIndex), context);
     }
 
     /**
@@ -121,7 +124,10 @@ public abstract class Factory<T> {
      * @param <D> the dependency type
      */
     protected final <D> Provider<D> getProviderForMethod(int methodIndex, int paramIndex, Context context) {
-        return providerFor(methodInjectionPoints().get(methodIndex).keys(), paramIndex, context, "method");
+        Objects.requireNonNull(context, "context");
+        MethodInjectionPoint point = methodInjectionPoints().get(methodIndex);
+        checkIndex(paramIndex, point.parameters().size(), "method");
+        return providerFor(point.<D>keyForParameter(paramIndex), context);
     }
 
     /**
@@ -144,7 +150,9 @@ public abstract class Factory<T> {
      * @param <D> the dependency type
      */
     protected final <D> Provider<D> getProviderForField(int fieldIndex, Context context) {
-        return providerFor(fieldInjectionPoints().get(fieldIndex).keys(), 0, context, "field");
+        Objects.requireNonNull(context, "context");
+        FieldInjectionPoint point = fieldInjectionPoints().get(fieldIndex);
+        return providerFor(point.<D>key(), context);
     }
 
     /**
@@ -159,12 +167,14 @@ public abstract class Factory<T> {
     }
 
     @SuppressWarnings("unchecked")
-    private <D> Provider<D> providerFor(List<Key<?>> keys, int index, Context context, String kind) {
-        Objects.requireNonNull(context, "context");
-        if (index < 0 || index >= keys.size()) {
+    private <D> Provider<D> providerFor(Key<D> key, Context context) {
+        return (Provider<D>) context.getProvider(key);
+    }
+
+    private void checkIndex(int index, int size, String kind) {
+        if (index < 0 || index >= size) {
             throw new IllegalArgumentException(
                     "No " + kind + " dependency at index " + index + " for " + type.getName());
         }
-        return (Provider<D>) context.getProvider(keys.get(index));
     }
 }

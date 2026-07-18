@@ -38,7 +38,8 @@ class FactoryTest {
 
         @Override
         protected ConstructorInjectionPoint constructorInjectionPoint() {
-            return new ConstructorInjectionPoint(List.of(Key.of(String.class)));
+            return new ConstructorInjectionPoint(
+                    this, List.of(new Parameter("message", String.class)), AnnotationMetadata.empty());
         }
 
         @Override
