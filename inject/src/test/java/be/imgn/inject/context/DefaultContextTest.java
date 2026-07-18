@@ -2,6 +2,7 @@ package be.imgn.inject.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.util.List;
 
@@ -44,7 +45,19 @@ class DefaultContextTest {
         assertThatExceptionOfType(CircularDependencyException.class)
                 .isThrownBy(
                         () -> context.getProvider(Key.of(CycleAFactory.A.class)).get())
-                .withMessageContaining("->");
+                .withMessage("Dependency cycle: "
+                        + Key.of(CycleAFactory.A.class)
+                        + " -> "
+                        + Key.of(CycleBFactory.B.class)
+                        + " -> "
+                        + Key.of(CycleAFactory.A.class));
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void getProviderRejectsNullKey() {
+        Context context = new DefaultContext(List.of(new LeafFactory()), List.of());
+        assertThatNullPointerException().isThrownBy(() -> context.getProvider(null));
     }
 
     @Test

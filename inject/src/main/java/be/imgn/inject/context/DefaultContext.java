@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import java.util.stream.Collectors;
+import java.util.StringJoiner;
 
 import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.DuplicateBindingException;
@@ -95,8 +95,10 @@ final class DefaultContext implements Context {
     void enter(Key<?> key) {
         Deque<Key<?>> current = stack.get();
         if (current.contains(key)) {
-            String path = current.stream().map(Object::toString).collect(Collectors.joining(" -> "));
-            throw new CircularDependencyException("Dependency cycle: " + path + " -> " + key);
+            StringJoiner path = new StringJoiner(" -> ");
+            current.descendingIterator().forEachRemaining(entered -> path.add(entered.toString()));
+            path.add(key.toString());
+            throw new CircularDependencyException("Dependency cycle: " + path);
         }
         current.push(key);
     }
