@@ -11,8 +11,9 @@ import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
+import com.palantir.javapoet.WildcardTypeName;
 
-/** Emits a {@code Factory} subclass for a bean with constructor, field, and method injection. */
+/** Emits a {@code Factory} subclass with constructor, field, and method injection, qualifiers, and scope. */
 final class BeanFactoryGenerator {
 
     private static final ClassName FACTORY = ClassName.get("be.imgn.inject.context", "Factory");
@@ -23,7 +24,11 @@ final class BeanFactoryGenerator {
     private static final ClassName METHOD_IP = ClassName.get("be.imgn.inject.context", "MethodInjectionPoint");
     private static final ClassName PARAMETER = ClassName.get("be.imgn.inject.context", "Parameter");
     private static final ClassName ANNOTATION_METADATA = ClassName.get("be.imgn.inject.context", "AnnotationMetadata");
+    private static final ClassName KEY = ClassName.get("be.imgn.inject", "Key");
     private static final ClassName LIST = ClassName.get("java.util", "List");
+    private static final ClassName OPTIONAL = ClassName.get("java.util", "Optional");
+    private static final ClassName CLASS = ClassName.get("java.lang", "Class");
+    private static final ClassName ANNOTATION = ClassName.get("java.lang.annotation", "Annotation");
 
     private BeanFactoryGenerator() {}
 
@@ -40,6 +45,12 @@ final class BeanFactoryGenerator {
         if (!model.methods().isEmpty()) {
             type.addMethod(methodInjectionPoints(model)).addMethod(injectMethods(model));
         }
+        if (model.scopeAnnotation() != null) {
+            type.addMethod(scope(model.scopeAnnotation()));
+        }
+        if (model.beanQualifier() != null) {
+            type.addMethod(exposedKeys(model, model.beanQualifier()));
+        }
         return JavaFile.builder(model.packageName(), type.build()).build();
     }
 
@@ -51,7 +62,6 @@ final class BeanFactoryGenerator {
     }
 
     private static MethodSpec constructorInjectionPoint(BeanModel model) {
-        CodeBlock parameters = parameterList(model.constructorParameters());
         return MethodSpec.methodBuilder("constructorInjectionPoint")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
@@ -60,14 +70,15 @@ final class BeanFactoryGenerator {
                         "return new $T(this, $T.of($L), $T.empty())",
                         CONSTRUCTOR_IP,
                         LIST,
-                        parameters,
+                        parameterList(model.constructorParameters()),
                         ANNOTATION_METADATA)
                 .build();
     }
 
     private static MethodSpec createInstance(BeanModel model) {
         CodeBlock arguments = IntStream.range(0, model.constructorParameters().size())
-                .mapToObj(index -> CodeBlock.of("getInstanceForConstructor($L, context)", index))
+                .mapToObj(index ->
+                        resolve(model.constructorParameters().get(index).isProvider(), "Constructor", index))
                 .collect(CodeBlock.joining(", "));
         return MethodSpec.methodBuilder("createInstance")
                 .addAnnotation(Override.class)
@@ -79,14 +90,8 @@ final class BeanFactoryGenerator {
     }
 
     private static MethodSpec fieldInjectionPoints(BeanModel model) {
-        CodeBlock points = model.fields().stream()
-                .map(field -> CodeBlock.of(
-                        "new $T(this, $S, $T.class, $T.empty())",
-                        FIELD_IP,
-                        field.name(),
-                        field.rawType(),
-                        ANNOTATION_METADATA))
-                .collect(CodeBlock.joining(", "));
+        CodeBlock points =
+                model.fields().stream().map(BeanFactoryGenerator::fieldPoint).collect(CodeBlock.joining(", "));
         return MethodSpec.methodBuilder("fieldInjectionPoints")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
@@ -103,10 +108,8 @@ final class BeanFactoryGenerator {
                 .addParameter(model.beanType(), "instance")
                 .addParameter(CONTEXT, "context");
         for (int index = 0; index < model.fields().size(); index++) {
-            builder.addStatement(
-                    "instance.$L = getInstanceForField($L, context)",
-                    model.fields().get(index).name(),
-                    index);
+            FieldModel field = model.fields().get(index);
+            builder.addStatement("instance.$L = $L", field.name(), resolve(field.isProvider(), "Field", index));
         }
         return builder.build();
     }
@@ -141,17 +144,90 @@ final class BeanFactoryGenerator {
             MethodModel method = model.methods().get(index);
             CodeBlock arguments = IntStream.range(0, method.parameters().size())
                     .mapToObj(paramIndex ->
-                            CodeBlock.of("getInstanceForMethod($L, $L, context)", methodIndex, paramIndex))
+                            resolveMethod(method.parameters().get(paramIndex).isProvider(), methodIndex, paramIndex))
                     .collect(CodeBlock.joining(", "));
             builder.addStatement("instance.$L($L)", method.name(), arguments);
         }
         return builder.build();
     }
 
+    private static MethodSpec scope(ClassName scopeAnnotation) {
+        TypeName returnType = ParameterizedTypeName.get(
+                OPTIONAL, ParameterizedTypeName.get(CLASS, WildcardTypeName.subtypeOf(ANNOTATION)));
+        return MethodSpec.methodBuilder("scope")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(returnType)
+                .addStatement("return $T.of($T.class)", OPTIONAL, scopeAnnotation)
+                .build();
+    }
+
+    private static MethodSpec exposedKeys(BeanModel model, CodeBlock beanQualifier) {
+        TypeName returnType = ParameterizedTypeName.get(
+                LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
+        return MethodSpec.methodBuilder("exposedKeys")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(returnType)
+                .addStatement("return $T.of($T.of($T.class, $L))", LIST, KEY, model.beanType(), beanQualifier)
+                .build();
+    }
+
+    private static CodeBlock resolve(boolean isProvider, String kind, int index) {
+        return isProvider
+                ? CodeBlock.of("getProviderFor$L($L, context)", kind, index)
+                : CodeBlock.of("getInstanceFor$L($L, context)", kind, index);
+    }
+
+    private static CodeBlock resolveMethod(boolean isProvider, int methodIndex, int paramIndex) {
+        return isProvider
+                ? CodeBlock.of("getProviderForMethod($L, $L, context)", methodIndex, paramIndex)
+                : CodeBlock.of("getInstanceForMethod($L, $L, context)", methodIndex, paramIndex);
+    }
+
     private static CodeBlock parameterList(List<ParameterModel> parameters) {
-        return parameters.stream()
-                .map(parameter ->
-                        CodeBlock.of("new $T($S, $T.class)", PARAMETER, parameter.name(), parameter.rawType()))
-                .collect(CodeBlock.joining(", "));
+        return parameters.stream().map(BeanFactoryGenerator::parameter).collect(CodeBlock.joining(", "));
+    }
+
+    private static CodeBlock parameter(ParameterModel parameter) {
+        CodeBlock qualifier = parameter.qualifier();
+        if (!parameter.isProvider()) {
+            return qualifier == null
+                    ? CodeBlock.of("new $T($S, $T.class)", PARAMETER, parameter.name(), parameter.rawType())
+                    : CodeBlock.of(
+                            "new $T($S, $T.class, $L)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
+        }
+        return qualifier == null
+                ? CodeBlock.of("new $T($S, $T.class, true)", PARAMETER, parameter.name(), parameter.rawType())
+                : CodeBlock.of(
+                        "new $T($S, $T.class, $L, true)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
+    }
+
+    private static CodeBlock fieldPoint(FieldModel field) {
+        CodeBlock qualifier = field.qualifier();
+        if (!field.isProvider()) {
+            return qualifier == null
+                    ? CodeBlock.of(
+                            "new $T(this, $S, $T.class, $T.empty())",
+                            FIELD_IP,
+                            field.name(),
+                            field.rawType(),
+                            ANNOTATION_METADATA)
+                    : CodeBlock.of(
+                            "new $T(this, $S, $T.class, $L, $T.empty())",
+                            FIELD_IP,
+                            field.name(),
+                            field.rawType(),
+                            qualifier,
+                            ANNOTATION_METADATA);
+        }
+        CodeBlock qualifierArgument = qualifier == null ? CodeBlock.of("null") : qualifier;
+        return CodeBlock.of(
+                "new $T(this, $S, $T.class, $L, $T.empty(), true)",
+                FIELD_IP,
+                field.name(),
+                field.rawType(),
+                qualifierArgument,
+                ANNOTATION_METADATA);
     }
 }

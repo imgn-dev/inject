@@ -3,6 +3,9 @@ package be.imgn.inject.processor;
 import java.util.List;
 
 import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
+
+import org.jspecify.annotations.Nullable;
 
 /**
  * The data needed to generate one bean factory.
@@ -13,6 +16,8 @@ import com.palantir.javapoet.ClassName;
  * @param constructorParameters the injectable constructor's parameters, in order (empty for a no-arg constructor)
  * @param fields the {@code @Inject} fields, in order
  * @param methods the {@code @Inject} methods, in order
+ * @param scopeAnnotation the bean's scoping annotation type, or {@code null} for prototype scope
+ * @param beanQualifier a {@code new Qualifier(...)} expression for the bean's own key, or {@code null} if unqualified
  */
 record BeanModel(
         String packageName,
@@ -20,4 +25,6 @@ record BeanModel(
         ClassName beanType,
         List<ParameterModel> constructorParameters,
         List<FieldModel> fields,
-        List<MethodModel> methods) {}
+        List<MethodModel> methods,
+        @Nullable ClassName scopeAnnotation,
+        @Nullable CodeBlock beanQualifier) {}
