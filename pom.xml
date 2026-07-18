@@ -11,6 +11,7 @@
 
     <modules>
         <module>inject</module>
+        <module>inject-processor</module>
     </modules>
 
     <properties>
@@ -32,6 +33,8 @@
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <junit.version>6.1.2</junit.version>
         <assertj.version>3.27.7</assertj.version>
+        <javapoet.version>0.7.0</javapoet.version>
+        <compile-testing.version>0.21.0</compile-testing.version>
     </properties>
 
     <dependencyManagement>
@@ -52,6 +55,16 @@
                 <groupId>org.jspecify</groupId>
                 <artifactId>jspecify</artifactId>
                 <version>${jspecify.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.palantir.javapoet</groupId>
+                <artifactId>javapoet</artifactId>
+                <version>${javapoet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.testing.compile</groupId>
+                <artifactId>compile-testing</artifactId>
+                <version>${compile-testing.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
