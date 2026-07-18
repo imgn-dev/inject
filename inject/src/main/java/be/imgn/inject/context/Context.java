@@ -16,4 +16,9 @@ public interface Context {
      * @throws be.imgn.inject.UnsatisfiedDependencyException if no binding exists
      */
     <T> Provider<T> getProvider(Key<T> key);
+
+    /** {@return a context loaded from all registered {@code Factory} and {@code Scope} services} */
+    static Context create() {
+        return new DefaultContext();
+    }
 }
