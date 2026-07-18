@@ -1,6 +1,7 @@
 package be.imgn.inject.processor;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -12,9 +13,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
@@ -29,6 +32,8 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.FileObject;
+import javax.tools.StandardLocation;
 
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
@@ -39,6 +44,11 @@ import org.jspecify.annotations.Nullable;
 import be.imgn.inject.Inject;
 import be.imgn.inject.Provider;
 import be.imgn.inject.Provides;
+import be.imgn.inject.context.Factory;
+import be.imgn.inject.processor.spi.GatherContext;
+import be.imgn.inject.processor.spi.GenerateContext;
+import be.imgn.inject.processor.spi.InjectPlugin;
+import be.imgn.inject.processor.spi.PlanContext;
 
 /**
  * Annotation processor that generates one zero-reflection {@code Factory} subclass per injectable class. Handles
@@ -50,6 +60,17 @@ import be.imgn.inject.Provides;
 public final class InjectProcessor extends AbstractProcessor {
 
     private static final String PROVIDER = Provider.class.getCanonicalName();
+    private static final String FACTORY_SERVICE = "META-INF/services/" + Factory.class.getName();
+
+    private List<InjectPlugin> plugins = List.of();
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnvironment) {
+        super.init(processingEnvironment);
+        List<InjectPlugin> loaded = new ArrayList<>();
+        ServiceLoader.load(InjectPlugin.class, getClass().getClassLoader()).forEach(loaded::add);
+        this.plugins = List.copyOf(loaded);
+    }
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -77,8 +98,12 @@ public final class InjectProcessor extends AbstractProcessor {
             edges.put(bean, dependencyTypes(bean, types));
         }
 
+        plugins.forEach(plugin -> plugin.onGather(new GatherContext(processingEnv, roundEnv)));
+
         List<ProvidesModel> providesModels = gatherProvides(roundEnv);
         planDefaultFactories(toGenerate, edges, roundEnv, providesDependencies(roundEnv, types));
+
+        plugins.forEach(plugin -> plugin.onPlan(new PlanContext(processingEnv, roundEnv)));
 
         List<TypeElement> cycle = findCycle(toGenerate.keySet(), edges);
         if (cycle != null) {
@@ -91,13 +116,64 @@ public final class InjectProcessor extends AbstractProcessor {
             return false;
         }
 
+        plugins.forEach(plugin -> plugin.onGenerate(new GenerateContext(processingEnv, roundEnv)));
+
+        List<String> factoryNames = new ArrayList<>();
         for (BeanModel model : toGenerate.values()) {
             write(model);
+            factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }
         for (ProvidesModel model : providesModels) {
             writeProvides(model);
+            factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }
+        registerFactories(factoryNames);
         return false;
+    }
+
+    private void registerFactories(List<String> factoryNames) {
+        if (factoryNames.isEmpty()) {
+            return;
+        }
+        if (serviceFileExistsOnSourcePath()) {
+            processingEnv
+                    .getMessager()
+                    .printMessage(
+                            Diagnostic.Kind.ERROR,
+                            "A hand-authored " + FACTORY_SERVICE
+                                    + " exists on the source path; the processor owns this file. Remove it.");
+            return;
+        }
+        try {
+            FileObject file =
+                    processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", FACTORY_SERVICE);
+            try (Writer writer = file.openWriter()) {
+                for (String name : factoryNames) {
+                    writer.write(name);
+                    writer.write('\n');
+                }
+            }
+        } catch (IOException e) {
+            processingEnv
+                    .getMessager()
+                    .printMessage(Diagnostic.Kind.ERROR, "Failed to write factory service file: " + e.getMessage());
+        }
+        String directives = "For the module path, declare in module-info.java:\n    provides " + Factory.class.getName()
+                + " with\n        " + String.join(",\n        ", factoryNames) + ";";
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, directives);
+    }
+
+    private boolean serviceFileExistsOnSourcePath() {
+        try {
+            processingEnv
+                    .getFiler()
+                    .getResource(StandardLocation.SOURCE_PATH, "", FACTORY_SERVICE)
+                    .openInputStream()
+                    .close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private List<ProvidesModel> gatherProvides(RoundEnvironment roundEnv) {
