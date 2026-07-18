@@ -53,7 +53,7 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 
 ### `be.imgn.inject.context` — public types, conceptually internal
 - `Context`, `Factory<T>`, `FactoryProvider<T>`
-- `ConstructorInjectionPoint`, `MethodInjectionPoint`, `FieldInjectionPoint`
+- `InjectionPoint` + `ConstructorInjectionPoint`, `MethodInjectionPoint`, `FieldInjectionPoint`, `Parameter`, `AnnotationMetadata`
 - `Scope` SPI, `SingletonProvider`
 
 These types are `public` only so generated factory subclasses (which live in the
@@ -62,16 +62,23 @@ to touch `be.imgn.inject.context` directly.
 
 ## 4. Public API (`be.imgn.inject`)
 
-### `Key<T>` — sealed interface
+### `Key<T>` — final class
 ```java
-public sealed interface Key<T> permits SimpleKey, QualifiedKey {
-    Class<T> type();
+public final class Key<T> {
+    Type type();                                        // java.lang.reflect.Type
+    @Nullable Qualifier qualifier();                    // null == unqualified
+    boolean hasQualifier();
     static <T> Key<T> of(Class<T> type);
-    static <T> Key<T> of(Class<T> type, Qualifier qualifier);
+    static <T> Key<T> of(Class<T> type, @Nullable Qualifier qualifier);
+    static Key<?> of(Type type, @Nullable Qualifier qualifier);
 }
 ```
-- `SimpleKey<T>` — type only.
-- `QualifiedKey<T>` — type + `Qualifier`.
+- A `Key` is a `final class` (not a hierarchy): a `java.lang.reflect.Type` plus a
+  **nullable** `Qualifier` (`null` denotes an unqualified key). Identity is type +
+  qualifier; `equals`/`hashCode` cover both.
+- The `Type` overload of `of` accepts parameterized types (e.g. from a `Parameter`);
+  the `Class` overloads are the common case. `Class` being more specific than `Type`,
+  a `Class` argument always binds to the `Class` overload and preserves `Key<T>`.
 - `Qualifier` — value object carrying the qualifier annotation type **and its
   attribute values**; `equals`/`hashCode` cover both. Marker qualifiers carry no
   values and match by type alone.
@@ -165,12 +172,20 @@ public abstract class Factory<T> {
     protected List<Key<?>> exposedKeys();           // default: List.of(Key.of(type))
 }
 ```
-- Injection points (`ConstructorInjectionPoint`, `MethodInjectionPoint`,
-  `FieldInjectionPoint`) carry the metadata used to resolve each parameter's `Key`
-  and for inspection/debugging.
-- **`Provider<T>` dependency types are recognized:** when a parameter/field is
-  declared as `Provider<Foo>`, the factory injects the provider itself rather than
-  a resolved `Foo`.
+- Injection points form a sealed hierarchy `InjectionPoint permits
+  ConstructorInjectionPoint, FieldInjectionPoint, MethodInjectionPoint`. Each carries
+  a back-reference to its owning `Factory<?>` and an `AnnotationMetadata` (annotations
+  present at the site — currently a stub exposing `empty()`, to be enriched for
+  plugins). Constructor/method points hold an ordered `List<Parameter>` and expose
+  `keyForParameter(int)`; field points hold `fieldName`/`fieldType`/nullable
+  `Qualifier`/`isProvider` and expose `key()`. Used for resolution and inspection.
+- `Parameter` (name, `java.lang.reflect.Type`, nullable `Qualifier`,
+  `AnnotationMetadata`, `isProvider`) describes one constructor/method argument;
+  `keyForParameter`/`key` build the `Key` from the type + qualifier.
+- **`Provider<T>` dependency types are recognized:** a parameter/field declared as
+  `Provider<Foo>` has `isProvider = true` and its `type`/`fieldType` set to the inner
+  `Foo`; the generated factory injects the provider itself (via
+  `getProviderFor…`) rather than a resolved `Foo` (via `getInstanceFor…`).
 
 ## 6. Annotation Processor (`inject-processor`)
 
@@ -271,7 +286,7 @@ cares about.
 ## 8. Testing
 
 - **Framework:** JUnit 6 + AssertJ 3.27.7.
-- **Runtime unit tests:** `Key` equality & sealed dispatch; `SingletonProvider`
+- **Runtime unit tests:** `Key` equality (type + nullable qualifier); `SingletonProvider`
   once-only under concurrency; scope wrapping; runtime cycle guard;
   `Provider<T>` injection.
 - **Processor tests:** `google-compile-testing` — assert generated sources and
