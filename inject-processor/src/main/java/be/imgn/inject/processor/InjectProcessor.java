@@ -3,7 +3,9 @@ package be.imgn.inject.processor;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -36,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 
 import be.imgn.inject.Inject;
 import be.imgn.inject.Provider;
+import be.imgn.inject.Provides;
 
 /**
  * Annotation processor that generates one zero-reflection {@code Factory} subclass per injectable class. Handles
@@ -74,7 +77,8 @@ public final class InjectProcessor extends AbstractProcessor {
             edges.put(bean, dependencyTypes(bean, types));
         }
 
-        planDefaultFactories(toGenerate, edges, roundEnv);
+        List<ProvidesModel> providesModels = gatherProvides(roundEnv);
+        planDefaultFactories(toGenerate, edges, roundEnv, providesDependencies(roundEnv, types));
 
         List<TypeElement> cycle = findCycle(toGenerate.keySet(), edges);
         if (cycle != null) {
@@ -90,15 +94,81 @@ public final class InjectProcessor extends AbstractProcessor {
         for (BeanModel model : toGenerate.values()) {
             write(model);
         }
+        for (ProvidesModel model : providesModels) {
+            writeProvides(model);
+        }
         return false;
+    }
+
+    private List<ProvidesModel> gatherProvides(RoundEnvironment roundEnv) {
+        Types types = processingEnv.getTypeUtils();
+        Elements elements = processingEnv.getElementUtils();
+        Map<String, Integer> indices = new HashMap<>();
+        List<ProvidesModel> models = new ArrayList<>();
+        for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
+            if (element.getKind() != ElementKind.METHOD) {
+                continue;
+            }
+            ExecutableElement method = (ExecutableElement) element;
+            if (!(method.getEnclosingElement() instanceof TypeElement host)) {
+                continue;
+            }
+            String key = host.getQualifiedName().toString() + "#" + method.getSimpleName();
+            int index = indices.merge(key, 0, (existing, ignored) -> existing + 1);
+            models.add(providesModel(method, host, index, types, elements));
+        }
+        return models;
+    }
+
+    private ProvidesModel providesModel(
+            ExecutableElement method, TypeElement host, int index, Types types, Elements elements) {
+        String name = method.getSimpleName().toString();
+        return new ProvidesModel(
+                packageOf(host),
+                GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
+                TypeName.get(types.erasure(method.getReturnType())),
+                ClassName.get(host),
+                name,
+                method.getModifiers().contains(Modifier.STATIC),
+                parameters(method, types, elements),
+                Annotations.scope(method).orElse(null),
+                Annotations.qualifier(method, elements).orElse(null));
+    }
+
+    private List<TypeElement> providesDependencies(RoundEnvironment roundEnv, Types types) {
+        List<TypeElement> dependencies = new ArrayList<>();
+        for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
+            if (element.getKind() != ElementKind.METHOD) {
+                continue;
+            }
+            ExecutableElement method = (ExecutableElement) element;
+            if (!method.getModifiers().contains(Modifier.STATIC)
+                    && method.getEnclosingElement() instanceof TypeElement host) {
+                dependencies.add(host);
+            }
+            addParameterDependencies(method, types, dependencies);
+        }
+        return dependencies;
+    }
+
+    private void writeProvides(ProvidesModel model) {
+        try {
+            ProvidesFactoryGenerator.generate(model).writeTo(processingEnv.getFiler());
+        } catch (IOException e) {
+            processingEnv
+                    .getMessager()
+                    .printMessage(Diagnostic.Kind.ERROR, "Failed to write @Provides factory: " + e.getMessage());
+        }
     }
 
     private void planDefaultFactories(
             Map<TypeElement, BeanModel> toGenerate,
             Map<TypeElement, List<TypeElement>> edges,
-            RoundEnvironment roundEnv) {
+            RoundEnvironment roundEnv,
+            Collection<TypeElement> extraRoots) {
         Deque<TypeElement> queue = new ArrayDeque<>();
         edges.values().forEach(queue::addAll);
+        queue.addAll(extraRoots);
         Set<TypeElement> seen = new HashSet<>();
         while (!queue.isEmpty()) {
             TypeElement dependency = queue.poll();
