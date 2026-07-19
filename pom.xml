@@ -13,6 +13,7 @@
         <module>inject</module>
         <module>inject-processor</module>
         <module>inject-log</module>
+        <module>inject-examples</module>
     </modules>
 
     <properties>
@@ -94,7 +95,7 @@
                             <!-- Required by Error Prone only when the host JDK is 21; harmless on newer host JDKs. -->
                             <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
                             <arg>--should-stop=ifError=FLOW</arg>
-                            <arg>-Xplugin:ErrorProne -XepDisableWarningsInGeneratedCode -XepExcludedPaths:.*/target/generated-sources/.* -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=be.imgn.inject -Xep:InvalidInlineTag:OFF -Xep:InvalidLink:OFF -Xep:AnnotateFormatMethod:OFF -Xep:ImmutableEnumChecker:OFF</arg>
+                            <arg>-Xplugin:ErrorProne -XepDisableWarningsInGeneratedCode -XepExcludedPaths:.*/target/generated-sources/.* -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=be.imgn.inject -XepOpt:NullAway:ExcludedFieldAnnotations=be.imgn.inject.Inject,be.imgn.inject.log.Log -Xep:InvalidInlineTag:OFF -Xep:InvalidLink:OFF -Xep:AnnotateFormatMethod:OFF -Xep:ImmutableEnumChecker:OFF</arg>
                         </compilerArgs>
                         <annotationProcessorPaths>
                             <path>
