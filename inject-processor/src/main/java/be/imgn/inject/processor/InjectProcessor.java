@@ -222,7 +222,7 @@ public final class InjectProcessor extends AbstractProcessor {
                 ClassName.get(host),
                 name,
                 method.getModifiers().contains(Modifier.STATIC),
-                parameters(method, types, elements),
+                parameters(method, host, types, elements),
                 Annotations.scope(method).orElse(null),
                 Annotations.qualifier(method, elements).orElse(null));
     }
@@ -301,7 +301,7 @@ public final class InjectProcessor extends AbstractProcessor {
         Types types = processingEnv.getTypeUtils();
         Elements elements = processingEnv.getElementUtils();
         List<ParameterModel> constructorParameters = injectConstructor(bean)
-                .map(constructor -> parameters(constructor, types, elements))
+                .map(constructor -> parameters(constructor, bean, types, elements))
                 .orElse(List.of());
         List<FieldModel> fields = new ArrayList<>();
         List<MethodModel> methods = new ArrayList<>();
@@ -313,7 +313,8 @@ public final class InjectProcessor extends AbstractProcessor {
                 fields.add(field((VariableElement) enclosed, types, elements));
             } else if (enclosed.getKind() == ElementKind.METHOD) {
                 ExecutableElement method = (ExecutableElement) enclosed;
-                methods.add(new MethodModel(method.getSimpleName().toString(), parameters(method, types, elements)));
+                methods.add(
+                        new MethodModel(method.getSimpleName().toString(), parameters(method, bean, types, elements)));
             }
         }
         return new BeanModel(
@@ -373,7 +374,7 @@ public final class InjectProcessor extends AbstractProcessor {
     private Optional<CodeBlock> pluginInitializer(VariableElement field, TypeElement bean) {
         InjectionSite site = new InjectionSite(field, bean, field.asType(), processingEnv);
         for (InjectPlugin plugin : plugins) {
-            Optional<CodeBlock> initializer = plugin.fieldInitializer(site);
+            Optional<CodeBlock> initializer = plugin.initializer(site);
             if (initializer.isPresent()) {
                 return initializer;
             }
@@ -420,6 +421,9 @@ public final class InjectProcessor extends AbstractProcessor {
     private static void addParameterDependencies(
             ExecutableElement executable, Types types, List<TypeElement> result, boolean includeProviderTargets) {
         for (VariableElement parameter : executable.getParameters()) {
+            if (hasInjectingAnnotation(parameter)) {
+                continue; // plugin-supplied argument, not a context dependency
+            }
             dependencyElement(parameter.asType(), types, includeProviderTargets).ifPresent(result::add);
         }
     }
@@ -484,9 +488,23 @@ public final class InjectProcessor extends AbstractProcessor {
         return Optional.empty();
     }
 
-    private static List<ParameterModel> parameters(ExecutableElement executable, Types types, Elements elements) {
+    private List<ParameterModel> parameters(
+            ExecutableElement executable, TypeElement declaringType, Types types, Elements elements) {
         return executable.getParameters().stream()
                 .map(parameter -> {
+                    CodeBlock pluginArgument = null;
+                    if (hasInjectingAnnotation(parameter)) {
+                        Optional<CodeBlock> supplied = pluginInitializer(parameter, declaringType);
+                        if (supplied.isEmpty()) {
+                            error(
+                                    "No plugin handles the injecting annotation on parameter "
+                                            + parameter.getSimpleName() + " of " + declaringType.getQualifiedName()
+                                            + ".",
+                                    parameter);
+                        } else {
+                            pluginArgument = supplied.get();
+                        }
+                    }
                     Dependency dependency = dependency(parameter.asType(), types);
                     CodeBlock qualifier =
                             Annotations.qualifier(parameter, elements).orElse(null);
@@ -494,7 +512,8 @@ public final class InjectProcessor extends AbstractProcessor {
                             parameter.getSimpleName().toString(),
                             dependency.rawType(),
                             qualifier,
-                            dependency.isProvider());
+                            dependency.isProvider(),
+                            pluginArgument);
                 })
                 .toList();
     }

@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /** Built-in string qualifier. */
 @QualifyingAnnotation
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
+@Target({ElementType.TYPE, ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
 public @interface Named {
     /** {@return the qualifier name} */
     String value();

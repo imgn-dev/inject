@@ -10,5 +10,5 @@ import be.imgn.inject.InjectingAnnotation;
 /** Test injecting annotation handled by {@link RecordingPlugin}. */
 @InjectingAnnotation
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.PARAMETER})
 public @interface Marker {}

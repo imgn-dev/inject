@@ -13,7 +13,7 @@ public final class RecordingPlugin implements InjectPlugin {
     public RecordingPlugin() {}
 
     @Override
-    public Optional<CodeBlock> fieldInitializer(InjectionSite site) {
+    public Optional<CodeBlock> initializer(InjectionSite site) {
         if (site.element().getAnnotation(Marker.class) != null) {
             return Optional.of(CodeBlock.of("$S", "marked"));
         }

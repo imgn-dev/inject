@@ -18,7 +18,7 @@ public final class LogPlugin implements InjectPlugin {
     public LogPlugin() {}
 
     @Override
-    public Optional<CodeBlock> fieldInitializer(InjectionSite site) {
+    public Optional<CodeBlock> initializer(InjectionSite site) {
         if (site.element().getAnnotation(Log.class) == null) {
             return Optional.empty();
         }

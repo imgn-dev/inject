@@ -80,8 +80,7 @@ final class BeanFactoryGenerator {
 
     private static MethodSpec createInstance(BeanModel model) {
         CodeBlock arguments = IntStream.range(0, model.constructorParameters().size())
-                .mapToObj(index ->
-                        resolve(model.constructorParameters().get(index).isProvider(), "Constructor", index))
+                .mapToObj(index -> argument(model.constructorParameters().get(index), "Constructor", index))
                 .collect(CodeBlock.joining(", "));
         return MethodSpec.methodBuilder("createInstance")
                 .addAnnotation(Override.class)
@@ -149,8 +148,8 @@ final class BeanFactoryGenerator {
             int methodIndex = index;
             MethodModel method = model.methods().get(index);
             CodeBlock arguments = IntStream.range(0, method.parameters().size())
-                    .mapToObj(paramIndex ->
-                            resolveMethod(method.parameters().get(paramIndex).isProvider(), methodIndex, paramIndex))
+                    .mapToObj(
+                            paramIndex -> methodArgument(method.parameters().get(paramIndex), methodIndex, paramIndex))
                     .collect(CodeBlock.joining(", "));
             builder.addStatement("instance.$L($L)", method.name(), arguments);
         }
@@ -177,6 +176,18 @@ final class BeanFactoryGenerator {
                 .returns(returnType)
                 .addStatement("return $T.of($T.of($T.class, $L))", LIST, KEY, model.beanType(), beanQualifier)
                 .build();
+    }
+
+    private static CodeBlock argument(ParameterModel parameter, String kind, int index) {
+        CodeBlock pluginInitializer = parameter.pluginInitializer();
+        return pluginInitializer != null ? pluginInitializer : resolve(parameter.isProvider(), kind, index);
+    }
+
+    private static CodeBlock methodArgument(ParameterModel parameter, int methodIndex, int paramIndex) {
+        CodeBlock pluginInitializer = parameter.pluginInitializer();
+        return pluginInitializer != null
+                ? pluginInitializer
+                : resolveMethod(parameter.isProvider(), methodIndex, paramIndex);
     }
 
     private static CodeBlock resolve(boolean isProvider, String kind, int index) {

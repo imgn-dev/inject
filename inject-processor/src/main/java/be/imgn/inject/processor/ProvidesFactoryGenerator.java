@@ -79,7 +79,7 @@ final class ProvidesFactoryGenerator {
     private static MethodSpec createInstance(ProvidesModel model) {
         int offset = model.isStatic() ? 0 : 1;
         CodeBlock arguments = IntStream.range(0, model.methodParameters().size())
-                .mapToObj(index -> resolve(model.methodParameters().get(index).isProvider(), index + offset))
+                .mapToObj(index -> argument(model.methodParameters().get(index), index + offset))
                 .collect(CodeBlock.joining(", "));
         MethodSpec.Builder builder = MethodSpec.methodBuilder("createInstance")
                 .addAnnotation(Override.class)
@@ -115,6 +115,11 @@ final class ProvidesFactoryGenerator {
                 .returns(returnType)
                 .addStatement("return $T.of($T.of($T.class, $L))", LIST, KEY, model.producedType(), qualifier)
                 .build();
+    }
+
+    private static CodeBlock argument(ParameterModel parameter, int index) {
+        CodeBlock pluginInitializer = parameter.pluginInitializer();
+        return pluginInitializer != null ? pluginInitializer : resolve(parameter.isProvider(), index);
     }
 
     private static CodeBlock resolve(boolean isProvider, int index) {

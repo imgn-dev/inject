@@ -41,6 +41,57 @@ class PluginSpiTest {
     }
 
     @Test
+    void pluginInitializesConstructorParameter() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Tagged", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.processor.Marker;
+
+                public class Tagged {
+                    @Inject
+                    public Tagged(@Marker String tag) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Tagged$$Factory")
+                .contentsAsUtf8String();
+        source.contains("return new Tagged(\"marked\")");
+        source.doesNotContain("getInstanceForConstructor");
+    }
+
+    @Test
+    void pluginInitializesMethodParameter() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Tagged", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.processor.Marker;
+
+                public class Tagged {
+                    @Inject
+                    public Tagged() {}
+
+                    @Inject
+                    void configure(@Marker String tag) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Tagged$$Factory")
+                .contentsAsUtf8String();
+        source.contains("instance.configure(\"marked\")");
+        source.doesNotContain("getInstanceForMethod");
+    }
+
+    @Test
     void rejectsPrivateInjectingAnnotationField() {
         JavaFileObject bean = JavaFileObjects.forSourceString("example.Tagged", """
                 package example;

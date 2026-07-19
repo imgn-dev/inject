@@ -10,5 +10,5 @@ import be.imgn.inject.InjectingAnnotation;
 /** Marks a {@link java.util.logging.Logger} field to be injected with a logger named after its declaring type. */
 @InjectingAnnotation
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.PARAMETER})
 public @interface Log {}

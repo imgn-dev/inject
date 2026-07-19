@@ -26,6 +26,9 @@ class ExamplesClasspathTest {
                     assertThat(resolved.registry()).isNotNull();
                     assertThat(resolved.logger()).isNotNull();
                     assertThat(resolved.logger().getName()).isEqualTo(GreetingService.class.getName());
+                    // @Log injected through Registry's constructor, named after Registry
+                    assertThat(resolved.registry().logger()).isNotNull();
+                    assertThat(resolved.registry().logger().getName()).isEqualTo(Registry.class.getName());
                 });
     }
 
