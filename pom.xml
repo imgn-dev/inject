@@ -12,6 +12,7 @@
     <modules>
         <module>inject</module>
         <module>inject-processor</module>
+        <module>inject-log</module>
     </modules>
 
     <properties>
