@@ -19,7 +19,8 @@ import org.jspecify.annotations.Nullable;
  * @param isStatic whether the method is static
  * @param methodParameters the method's parameters, in order
  * @param scopeAnnotation the method's scoping annotation type, or {@code null} for prototype scope
- * @param qualifier a {@code new Qualifier(...)} expression for the produced key, or {@code null} if unqualified
+ * @param qualifier a {@code new Qualifier(...)} expression applied to every exposed key, or {@code null}
+ * @param exposedTypes the types the result is exposed as; empty means "use the factory's default single key"
  */
 record ProvidesModel(
         String packageName,
@@ -30,4 +31,5 @@ record ProvidesModel(
         boolean isStatic,
         List<ParameterModel> methodParameters,
         @Nullable ClassName scopeAnnotation,
-        @Nullable CodeBlock qualifier) {}
+        @Nullable CodeBlock qualifier,
+        List<TypeName> exposedTypes) {}

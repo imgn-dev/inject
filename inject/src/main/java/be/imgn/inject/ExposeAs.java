@@ -11,8 +11,11 @@ import java.lang.annotation.Target;
  * remains injectable unless listed. Any qualifier on the bean applies to every exposed key.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface ExposeAs {
-    /** {@return the types the bean is exposed as; must be non-empty and each a supertype of the bean} */
+    /**
+     * {@return the types the bean (or {@code @Provides} result) is exposed as; must be non-empty and each a supertype
+     * of the produced type}
+     */
     Class<?>[] value();
 }

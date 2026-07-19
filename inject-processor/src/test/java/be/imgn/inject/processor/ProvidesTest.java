@@ -123,6 +123,70 @@ class ProvidesTest {
     }
 
     @Test
+    void exposeAsNarrowsTheProvidesResult() {
+        JavaFileObject engine =
+                JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
+        JavaFileObject v8 = JavaFileObjects.forSourceString(
+                "example.V8Engine", "package example;\n\npublic class V8Engine implements Engine {}\n");
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.ExposeAs;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    @ExposeAs(Engine.class)
+                    public static V8Engine engine() {
+                        return new V8Engine();
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Config$engine$$Factory")
+                .contentsAsUtf8String();
+        source.contains("Key.of(Engine.class)");
+        source.doesNotContain("Key.of(V8Engine.class)");
+    }
+
+    @Test
+    void exposeAsOnProvidesAppliesTheMethodQualifier() {
+        JavaFileObject engine =
+                JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
+        JavaFileObject v8 = JavaFileObjects.forSourceString(
+                "example.V8Engine", "package example;\n\npublic class V8Engine implements Engine {}\n");
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.ExposeAs;
+                import be.imgn.inject.Named;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    @Named("fast")
+                    @ExposeAs(Engine.class)
+                    public static V8Engine engine() {
+                        return new V8Engine();
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Config$engine$$Factory")
+                .contentsAsUtf8String();
+        source.contains("Key.of(Engine.class,");
+        source.contains("Map.of(\"value\", \"fast\")");
+    }
+
+    @Test
     void disambiguatesOverloadedProvidesMethods() {
         JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
                 package example;

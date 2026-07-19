@@ -104,6 +104,12 @@ public final class InjectProcessor extends AbstractProcessor {
             }
         }
 
+        for (Element element : roundEnv.getElementsAnnotatedWith(ExposeAs.class)) {
+            if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
+                error("@ExposeAs on a method is only allowed together with @Provides.", element);
+            }
+        }
+
         Map<TypeElement, BeanModel> toGenerate = new LinkedHashMap<>();
         Map<TypeElement, List<TypeElement>> edges = new LinkedHashMap<>();
         List<TypeElement> seeds = new ArrayList<>();
@@ -217,6 +223,7 @@ public final class InjectProcessor extends AbstractProcessor {
     private ProvidesModel providesModel(
             ExecutableElement method, TypeElement host, int index, Types types, Elements elements) {
         String name = method.getSimpleName().toString();
+        CodeBlock qualifier = Annotations.qualifier(method, elements).orElse(null);
         return new ProvidesModel(
                 packageOf(host),
                 GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
@@ -226,7 +233,36 @@ public final class InjectProcessor extends AbstractProcessor {
                 method.getModifiers().contains(Modifier.STATIC),
                 parameters(method, host, types, elements),
                 Annotations.scope(method).orElse(null),
-                Annotations.qualifier(method, elements).orElse(null));
+                qualifier,
+                exposedTypesForProvides(method, method.getReturnType(), qualifier != null));
+    }
+
+    private List<TypeName> exposedTypesForProvides(
+            ExecutableElement method, TypeMirror producedType, boolean qualified) {
+        Types types = processingEnv.getTypeUtils();
+        List<? extends TypeMirror> declared = exposeAsMirrors(method);
+        if (declared != null) {
+            if (declared.isEmpty()) {
+                error("@ExposeAs on " + method.getSimpleName() + " must specify at least one type.", method);
+                return List.of();
+            }
+            List<TypeName> result = new ArrayList<>();
+            for (TypeMirror exposed : declared) {
+                if (types.isAssignable(producedType, exposed)) {
+                    result.add(TypeName.get(types.erasure(exposed)));
+                } else {
+                    error(
+                            "Cannot expose the result of " + method.getSimpleName() + " as unrelated type " + exposed
+                                    + "; it is not a supertype of the produced type.",
+                            method);
+                }
+            }
+            return result;
+        }
+        if (qualified) {
+            return List.of(TypeName.get(types.erasure(producedType)));
+        }
+        return List.of();
     }
 
     private List<TypeElement> providesDependencies(RoundEnvironment roundEnv, Types types) {
@@ -377,8 +413,8 @@ public final class InjectProcessor extends AbstractProcessor {
         return hierarchy.stream().map(type -> (TypeName) ClassName.get(type)).toList();
     }
 
-    private static @Nullable List<? extends TypeMirror> exposeAsMirrors(TypeElement bean) {
-        ExposeAs exposeAs = bean.getAnnotation(ExposeAs.class);
+    private static @Nullable List<? extends TypeMirror> exposeAsMirrors(Element element) {
+        ExposeAs exposeAs = element.getAnnotation(ExposeAs.class);
         if (exposeAs == null) {
             return null;
         }

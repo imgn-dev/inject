@@ -179,6 +179,25 @@ class ExposeAsTest {
     }
 
     @Test
+    void exposeAsOnMethodWithoutProvidesFails() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+                package example;
+
+                import be.imgn.inject.ExposeAs;
+
+                public class Bad {
+                    @ExposeAs(Object.class)
+                    public void notProvides() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("@ExposeAs on a method is only allowed together with @Provides");
+    }
+
+    @Test
     void qualifierAppliesToEveryExposedKey() {
         JavaFileObject audit = JavaFileObjects.forSourceString(
                 "example.RepositoryAuditable", "package example;\n\npublic interface RepositoryAuditable {}\n");

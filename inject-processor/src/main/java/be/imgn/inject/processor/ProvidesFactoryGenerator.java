@@ -41,8 +41,8 @@ final class ProvidesFactoryGenerator {
         if (model.scopeAnnotation() != null) {
             type.addMethod(scope(model.scopeAnnotation()));
         }
-        if (model.qualifier() != null) {
-            type.addMethod(exposedKeys(model, model.qualifier()));
+        if (!model.exposedTypes().isEmpty()) {
+            type.addMethod(exposedKeys(model));
         }
         return JavaFile.builder(model.packageName(), type.build()).build();
     }
@@ -106,14 +106,20 @@ final class ProvidesFactoryGenerator {
                 .build();
     }
 
-    private static MethodSpec exposedKeys(ProvidesModel model, CodeBlock qualifier) {
+    private static MethodSpec exposedKeys(ProvidesModel model) {
+        CodeBlock qualifier = model.qualifier();
+        CodeBlock keys = model.exposedTypes().stream()
+                .map(type -> qualifier == null
+                        ? CodeBlock.of("$T.of($T.class)", KEY, type)
+                        : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier))
+                .collect(CodeBlock.joining(", "));
         TypeName returnType = ParameterizedTypeName.get(
                 LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
         return MethodSpec.methodBuilder("exposedKeys")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
-                .addStatement("return $T.of($T.of($T.class, $L))", LIST, KEY, model.producedType(), qualifier)
+                .addStatement("return $T.of($L)", LIST, keys)
                 .build();
     }
 
