@@ -21,6 +21,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -42,13 +43,12 @@ import com.palantir.javapoet.TypeName;
 import org.jspecify.annotations.Nullable;
 
 import be.imgn.inject.Inject;
+import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Provider;
 import be.imgn.inject.Provides;
 import be.imgn.inject.context.Factory;
-import be.imgn.inject.processor.spi.GatherContext;
-import be.imgn.inject.processor.spi.GenerateContext;
 import be.imgn.inject.processor.spi.InjectPlugin;
-import be.imgn.inject.processor.spi.PlanContext;
+import be.imgn.inject.processor.spi.InjectionSite;
 
 /**
  * Annotation processor that generates one zero-reflection {@code Factory} subclass per injectable class. Handles
@@ -90,6 +90,17 @@ public final class InjectProcessor extends AbstractProcessor {
                 beanTypes.add(bean);
             }
         }
+        for (TypeElement annotation : annotations) {
+            if (annotation.getAnnotation(InjectingAnnotation.class) == null) {
+                continue;
+            }
+            for (Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
+                if (element.getKind() == ElementKind.FIELD
+                        && element.getEnclosingElement() instanceof TypeElement bean) {
+                    beanTypes.add(bean);
+                }
+            }
+        }
 
         Map<TypeElement, BeanModel> toGenerate = new LinkedHashMap<>();
         Map<TypeElement, List<TypeElement>> edges = new LinkedHashMap<>();
@@ -104,8 +115,6 @@ public final class InjectProcessor extends AbstractProcessor {
             edges.put(bean, collectDependencies(bean, types, false));
             seeds.addAll(collectDependencies(bean, types, true));
         }
-
-        plugins.forEach(plugin -> plugin.onGather(new GatherContext(processingEnv, roundEnv)));
 
         List<ProvidesModel> providesModels = gatherProvides(roundEnv);
         seeds.addAll(providesDependencies(roundEnv, types));
@@ -125,9 +134,6 @@ public final class InjectProcessor extends AbstractProcessor {
         // Duplicate bindings that arise WITHIN one compilation fall through to the runtime
         // DuplicateBindingException. Cross-module duplicates are undetectable at compile time under the
         // ServiceLoader architecture, so runtime detection is the single, consistent safety net.
-        plugins.forEach(plugin -> plugin.onPlan(new PlanContext(processingEnv, roundEnv)));
-        plugins.forEach(plugin -> plugin.onGenerate(new GenerateContext(processingEnv, roundEnv)));
-
         List<String> factoryNames = new ArrayList<>();
         for (BeanModel model : toGenerate.values()) {
             write(model);
@@ -317,6 +323,7 @@ public final class InjectProcessor extends AbstractProcessor {
                 constructorParameters,
                 List.copyOf(fields),
                 List.copyOf(methods),
+                pluginFields(bean),
                 Annotations.scope(bean).orElse(null),
                 Annotations.qualifier(bean, elements).orElse(null));
     }
@@ -329,8 +336,50 @@ public final class InjectProcessor extends AbstractProcessor {
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of(),
                 Annotations.scope(type).orElse(null),
                 Annotations.qualifier(type, processingEnv.getElementUtils()).orElse(null));
+    }
+
+    private List<PluginField> pluginFields(TypeElement bean) {
+        List<PluginField> result = new ArrayList<>();
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.FIELD || !hasInjectingAnnotation(enclosed)) {
+                continue;
+            }
+            VariableElement field = (VariableElement) enclosed;
+            Optional<CodeBlock> initializer = pluginInitializer(field, bean);
+            if (initializer.isEmpty()) {
+                error(
+                        "No plugin handles the injecting annotation on field " + field.getSimpleName() + " in "
+                                + bean.getQualifiedName() + ".",
+                        field);
+                continue;
+            }
+            result.add(new PluginField(field.getSimpleName().toString(), initializer.get()));
+        }
+        return List.copyOf(result);
+    }
+
+    private Optional<CodeBlock> pluginInitializer(VariableElement field, TypeElement bean) {
+        InjectionSite site = new InjectionSite(field, bean, field.asType(), processingEnv);
+        for (InjectPlugin plugin : plugins) {
+            Optional<CodeBlock> initializer = plugin.fieldInitializer(site);
+            if (initializer.isPresent()) {
+                return initializer;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static boolean hasInjectingAnnotation(Element element) {
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            if (((TypeElement) mirror.getAnnotationType().asElement()).getAnnotation(InjectingAnnotation.class)
+                    != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String packageOf(TypeElement type) {

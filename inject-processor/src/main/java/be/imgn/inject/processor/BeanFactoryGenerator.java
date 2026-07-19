@@ -40,7 +40,10 @@ final class BeanFactoryGenerator {
                 .addMethod(constructorInjectionPoint(model))
                 .addMethod(createInstance(model));
         if (!model.fields().isEmpty()) {
-            type.addMethod(fieldInjectionPoints(model)).addMethod(injectFields(model));
+            type.addMethod(fieldInjectionPoints(model));
+        }
+        if (!model.fields().isEmpty() || !model.pluginFields().isEmpty()) {
+            type.addMethod(injectFields(model));
         }
         if (!model.methods().isEmpty()) {
             type.addMethod(methodInjectionPoints(model)).addMethod(injectMethods(model));
@@ -110,6 +113,9 @@ final class BeanFactoryGenerator {
         for (int index = 0; index < model.fields().size(); index++) {
             FieldModel field = model.fields().get(index);
             builder.addStatement("instance.$L = $L", field.name(), resolve(field.isProvider(), "Field", index));
+        }
+        for (PluginField pluginField : model.pluginFields()) {
+            builder.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
         }
         return builder.build();
     }

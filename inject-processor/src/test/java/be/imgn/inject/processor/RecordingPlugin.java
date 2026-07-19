@@ -1,32 +1,22 @@
 package be.imgn.inject.processor;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
-import be.imgn.inject.processor.spi.GatherContext;
-import be.imgn.inject.processor.spi.GenerateContext;
+import com.palantir.javapoet.CodeBlock;
+
 import be.imgn.inject.processor.spi.InjectPlugin;
-import be.imgn.inject.processor.spi.PlanContext;
+import be.imgn.inject.processor.spi.InjectionSite;
 
-/** Test plugin that records which pipeline stages were invoked. */
+/** Test plugin that supplies a constant initializer for {@link Marker}-annotated fields. */
 public final class RecordingPlugin implements InjectPlugin {
-
-    static final Set<String> STAGES = ConcurrentHashMap.newKeySet();
 
     public RecordingPlugin() {}
 
     @Override
-    public void onGather(GatherContext context) {
-        STAGES.add("gather");
-    }
-
-    @Override
-    public void onPlan(PlanContext context) {
-        STAGES.add("plan");
-    }
-
-    @Override
-    public void onGenerate(GenerateContext context) {
-        STAGES.add("generate");
+    public Optional<CodeBlock> fieldInitializer(InjectionSite site) {
+        if (site.element().getAnnotation(Marker.class) != null) {
+            return Optional.of(CodeBlock.of("$S", "marked"));
+        }
+        return Optional.empty();
     }
 }

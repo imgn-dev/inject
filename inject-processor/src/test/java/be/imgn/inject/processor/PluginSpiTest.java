@@ -1,12 +1,12 @@
 package be.imgn.inject.processor;
 
+import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
-import static org.assertj.core.api.Assertions.assertThat;
 
 import javax.tools.JavaFileObject;
 
+import com.google.common.truth.StringSubject;
 import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
 import com.google.testing.compile.JavaFileObjects;
 
 import org.junit.jupiter.api.Test;
@@ -14,22 +14,29 @@ import org.junit.jupiter.api.Test;
 class PluginSpiTest {
 
     @Test
-    void invokesRegisteredPluginHooksAtEachStage() {
-        RecordingPlugin.STAGES.clear();
-        JavaFileObject widget = JavaFileObjects.forSourceString("example.Widget", """
+    void pluginInitializesInjectingAnnotationField() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Tagged", """
                 package example;
 
                 import be.imgn.inject.Inject;
+                import be.imgn.inject.processor.Marker;
 
-                public class Widget {
+                public class Tagged {
+                    @Marker
+                    String tag;
+
                     @Inject
-                    public Widget() {}
+                    public Tagged() {}
                 }
                 """);
 
-        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(widget);
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
-        CompilationSubject.assertThat(compilation).succeeded();
-        assertThat(RecordingPlugin.STAGES).contains("gather", "plan", "generate");
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Tagged$$Factory")
+                .contentsAsUtf8String();
+        source.contains("instance.tag = \"marked\"");
+        source.doesNotContain("fieldInjectionPoints");
     }
 }
