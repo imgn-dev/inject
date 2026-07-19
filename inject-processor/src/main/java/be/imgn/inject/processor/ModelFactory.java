@@ -1,9 +1,11 @@
 package be.imgn.inject.processor;
 
+import java.io.Closeable;
 import java.io.Serializable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EventListener;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -44,10 +46,18 @@ final class ModelFactory {
 
     private static final String PROVIDER = Provider.class.getCanonicalName();
 
-    // Types never exposed by the default (no-@ExposeAs) supertype closure: universal supertypes that would collide
-    // across unrelated beans. @ExposeAs can still expose these explicitly.
-    private static final Set<String> EXCLUDED_DEFAULT_EXPOSURES =
-            Set.of(Object.class.getName(), Serializable.class.getName());
+    // Types never exposed by the default (no-@ExposeAs) supertype closure: universal supertypes and common marker
+    // interfaces that would collide across unrelated beans. @ExposeAs can still expose these explicitly.
+    private static final Set<String> EXCLUDED_DEFAULT_EXPOSURES = Set.of(
+            Object.class.getName(),
+            Serializable.class.getName(),
+            Cloneable.class.getName(),
+            Comparable.class.getName(),
+            Runnable.class.getName(),
+            AutoCloseable.class.getName(),
+            Closeable.class.getName(),
+            Iterable.class.getName(),
+            EventListener.class.getName());
 
     private final ProcessingEnvironment environment;
     private final List<InjectPlugin> plugins;
