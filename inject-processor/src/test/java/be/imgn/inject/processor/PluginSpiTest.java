@@ -39,4 +39,50 @@ class PluginSpiTest {
         source.contains("instance.tag = \"marked\"");
         source.doesNotContain("fieldInjectionPoints");
     }
+
+    @Test
+    void rejectsPrivateInjectingAnnotationField() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Tagged", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.processor.Marker;
+
+                public class Tagged {
+                    @Marker
+                    private String tag;
+
+                    @Inject
+                    public Tagged() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("must not be private, static, or final");
+    }
+
+    @Test
+    void errorsWhenNoPluginHandlesInjectingAnnotation() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orphan", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.processor.Unhandled;
+
+                public class Orphan {
+                    @Unhandled
+                    String value;
+
+                    @Inject
+                    public Orphan() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("No plugin handles");
+    }
 }

@@ -348,6 +348,15 @@ public final class InjectProcessor extends AbstractProcessor {
                 continue;
             }
             VariableElement field = (VariableElement) enclosed;
+            if (field.getModifiers().contains(Modifier.PRIVATE)
+                    || field.getModifiers().contains(Modifier.STATIC)
+                    || field.getModifiers().contains(Modifier.FINAL)) {
+                error(
+                        "Field " + field.getSimpleName() + " in " + bean.getQualifiedName()
+                                + " annotated with an injecting annotation must not be private, static, or final.",
+                        field);
+                continue;
+            }
             Optional<CodeBlock> initializer = pluginInitializer(field, bean);
             if (initializer.isEmpty()) {
                 error(
