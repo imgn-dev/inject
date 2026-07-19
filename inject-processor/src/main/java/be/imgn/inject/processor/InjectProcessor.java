@@ -29,6 +29,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -42,6 +43,7 @@ import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
 
+import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Provider;
@@ -317,6 +319,7 @@ public final class InjectProcessor extends AbstractProcessor {
                         new MethodModel(method.getSimpleName().toString(), parameters(method, bean, types, elements)));
             }
         }
+        CodeBlock beanQualifier = Annotations.qualifier(bean, elements).orElse(null);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
@@ -326,10 +329,13 @@ public final class InjectProcessor extends AbstractProcessor {
                 List.copyOf(methods),
                 pluginFields(bean),
                 Annotations.scope(bean).orElse(null),
-                Annotations.qualifier(bean, elements).orElse(null));
+                beanQualifier,
+                exposedTypes(bean, beanQualifier != null));
     }
 
     private BeanModel defaultModel(TypeElement type) {
+        CodeBlock beanQualifier =
+                Annotations.qualifier(type, processingEnv.getElementUtils()).orElse(null);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
@@ -339,7 +345,67 @@ public final class InjectProcessor extends AbstractProcessor {
                 List.of(),
                 List.of(),
                 Annotations.scope(type).orElse(null),
-                Annotations.qualifier(type, processingEnv.getElementUtils()).orElse(null));
+                beanQualifier,
+                exposedTypes(type, beanQualifier != null));
+    }
+
+    private List<TypeName> exposedTypes(TypeElement bean, boolean qualified) {
+        Types types = processingEnv.getTypeUtils();
+        List<? extends TypeMirror> declared = exposeAsMirrors(bean);
+        if (declared != null) {
+            if (declared.isEmpty()) {
+                error(bean.getQualifiedName() + " @ExposeAs must specify at least one type.", bean);
+                return List.of();
+            }
+            List<TypeName> result = new ArrayList<>();
+            for (TypeMirror exposed : declared) {
+                if (types.isAssignable(bean.asType(), exposed)) {
+                    result.add(TypeName.get(types.erasure(exposed)));
+                } else {
+                    error(
+                            "Cannot expose " + bean.getQualifiedName() + " as unrelated type " + exposed
+                                    + "; it is not a supertype of the bean.",
+                            bean);
+                }
+            }
+            return result;
+        }
+        List<TypeElement> hierarchy = supertypeClosure(bean, types);
+        if (hierarchy.size() == 1 && !qualified) {
+            return List.of(); // just the bean type, unqualified: the factory's default key already covers it
+        }
+        return hierarchy.stream().map(type -> (TypeName) ClassName.get(type)).toList();
+    }
+
+    private static @Nullable List<? extends TypeMirror> exposeAsMirrors(TypeElement bean) {
+        ExposeAs exposeAs = bean.getAnnotation(ExposeAs.class);
+        if (exposeAs == null) {
+            return null;
+        }
+        try {
+            exposeAs.value();
+            return List.of();
+        } catch (MirroredTypesException mirrors) {
+            return mirrors.getTypeMirrors();
+        }
+    }
+
+    private static List<TypeElement> supertypeClosure(TypeElement bean, Types types) {
+        LinkedHashSet<TypeElement> collected = new LinkedHashSet<>();
+        Deque<TypeMirror> queue = new ArrayDeque<>();
+        queue.add(bean.asType());
+        while (!queue.isEmpty()) {
+            TypeMirror current = queue.poll();
+            if (current instanceof DeclaredType declared && declared.asElement() instanceof TypeElement typeElement) {
+                if (typeElement.getQualifiedName().contentEquals(Object.class.getName())) {
+                    continue;
+                }
+                if (collected.add(typeElement)) {
+                    queue.addAll(types.directSupertypes(current));
+                }
+            }
+        }
+        return List.copyOf(collected);
     }
 
     private List<PluginField> pluginFields(TypeElement bean) {

@@ -8,7 +8,7 @@ import be.imgn.inject.log.Log;
 
 /** A singleton-scoped collaborator whose logger is injected through the constructor by the {@code @Log} plugin. */
 @Singleton
-public final class Registry {
+public final class Registry implements Audited {
 
     private final Logger logger;
 

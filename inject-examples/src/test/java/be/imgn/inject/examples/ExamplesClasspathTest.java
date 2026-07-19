@@ -1,6 +1,7 @@
 package be.imgn.inject.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Named;
 import be.imgn.inject.Qualifier;
+import be.imgn.inject.UnsatisfiedDependencyException;
 
 class ExamplesClasspathTest {
 
@@ -43,5 +45,25 @@ class ExamplesClasspathTest {
         Injector injector = Injector.create();
         Qualifier greeting = new Qualifier(Named.class, Map.of("value", "greeting"));
         assertThat(injector.getInstance(Key.of(String.class, greeting))).isEqualTo("Hello");
+    }
+
+    @Test
+    void exposeAsMakesBeanInjectableOnlyAsListedType() {
+        Injector injector = Injector.create();
+
+        Engine engine = injector.getInstance(Engine.class);
+        assertThat(engine).isNotNull().isInstanceOf(V8Engine.class);
+        assertThat(injector.getInstance(Engine.class)).isSameAs(engine); // singleton
+        assertThatExceptionOfType(UnsatisfiedDependencyException.class)
+                .isThrownBy(() -> injector.getInstance(V8Engine.class));
+    }
+
+    @Test
+    void defaultExposesBeanUnderAllOfItsTypes() {
+        Injector injector = Injector.create();
+
+        // Registry has no @ExposeAs, so it is injectable as both its own type and its Audited supertype,
+        // resolving to the same singleton.
+        assertThat(injector.getInstance(Audited.class)).isNotNull().isSameAs(injector.getInstance(Registry.class));
     }
 }
