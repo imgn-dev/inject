@@ -42,6 +42,35 @@ class ExposeAsTest {
     }
 
     @Test
+    void defaultExposureExcludesSerializable() {
+        JavaFileObject base = JavaFileObjects.forSourceString("example.Y", "package example;\n\npublic class Y {}\n");
+        JavaFileObject iface =
+                JavaFileObjects.forSourceString("example.Z", "package example;\n\npublic interface Z {}\n");
+        JavaFileObject x = JavaFileObjects.forSourceString("example.X", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import java.io.Serializable;
+
+                public class X extends Y implements Z, Serializable {
+                    @Inject
+                    public X() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(base, iface, x);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$X$$Factory")
+                .contentsAsUtf8String();
+        source.contains("Key.of(X.class)");
+        source.contains("Key.of(Y.class)");
+        source.contains("Key.of(Z.class)");
+        source.doesNotContain("Serializable");
+    }
+
+    @Test
     void exposeAsNarrowsToExactlyTheListedType() {
         JavaFileObject engine =
                 JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
