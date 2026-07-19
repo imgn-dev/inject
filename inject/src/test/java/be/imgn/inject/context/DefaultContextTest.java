@@ -54,6 +54,16 @@ class DefaultContextTest {
     }
 
     @Test
+    void missingTransitiveDependencyReportsRequesterChain() {
+        Context context = new DefaultContext(List.of(new RootFactory()), List.of(new SingletonScope()));
+        assertThatExceptionOfType(UnsatisfiedDependencyException.class)
+                .isThrownBy(() ->
+                        context.getProvider(Key.of(RootFactory.Root.class)).get())
+                .withMessageContaining("No binding for " + Key.of(String.class))
+                .withMessageContaining("required by " + Key.of(RootFactory.Root.class));
+    }
+
+    @Test
     @SuppressWarnings("NullAway")
     void getProviderRejectsNullKey() {
         Context context = new DefaultContext(List.of(new LeafFactory()), List.of());

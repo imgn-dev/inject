@@ -87,9 +87,19 @@ final class DefaultContext implements Context {
         Objects.requireNonNull(key, "key");
         Provider<?> provider = registry.get(key);
         if (provider == null) {
-            throw new UnsatisfiedDependencyException("No binding for " + key);
+            throw new UnsatisfiedDependencyException("No binding for " + key + requiredBySuffix());
         }
         return (Provider<T>) provider;
+    }
+
+    private String requiredBySuffix() {
+        Deque<Key<?>> current = stack.get();
+        if (current.isEmpty()) {
+            return "";
+        }
+        StringJoiner path = new StringJoiner(" -> ");
+        current.descendingIterator().forEachRemaining(entered -> path.add(entered.toString()));
+        return " (required by " + path + ")";
     }
 
     void enter(Key<?> key) {
