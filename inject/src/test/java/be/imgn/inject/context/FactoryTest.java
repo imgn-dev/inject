@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -37,9 +38,9 @@ class FactoryTest {
         }
 
         @Override
-        protected ConstructorInjectionPoint constructorInjectionPoint() {
-            return new ConstructorInjectionPoint(
-                    this, List.of(new Parameter("message", String.class)), AnnotationMetadata.empty());
+        protected Optional<ConstructorInjectionPoint> constructorInjectionPoint() {
+            return Optional.of(new ConstructorInjectionPoint(
+                    this, List.of(new Parameter("message", String.class)), AnnotationMetadata.empty()));
         }
 
         @Override

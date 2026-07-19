@@ -65,9 +65,9 @@ public abstract class Factory<T> {
      */
     protected void injectFields(T instance, Context context) {}
 
-    /** {@return the constructor injection point; no-arg by default} */
-    protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return new ConstructorInjectionPoint(this, List.of(), AnnotationMetadata.empty());
+    /** {@return the constructor injection point, or empty when the constructor takes no injected arguments} */
+    protected Optional<ConstructorInjectionPoint> constructorInjectionPoint() {
+        return Optional.empty();
     }
 
     /** {@return the method injection points; none by default} */
@@ -99,7 +99,8 @@ public abstract class Factory<T> {
      */
     protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Context context) {
         Objects.requireNonNull(context, "context");
-        ConstructorInjectionPoint point = constructorInjectionPoint();
+        ConstructorInjectionPoint point = constructorInjectionPoint()
+                .orElseThrow(() -> new IllegalStateException("No constructor injection point for " + type().getName()));
         checkIndex(paramIndex, point.parameters().size(), "constructor");
         return providerFor(point.<D>keyForParameter(paramIndex), context);
     }

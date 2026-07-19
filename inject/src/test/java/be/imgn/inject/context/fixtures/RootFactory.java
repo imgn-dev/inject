@@ -21,9 +21,9 @@ public final class RootFactory extends Factory<RootFactory.Root> {
     }
 
     @Override
-    protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return new ConstructorInjectionPoint(
-                this, List.of(new Parameter("leaf", String.class)), AnnotationMetadata.empty());
+    protected Optional<ConstructorInjectionPoint> constructorInjectionPoint() {
+        return Optional.of(new ConstructorInjectionPoint(
+                this, List.of(new Parameter("leaf", String.class)), AnnotationMetadata.empty()));
     }
 
     @Override

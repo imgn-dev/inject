@@ -1,6 +1,7 @@
 package be.imgn.inject.context.fixtures;
 
 import java.util.List;
+import java.util.Optional;
 
 import be.imgn.inject.context.AnnotationMetadata;
 import be.imgn.inject.context.ConstructorInjectionPoint;
@@ -18,9 +19,9 @@ public final class CycleBFactory extends Factory<CycleBFactory.B> {
     }
 
     @Override
-    protected ConstructorInjectionPoint constructorInjectionPoint() {
-        return new ConstructorInjectionPoint(
-                this, List.of(new Parameter("a", CycleAFactory.A.class)), AnnotationMetadata.empty());
+    protected Optional<ConstructorInjectionPoint> constructorInjectionPoint() {
+        return Optional.of(new ConstructorInjectionPoint(
+                this, List.of(new Parameter("a", CycleAFactory.A.class)), AnnotationMetadata.empty()));
     }
 
     @Override

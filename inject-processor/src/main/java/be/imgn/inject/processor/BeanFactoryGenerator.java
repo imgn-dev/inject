@@ -37,8 +37,10 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(ParameterizedTypeName.get(FACTORY, model.beanType()))
                 .addMethod(constructor(model))
-                .addMethod(constructorInjectionPoint(model))
                 .addMethod(createInstance(model));
+        if (!model.constructorParameters().isEmpty()) {
+            type.addMethod(constructorInjectionPoint(model));
+        }
         if (!model.fields().isEmpty()) {
             type.addMethod(fieldInjectionPoints(model));
         }
@@ -68,9 +70,10 @@ final class BeanFactoryGenerator {
         return MethodSpec.methodBuilder("constructorInjectionPoint")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
-                .returns(CONSTRUCTOR_IP)
+                .returns(ParameterizedTypeName.get(OPTIONAL, CONSTRUCTOR_IP))
                 .addStatement(
-                        "return new $T(this, $T.of($L), $T.empty())",
+                        "return $T.of(new $T(this, $T.of($L), $T.empty()))",
+                        OPTIONAL,
                         CONSTRUCTOR_IP,
                         LIST,
                         parameterList(model.constructorParameters()),

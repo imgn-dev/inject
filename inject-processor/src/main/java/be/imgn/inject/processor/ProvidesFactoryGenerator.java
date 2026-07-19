@@ -36,8 +36,10 @@ final class ProvidesFactoryGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(ParameterizedTypeName.get(FACTORY, model.producedType()))
                 .addMethod(constructor(model))
-                .addMethod(constructorInjectionPoint(model))
                 .addMethod(createInstance(model));
+        if (!model.isStatic() || !model.methodParameters().isEmpty()) {
+            type.addMethod(constructorInjectionPoint(model));
+        }
         if (model.scopeAnnotation() != null) {
             type.addMethod(scope(model.scopeAnnotation()));
         }
@@ -66,9 +68,10 @@ final class ProvidesFactoryGenerator {
         return MethodSpec.methodBuilder("constructorInjectionPoint")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
-                .returns(CONSTRUCTOR_IP)
+                .returns(ParameterizedTypeName.get(OPTIONAL, CONSTRUCTOR_IP))
                 .addStatement(
-                        "return new $T(this, $T.of($L), $T.empty())",
+                        "return $T.of(new $T(this, $T.of($L), $T.empty()))",
+                        OPTIONAL,
                         CONSTRUCTOR_IP,
                         LIST,
                         parameters,
