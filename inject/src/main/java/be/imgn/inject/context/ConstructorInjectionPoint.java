@@ -34,9 +34,7 @@ public record ConstructorInjectionPoint(
      * @param index the zero-based parameter index
      * @param <T> the dependency type
      */
-    @SuppressWarnings("unchecked")
     public <T> Key<T> keyForParameter(int index) {
-        Parameter parameter = parameters.get(index);
-        return (Key<T>) Key.of(parameter.type(), parameter.qualifier());
+        return parameters.get(index).key();
     }
 }

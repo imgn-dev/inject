@@ -36,7 +36,7 @@ class DefaultFactoryTest {
         assertThat(compilation)
                 .generatedSourceFile("example.$Service$$Factory")
                 .contentsAsUtf8String()
-                .contains("new Parameter(\"repo\", Repo.class)");
+                .contains("new Parameter(\"repo\", Repo.class,");
         assertThat(compilation)
                 .generatedSourceFile("example.$Repo$$Factory")
                 .contentsAsUtf8String()

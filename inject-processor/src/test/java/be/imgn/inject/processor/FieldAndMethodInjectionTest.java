@@ -54,7 +54,7 @@ class FieldAndMethodInjectionTest {
                 .generatedSourceFile("example.$Service$$Factory")
                 .contentsAsUtf8String();
         source.contains("new MethodInjectionPoint(this, \"setClock\"");
-        source.contains("new Parameter(\"clock\", String.class)");
+        source.contains("new Parameter(\"clock\", String.class,");
         source.contains("instance.setClock(getInstanceForMethod(0, 0, context))");
     }
 

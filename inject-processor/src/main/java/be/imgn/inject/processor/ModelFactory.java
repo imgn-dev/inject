@@ -62,11 +62,19 @@ final class ModelFactory {
     private final ProcessingEnvironment environment;
     private final List<InjectPlugin> plugins;
     private final Diagnostics diagnostics;
+    private final Set<TypeElement> qualifierImplTypes = new LinkedHashSet<>();
 
     ModelFactory(ProcessingEnvironment environment, List<InjectPlugin> plugins, Diagnostics diagnostics) {
         this.environment = environment;
         this.plugins = plugins;
         this.diagnostics = diagnostics;
+    }
+
+    /** {@return the attributed-qualifier annotation types encountered since the last drain, then clears them} */
+    Set<TypeElement> drainQualifierImplTypes() {
+        Set<TypeElement> drained = new LinkedHashSet<>(qualifierImplTypes);
+        qualifierImplTypes.clear();
+        return drained;
     }
 
     BeanModel buildModel(TypeElement bean) {
@@ -89,7 +97,8 @@ final class ModelFactory {
                         new MethodModel(method.getSimpleName().toString(), parameters(method, bean, types, elements)));
             }
         }
-        CodeBlock beanQualifier = Annotations.qualifier(bean, elements).orElse(null);
+        RenderedQualifier beanQualifier =
+                Annotations.qualifier(bean, elements, qualifierImplTypes).orElse(null);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
@@ -104,8 +113,8 @@ final class ModelFactory {
     }
 
     BeanModel defaultModel(TypeElement type) {
-        CodeBlock beanQualifier =
-                Annotations.qualifier(type, environment.getElementUtils()).orElse(null);
+        RenderedQualifier beanQualifier = Annotations.qualifier(type, environment.getElementUtils(), qualifierImplTypes)
+                .orElse(null);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
@@ -123,7 +132,8 @@ final class ModelFactory {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
         String name = method.getSimpleName().toString();
-        CodeBlock qualifier = Annotations.qualifier(method, elements).orElse(null);
+        RenderedQualifier qualifier =
+                Annotations.qualifier(method, elements, qualifierImplTypes).orElse(null);
         return new ProvidesModel(
                 packageOf(host),
                 GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
@@ -331,8 +341,8 @@ final class ModelFactory {
                         }
                     }
                     Dependency dependency = dependency(parameter.asType(), types);
-                    CodeBlock qualifier =
-                            Annotations.qualifier(parameter, elements).orElse(null);
+                    RenderedQualifier qualifier = Annotations.qualifier(parameter, elements, qualifierImplTypes)
+                            .orElse(null);
                     return new ParameterModel(
                             parameter.getSimpleName().toString(),
                             dependency.rawType(),
@@ -417,9 +427,10 @@ final class ModelFactory {
         return Optional.empty();
     }
 
-    private static FieldModel field(VariableElement fieldElement, Types types, Elements elements) {
+    private FieldModel field(VariableElement fieldElement, Types types, Elements elements) {
         Dependency dependency = dependency(fieldElement.asType(), types);
-        CodeBlock qualifier = Annotations.qualifier(fieldElement, elements).orElse(null);
+        RenderedQualifier qualifier = Annotations.qualifier(fieldElement, elements, qualifierImplTypes)
+                .orElse(null);
         return new FieldModel(
                 fieldElement.getSimpleName().toString(), dependency.rawType(), qualifier, dependency.isProvider());
     }

@@ -23,7 +23,17 @@ final class DefaultInjector implements Injector {
     }
 
     @Override
+    public <T> T getInstance(TypeLiteral<T> type) {
+        return getProvider(type).get();
+    }
+
+    @Override
     public <T> Provider<T> getProvider(Class<T> type) {
+        return getProvider(Key.of(Objects.requireNonNull(type, "type")));
+    }
+
+    @Override
+    public <T> Provider<T> getProvider(TypeLiteral<T> type) {
         return getProvider(Key.of(Objects.requireNonNull(type, "type")));
     }
 

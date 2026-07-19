@@ -21,12 +21,28 @@ public interface Injector {
     <T> T getInstance(Key<T> key);
 
     /**
+     * {@return an instance of the generic {@code type}}
+     *
+     * @param type the requested type literal
+     * @param <T> the requested type
+     */
+    <T> T getInstance(TypeLiteral<T> type);
+
+    /**
      * {@return a provider of {@code type}}
      *
      * @param type the requested type
      * @param <T> the requested type
      */
     <T> Provider<T> getProvider(Class<T> type);
+
+    /**
+     * {@return a provider of the generic {@code type}}
+     *
+     * @param type the requested type literal
+     * @param <T> the requested type
+     */
+    <T> Provider<T> getProvider(TypeLiteral<T> type);
 
     /**
      * {@return the provider for {@code key}}

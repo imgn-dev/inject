@@ -2,6 +2,7 @@ package be.imgn.inject.processor;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
@@ -30,7 +31,9 @@ import be.imgn.inject.processor.spi.InjectPlugin;
 public final class InjectProcessor extends AbstractProcessor {
 
     private final List<String> factoryNames = new ArrayList<>();
+    private final Set<String> emittedQualifierImpls = new HashSet<>();
 
+    private @Nullable ModelFactory modelFactory;
     private @Nullable GatherStage gatherStage;
     private @Nullable PlanStage planStage;
     private @Nullable ServiceRegistrar serviceRegistrar;
@@ -41,9 +44,10 @@ public final class InjectProcessor extends AbstractProcessor {
         List<InjectPlugin> plugins = new ArrayList<>();
         ServiceLoader.load(InjectPlugin.class, getClass().getClassLoader()).forEach(plugins::add);
         Diagnostics diagnostics = new Diagnostics(processingEnvironment);
-        ModelFactory modelFactory = new ModelFactory(processingEnvironment, List.copyOf(plugins), diagnostics);
-        this.gatherStage = new GatherStage(modelFactory, diagnostics);
-        this.planStage = new PlanStage(modelFactory, diagnostics);
+        ModelFactory factory = new ModelFactory(processingEnvironment, List.copyOf(plugins), diagnostics);
+        this.modelFactory = factory;
+        this.gatherStage = new GatherStage(factory, diagnostics);
+        this.planStage = new PlanStage(factory, diagnostics);
         this.serviceRegistrar = new ServiceRegistrar(processingEnvironment, diagnostics);
     }
 
@@ -70,7 +74,22 @@ public final class InjectProcessor extends AbstractProcessor {
             writeFactory(ProvidesFactoryGenerator.generate(model));
             factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }
+        writeQualifierImpls();
         return false;
+    }
+
+    private void writeQualifierImpls() {
+        for (TypeElement qualifierType : Objects.requireNonNull(modelFactory).drainQualifierImplTypes()) {
+            String packageName = processingEnv
+                    .getElementUtils()
+                    .getPackageOf(qualifierType)
+                    .getQualifiedName()
+                    .toString();
+            String qualifiedName = packageName + "." + QualifierImplGenerator.implSimpleName(qualifierType);
+            if (emittedQualifierImpls.add(qualifiedName)) {
+                writeFactory(QualifierImplGenerator.generate(qualifierType, packageName));
+            }
+        }
     }
 
     private void writeFactory(JavaFile file) {

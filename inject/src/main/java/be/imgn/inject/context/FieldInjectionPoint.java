@@ -2,18 +2,22 @@ package be.imgn.inject.context;
 
 import static java.util.Objects.requireNonNull;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
+
 import org.jspecify.annotations.Nullable;
 
 import be.imgn.inject.Key;
-import be.imgn.inject.Qualifier;
 
 /**
- * A field injection point.
+ * A field injection point. A qualifier is either a marker annotation type ({@code qualifierType}) or a concrete
+ * annotation instance ({@code qualifier}); at most one is non-{@code null}.
  *
  * @param factory the factory owning this injection point
  * @param fieldName the field name (for inspection)
  * @param fieldType the field's declared type (its inner type when {@code isProvider})
- * @param qualifier the qualifier, or {@code null}
+ * @param qualifierType the marker qualifier annotation type, or {@code null}
+ * @param qualifier the qualifier annotation instance, or {@code null}
  * @param annotationMetadata annotations present on the field
  * @param isProvider whether the declared field is a {@code Provider} of {@code fieldType}
  */
@@ -21,7 +25,8 @@ public record FieldInjectionPoint(
         Factory<?> factory,
         String fieldName,
         Class<?> fieldType,
-        @Nullable Qualifier qualifier,
+        @Nullable Class<? extends Annotation> qualifierType,
+        @Nullable Annotation qualifier,
         AnnotationMetadata annotationMetadata,
         boolean isProvider)
         implements InjectionPoint {
@@ -30,7 +35,8 @@ public record FieldInjectionPoint(
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type
-     * @param qualifier the qualifier, or {@code null}
+     * @param qualifierType the marker qualifier annotation type, or {@code null}
+     * @param qualifier the qualifier annotation instance, or {@code null}
      * @param annotationMetadata annotations present on the field
      * @param isProvider provider flag
      */
@@ -49,23 +55,44 @@ public record FieldInjectionPoint(
      */
     public FieldInjectionPoint(
             Factory<?> factory, String fieldName, Class<?> fieldType, AnnotationMetadata annotationMetadata) {
-        this(factory, fieldName, fieldType, null, annotationMetadata, false);
+        this(factory, fieldName, fieldType, null, null, annotationMetadata, false);
     }
 
     /**
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type
-     * @param qualifier the qualifier, or {@code null}
+     * @param qualifierType the marker qualifier annotation type
      * @param annotationMetadata annotations present on the field
      */
     public FieldInjectionPoint(
             Factory<?> factory,
             String fieldName,
             Class<?> fieldType,
-            @Nullable Qualifier qualifier,
+            Class<? extends Annotation> qualifierType,
             AnnotationMetadata annotationMetadata) {
-        this(factory, fieldName, fieldType, qualifier, annotationMetadata, false);
+        this(factory, fieldName, fieldType, qualifierType, null, annotationMetadata, false);
+    }
+
+    /**
+     * @param factory the factory owning this injection point
+     * @param fieldName the field name
+     * @param fieldType the field's declared type
+     * @param qualifier the qualifier annotation instance
+     * @param annotationMetadata annotations present on the field
+     */
+    public FieldInjectionPoint(
+            Factory<?> factory,
+            String fieldName,
+            Class<?> fieldType,
+            Annotation qualifier,
+            AnnotationMetadata annotationMetadata) {
+        this(factory, fieldName, fieldType, null, qualifier, annotationMetadata, false);
+    }
+
+    /** {@return whether this field has a qualifier} */
+    public boolean hasQualifier() {
+        return qualifierType != null || qualifier != null;
     }
 
     /**
@@ -75,6 +102,6 @@ public record FieldInjectionPoint(
      */
     @SuppressWarnings("unchecked")
     public <T> Key<T> key() {
-        return (Key<T>) Key.of(fieldType, qualifier);
+        return (Key<T>) (qualifier != null ? Key.of(fieldType, qualifier) : Key.of((Type) fieldType, qualifierType));
     }
 }

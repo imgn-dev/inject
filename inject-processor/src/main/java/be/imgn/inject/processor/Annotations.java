@@ -1,8 +1,11 @@
 package be.imgn.inject.processor;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -10,6 +13,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 
 import com.palantir.javapoet.ClassName;
@@ -22,18 +26,23 @@ import be.imgn.inject.ScopingAnnotation;
 /** Reads qualifying and scoping annotations off elements and renders them as generated expressions. */
 final class Annotations {
 
-    private static final ClassName QUALIFIER = ClassName.get("be.imgn.inject", "Qualifier");
-    private static final ClassName MAP = ClassName.get("java.util", "Map");
+    private static final ClassName NAMED = ClassName.get("be.imgn.inject", "Named");
+    private static final ClassName NAMES = ClassName.get("be.imgn.inject", "Names");
 
     private Annotations() {}
 
-    /** {@return a {@code new Qualifier(...)} expression for the element's qualifying annotation, if any} */
-    static Optional<CodeBlock> qualifier(Element element, Elements elements) {
+    /**
+     * {@return the rendered qualifier for the element's qualifying annotation, if any}
+     *
+     * <p>When the qualifier is an attributed custom annotation, its {@link TypeElement} is added to {@code implTypes}
+     * so the caller can emit a matching {@link QualifierImplGenerator} implementation.
+     */
+    static Optional<RenderedQualifier> qualifier(Element element, Elements elements, Set<TypeElement> implTypes) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
                     (TypeElement) mirror.getAnnotationType().asElement();
             if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
-                return Optional.of(qualifierExpression(annotationType, mirror, elements));
+                return Optional.of(render(annotationType, mirror, elements, implTypes));
             }
         }
         return Optional.empty();
@@ -51,18 +60,33 @@ final class Annotations {
         return Optional.empty();
     }
 
-    private static CodeBlock qualifierExpression(
-            TypeElement annotationType, AnnotationMirror mirror, Elements elements) {
-        Map<? extends ExecutableElement, ? extends AnnotationValue> values =
-                elements.getElementValuesWithDefaults(mirror);
-        CodeBlock attributes = values.entrySet().stream()
-                .map(entry ->
-                        CodeBlock.of("$S, $L", entry.getKey().getSimpleName().toString(), value(entry.getValue())))
-                .collect(CodeBlock.joining(", "));
-        if (attributes.isEmpty()) {
-            return CodeBlock.of("new $T($T.class, $T.of())", QUALIFIER, ClassName.get(annotationType), MAP);
+    private static RenderedQualifier render(
+            TypeElement annotationType, AnnotationMirror mirror, Elements elements, Set<TypeElement> implTypes) {
+        List<ExecutableElement> members = ElementFilter.methodsIn(annotationType.getEnclosedElements());
+        if (members.isEmpty()) {
+            return new RenderedQualifier(CodeBlock.of("$T.class", ClassName.get(annotationType)), true);
         }
-        return CodeBlock.of("new $T($T.class, $T.of($L))", QUALIFIER, ClassName.get(annotationType), MAP, attributes);
+
+        Map<String, AnnotationValue> values = new LinkedHashMap<>();
+        elements.getElementValuesWithDefaults(mirror)
+                .forEach((member, value) -> values.put(member.getSimpleName().toString(), value));
+
+        if (annotationType.getQualifiedName().contentEquals(NAMED.canonicalName())) {
+            return new RenderedQualifier(
+                    CodeBlock.of("$T.named($L)", NAMES, value(Objects.requireNonNull(values.get("value")))), false);
+        }
+
+        implTypes.add(annotationType);
+        String packageName =
+                elements.getPackageOf(annotationType).getQualifiedName().toString();
+        CodeBlock arguments = members.stream()
+                .map(member -> value(
+                        Objects.requireNonNull(values.get(member.getSimpleName().toString()))))
+                .collect(CodeBlock.joining(", "));
+        return new RenderedQualifier(
+                CodeBlock.of(
+                        "new $T($L)", QualifierImplGenerator.implClassName(annotationType, packageName), arguments),
+                false);
     }
 
     private static CodeBlock value(AnnotationValue annotationValue) {

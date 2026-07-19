@@ -88,7 +88,7 @@ class ProvidesTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Config$greeting$$Factory")
                 .contentsAsUtf8String();
-        source.contains("new Parameter(\"count\", Integer.class)");
+        source.contains("new Parameter(\"count\", Integer.class,");
         source.contains("return Config.greeting(getInstanceForConstructor(0, context))");
     }
 
@@ -118,7 +118,7 @@ class ProvidesTest {
                 .generatedSourceFile("example.$Config$url$$Factory")
                 .contentsAsUtf8String();
         source.contains("Key.of(String.class,");
-        source.contains("Map.of(\"value\", \"db\")");
+        source.contains("Names.named(\"db\")");
         source.contains("return Optional.of(Singleton.class)");
     }
 
@@ -183,7 +183,7 @@ class ProvidesTest {
                 .generatedSourceFile("example.$Config$engine$$Factory")
                 .contentsAsUtf8String();
         source.contains("Key.of(Engine.class,");
-        source.contains("Map.of(\"value\", \"fast\")");
+        source.contains("Names.named(\"fast\")");
     }
 
     @Test

@@ -33,8 +33,7 @@ class QualifierScopeProviderTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Consumer$$Factory")
                 .contentsAsUtf8String();
-        source.contains("new Qualifier(Named.class,");
-        source.contains("Map.of(\"value\", \"main\")");
+        source.contains("Names.named(\"main\")");
     }
 
     @Test
@@ -81,7 +80,7 @@ class QualifierScopeProviderTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Lazy$$Factory")
                 .contentsAsUtf8String();
-        source.contains("new Parameter(\"provider\", String.class, true)");
+        source.contains("new Parameter(\"provider\", String.class,");
         source.contains("return new Lazy(getProviderForConstructor(0, context))");
     }
 
@@ -119,7 +118,7 @@ class QualifierScopeProviderTest {
                 .generatedSourceFile("example.$Widget$$Factory")
                 .contentsAsUtf8String();
         source.contains("Key.of(Widget.class,");
-        source.contains("Map.of(\"value\", \"primary\")");
+        source.contains("new Tag__Qualifier(\"primary\")");
     }
 
     @Test
@@ -151,7 +150,7 @@ class QualifierScopeProviderTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Task$$Factory")
                 .contentsAsUtf8String();
-        source.contains("new Qualifier(Priority.class,");
-        source.contains("Map.of(\"value\", 5)");
+        source.contains("new Priority__Qualifier(5)");
+        assertThat(compilation).generatedSourceFile("example.Priority__Qualifier");
     }
 }

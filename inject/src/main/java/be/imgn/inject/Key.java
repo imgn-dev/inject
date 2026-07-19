@@ -1,13 +1,17 @@
 package be.imgn.inject;
 
+import static java.util.Objects.requireNonNull;
+
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Objects;
 
 import org.jspecify.annotations.Nullable;
 
 /**
- * A binding identity: a {@link Type} optionally combined with a {@link Qualifier}. A {@code null} qualifier denotes an
- * unqualified key. Identity is type + qualifier.
+ * A binding identity: a {@link Type} optionally combined with a qualifier annotation. Following Guice, a qualifier is
+ * either a marker annotation type (no attributes, matched by type) or a concrete annotation instance (attributes
+ * matter, matched by the annotation's {@code equals}). An unqualified key carries neither.
  *
  * @param <T> the bound type
  */
@@ -16,11 +20,13 @@ import org.jspecify.annotations.Nullable;
 @SuppressWarnings("UnusedTypeParameter")
 public final class Key<T> {
     private final Type type;
-    private final @Nullable Qualifier qualifier;
+    private final @Nullable Class<? extends Annotation> annotationType;
+    private final @Nullable Annotation annotation;
 
-    private Key(Type type, @Nullable Qualifier qualifier) {
-        this.type = Objects.requireNonNull(type, "type");
-        this.qualifier = qualifier;
+    private Key(Type type, @Nullable Class<? extends Annotation> annotationType, @Nullable Annotation annotation) {
+        this.type = requireNonNull(type, "type");
+        this.annotationType = annotationType;
+        this.annotation = annotation;
     }
 
     /**
@@ -30,28 +36,93 @@ public final class Key<T> {
      * @param <T> the bound type
      */
     public static <T> Key<T> of(Class<T> type) {
-        return new Key<>(type, null);
+        return new Key<>(type, null, null);
     }
 
     /**
-     * {@return a key for {@code type} with an optional qualifier}
+     * {@return a key for {@code type} qualified by a marker annotation type}
      *
      * @param type the bound type
-     * @param qualifier the qualifier, or {@code null} for none
+     * @param qualifierType the marker qualifier annotation type
      * @param <T> the bound type
      */
-    public static <T> Key<T> of(Class<T> type, @Nullable Qualifier qualifier) {
-        return new Key<>(type, qualifier);
+    public static <T> Key<T> of(Class<T> type, Class<? extends Annotation> qualifierType) {
+        return new Key<>(type, requireNonNull(qualifierType, "qualifierType"), null);
     }
 
     /**
-     * {@return a key for a general {@link Type} with an optional qualifier}
+     * {@return a key for {@code type} qualified by an annotation instance}
      *
-     * @param type the bound type (may be a parameterized type)
-     * @param qualifier the qualifier, or {@code null} for none
+     * @param type the bound type
+     * @param qualifier the qualifier annotation instance (for example {@link Names#named})
+     * @param <T> the bound type
      */
-    public static Key<?> of(Type type, @Nullable Qualifier qualifier) {
-        return new Key<>(type, qualifier);
+    public static <T> Key<T> of(Class<T> type, Annotation qualifier) {
+        requireNonNull(qualifier, "qualifier");
+        return new Key<>(type, qualifier.annotationType(), qualifier);
+    }
+
+    /**
+     * {@return an unqualified key for {@code type}}
+     *
+     * @param type the bound type literal
+     * @param <T> the bound type
+     */
+    public static <T> Key<T> of(TypeLiteral<T> type) {
+        return new Key<>(requireNonNull(type, "type").getType(), null, null);
+    }
+
+    /**
+     * {@return a key for {@code type} qualified by a marker annotation type}
+     *
+     * @param type the bound type literal
+     * @param qualifierType the marker qualifier annotation type
+     * @param <T> the bound type
+     */
+    public static <T> Key<T> of(TypeLiteral<T> type, Class<? extends Annotation> qualifierType) {
+        return new Key<>(requireNonNull(type, "type").getType(), requireNonNull(qualifierType, "qualifierType"), null);
+    }
+
+    /**
+     * {@return a key for {@code type} qualified by an annotation instance}
+     *
+     * @param type the bound type literal
+     * @param qualifier the qualifier annotation instance
+     * @param <T> the bound type
+     */
+    public static <T> Key<T> of(TypeLiteral<T> type, Annotation qualifier) {
+        requireNonNull(type, "type");
+        requireNonNull(qualifier, "qualifier");
+        return new Key<>(type.getType(), qualifier.annotationType(), qualifier);
+    }
+
+    /**
+     * {@return an unqualified key for a general {@link Type}}
+     *
+     * @param type the bound type (may be parameterized)
+     */
+    public static Key<?> of(Type type) {
+        return new Key<>(type, null, null);
+    }
+
+    /**
+     * {@return a key for a general {@link Type} with an optional marker qualifier}
+     *
+     * @param type the bound type (may be parameterized)
+     * @param qualifierType the marker qualifier annotation type, or {@code null} for none
+     */
+    public static Key<?> of(Type type, @Nullable Class<? extends Annotation> qualifierType) {
+        return new Key<>(type, qualifierType, null);
+    }
+
+    /**
+     * {@return a key for a general {@link Type} with an optional annotation-instance qualifier}
+     *
+     * @param type the bound type (may be parameterized)
+     * @param qualifier the qualifier annotation instance, or {@code null} for none
+     */
+    public static Key<?> of(Type type, @Nullable Annotation qualifier) {
+        return new Key<>(type, qualifier == null ? null : qualifier.annotationType(), qualifier);
     }
 
     /** {@return the bound type} */
@@ -59,30 +130,42 @@ public final class Key<T> {
         return type;
     }
 
-    /** {@return the qualifier, or {@code null} if unqualified} */
-    public @Nullable Qualifier qualifier() {
-        return qualifier;
+    /** {@return the qualifier annotation type, or {@code null} if unqualified} */
+    public @Nullable Class<? extends Annotation> annotationType() {
+        return annotationType;
+    }
+
+    /** {@return the qualifier annotation instance, or {@code null} for a marker or unqualified key} */
+    public @Nullable Annotation annotation() {
+        return annotation;
     }
 
     /** {@return whether this key carries a qualifier} */
     public boolean hasQualifier() {
-        return qualifier != null;
+        return annotationType != null;
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof Key<?> other && type.equals(other.type) && Objects.equals(qualifier, other.qualifier);
+        return o instanceof Key<?> other
+                && type.equals(other.type)
+                && Objects.equals(annotationType, other.annotationType)
+                && Objects.equals(annotation, other.annotation);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, qualifier);
+        return Objects.hash(type, annotationType, annotation);
     }
 
     @Override
     public String toString() {
-        return qualifier == null
-                ? "Key[" + type.getTypeName() + "]"
-                : "Key[" + type.getTypeName() + " " + qualifier + "]";
+        if (annotation != null) {
+            return "Key[" + type.getTypeName() + " " + annotation + "]";
+        }
+        if (annotationType != null) {
+            return "Key[" + type.getTypeName() + " @" + annotationType.getName() + "]";
+        }
+        return "Key[" + type.getTypeName() + "]";
     }
 }

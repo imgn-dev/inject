@@ -4,13 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import be.imgn.inject.Key;
 import be.imgn.inject.Named;
-import be.imgn.inject.Qualifier;
+import be.imgn.inject.Names;
 
 class InjectionPointTest {
     private static final Factory<Object> FACTORY = new Factory<>(Object.class) {
@@ -33,30 +32,38 @@ class InjectionPointTest {
     }
 
     @Test
-    void fieldPointBuildsKeyFromTypeAndQualifier() {
-        Qualifier named = new Qualifier(Named.class, Map.of("value", "db"));
+    void fieldPointBuildsKeyFromTypeAndInstanceQualifier() {
+        Named db = Names.named("db");
         FieldInjectionPoint qualified =
-                new FieldInjectionPoint(FACTORY, "conn", String.class, named, AnnotationMetadata.empty());
+                new FieldInjectionPoint(FACTORY, "conn", String.class, db, AnnotationMetadata.empty());
         assertThat(qualified)
                 .returns("conn", FieldInjectionPoint::fieldName)
                 .returns(false, FieldInjectionPoint::isProvider)
                 .extracting(FieldInjectionPoint::key)
-                .isEqualTo(Key.of(String.class, named));
+                .isEqualTo(Key.of(String.class, db));
+    }
+
+    @Test
+    void fieldPointBuildsKeyFromMarkerQualifier() {
+        FieldInjectionPoint qualified =
+                new FieldInjectionPoint(FACTORY, "conn", String.class, Named.class, AnnotationMetadata.empty());
+        assertThat(qualified.key()).isEqualTo(Key.of(String.class, Named.class));
     }
 
     @Test
     void fieldPointConvenienceCtorHasNoQualifier() {
         FieldInjectionPoint point =
                 new FieldInjectionPoint(FACTORY, "logger", String.class, AnnotationMetadata.empty());
-        assertThat(point.qualifier()).isNull();
+        assertThat(point.hasQualifier()).isFalse();
         assertThat(point.key()).isEqualTo(Key.of(String.class));
     }
 
     @Test
     void parameterQualifierPresence() {
-        Qualifier named = new Qualifier(Named.class, Map.of("value", "v"));
         assertThat(new Parameter("x", String.class).hasQualifier()).isFalse();
-        assertThat(new Parameter("x", String.class, named).hasQualifier()).isTrue();
+        assertThat(new Parameter("x", String.class, Names.named("v")).hasQualifier())
+                .isTrue();
+        assertThat(new Parameter("x", String.class, Named.class).hasQualifier()).isTrue();
     }
 
     @Test

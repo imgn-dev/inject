@@ -110,11 +110,11 @@ final class ProvidesFactoryGenerator {
     }
 
     private static MethodSpec exposedKeys(ProvidesModel model) {
-        CodeBlock qualifier = model.qualifier();
+        RenderedQualifier qualifier = model.qualifier();
         CodeBlock keys = model.exposedTypes().stream()
                 .map(type -> qualifier == null
                         ? CodeBlock.of("$T.of($T.class)", KEY, type)
-                        : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier))
+                        : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier.expression()))
                 .collect(CodeBlock.joining(", "));
         TypeName returnType = ParameterizedTypeName.get(
                 LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
@@ -138,16 +138,15 @@ final class ProvidesFactoryGenerator {
     }
 
     private static CodeBlock parameter(ParameterModel parameter) {
-        CodeBlock qualifier = parameter.qualifier();
-        if (!parameter.isProvider()) {
-            return qualifier == null
-                    ? CodeBlock.of("new $T($S, $T.class)", PARAMETER, parameter.name(), parameter.rawType())
-                    : CodeBlock.of(
-                            "new $T($S, $T.class, $L)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
-        }
-        return qualifier == null
-                ? CodeBlock.of("new $T($S, $T.class, true)", PARAMETER, parameter.name(), parameter.rawType())
-                : CodeBlock.of(
-                        "new $T($S, $T.class, $L, true)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
+        RenderedQualifier qualifier = parameter.qualifier();
+        return CodeBlock.of(
+                "new $T($S, $T.class, $L, $L, $T.empty(), $L)",
+                PARAMETER,
+                parameter.name(),
+                parameter.rawType(),
+                Qualifiers.markerArgument(qualifier),
+                Qualifiers.instanceArgument(qualifier),
+                ANNOTATION_METADATA,
+                parameter.isProvider());
     }
 }

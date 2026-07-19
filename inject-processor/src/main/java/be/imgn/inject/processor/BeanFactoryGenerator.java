@@ -171,11 +171,11 @@ final class BeanFactoryGenerator {
     }
 
     private static MethodSpec exposedKeys(BeanModel model) {
-        CodeBlock qualifier = model.beanQualifier();
+        RenderedQualifier qualifier = model.beanQualifier();
         CodeBlock keys = model.exposedTypes().stream()
                 .map(type -> qualifier == null
                         ? CodeBlock.of("$T.of($T.class)", KEY, type)
-                        : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier))
+                        : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier.expression()))
                 .collect(CodeBlock.joining(", "));
         TypeName returnType = ParameterizedTypeName.get(
                 LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
@@ -216,44 +216,28 @@ final class BeanFactoryGenerator {
     }
 
     private static CodeBlock parameter(ParameterModel parameter) {
-        CodeBlock qualifier = parameter.qualifier();
-        if (!parameter.isProvider()) {
-            return qualifier == null
-                    ? CodeBlock.of("new $T($S, $T.class)", PARAMETER, parameter.name(), parameter.rawType())
-                    : CodeBlock.of(
-                            "new $T($S, $T.class, $L)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
-        }
-        return qualifier == null
-                ? CodeBlock.of("new $T($S, $T.class, true)", PARAMETER, parameter.name(), parameter.rawType())
-                : CodeBlock.of(
-                        "new $T($S, $T.class, $L, true)", PARAMETER, parameter.name(), parameter.rawType(), qualifier);
+        RenderedQualifier qualifier = parameter.qualifier();
+        return CodeBlock.of(
+                "new $T($S, $T.class, $L, $L, $T.empty(), $L)",
+                PARAMETER,
+                parameter.name(),
+                parameter.rawType(),
+                Qualifiers.markerArgument(qualifier),
+                Qualifiers.instanceArgument(qualifier),
+                ANNOTATION_METADATA,
+                parameter.isProvider());
     }
 
     private static CodeBlock fieldPoint(FieldModel field) {
-        CodeBlock qualifier = field.qualifier();
-        if (!field.isProvider()) {
-            return qualifier == null
-                    ? CodeBlock.of(
-                            "new $T(this, $S, $T.class, $T.empty())",
-                            FIELD_IP,
-                            field.name(),
-                            field.rawType(),
-                            ANNOTATION_METADATA)
-                    : CodeBlock.of(
-                            "new $T(this, $S, $T.class, $L, $T.empty())",
-                            FIELD_IP,
-                            field.name(),
-                            field.rawType(),
-                            qualifier,
-                            ANNOTATION_METADATA);
-        }
-        CodeBlock qualifierArgument = qualifier == null ? CodeBlock.of("null") : qualifier;
+        RenderedQualifier qualifier = field.qualifier();
         return CodeBlock.of(
-                "new $T(this, $S, $T.class, $L, $T.empty(), true)",
+                "new $T(this, $S, $T.class, $L, $L, $T.empty(), $L)",
                 FIELD_IP,
                 field.name(),
                 field.rawType(),
-                qualifierArgument,
-                ANNOTATION_METADATA);
+                Qualifiers.markerArgument(qualifier),
+                Qualifiers.instanceArgument(qualifier),
+                ANNOTATION_METADATA,
+                field.isProvider());
     }
 }

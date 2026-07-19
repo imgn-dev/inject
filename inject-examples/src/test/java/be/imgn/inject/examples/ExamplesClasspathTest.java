@@ -3,14 +3,11 @@ package be.imgn.inject.examples;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
-import be.imgn.inject.Named;
-import be.imgn.inject.Qualifier;
+import be.imgn.inject.Names;
 import be.imgn.inject.UnsatisfiedDependencyException;
 
 class ExamplesClasspathTest {
@@ -43,8 +40,8 @@ class ExamplesClasspathTest {
     @Test
     void namedQualifierResolvesTheProvidedValue() {
         Injector injector = Injector.create();
-        Qualifier greeting = new Qualifier(Named.class, Map.of("value", "greeting"));
-        assertThat(injector.getInstance(Key.of(String.class, greeting))).isEqualTo("Hello");
+        assertThat(injector.getInstance(Key.of(String.class, Names.named("greeting"))))
+                .isEqualTo("Hello");
     }
 
     @Test

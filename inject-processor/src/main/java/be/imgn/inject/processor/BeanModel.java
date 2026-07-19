@@ -3,7 +3,6 @@ package be.imgn.inject.processor;
 import java.util.List;
 
 import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
@@ -19,7 +18,7 @@ import org.jspecify.annotations.Nullable;
  * @param methods the {@code @Inject} methods, in order
  * @param pluginFields the plugin-initialized fields (via an {@code @InjectingAnnotation}), in order
  * @param scopeAnnotation the bean's scoping annotation type, or {@code null} for prototype scope
- * @param beanQualifier a {@code new Qualifier(...)} expression applied to every exposed key, or {@code null}
+ * @param beanQualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the bean is exposed as; empty means "use the factory's default single key"
  */
 record BeanModel(
@@ -31,5 +30,5 @@ record BeanModel(
         List<MethodModel> methods,
         List<PluginField> pluginFields,
         @Nullable ClassName scopeAnnotation,
-        @Nullable CodeBlock beanQualifier,
+        @Nullable RenderedQualifier beanQualifier,
         List<TypeName> exposedTypes) {}

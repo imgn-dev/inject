@@ -251,6 +251,6 @@ class ExposeAsTest {
                 .contentsAsUtf8String();
         source.contains("Key.of(UserRepository.class,");
         source.contains("Key.of(RepositoryAuditable.class,");
-        source.contains("Map.of(\"value\", \"primary-db\")");
+        source.contains("Names.named(\"primary-db\")");
     }
 }
