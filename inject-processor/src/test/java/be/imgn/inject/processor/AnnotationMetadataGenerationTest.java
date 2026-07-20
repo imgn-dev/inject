@@ -35,10 +35,11 @@ class AnnotationMetadataGenerationTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Service$$Factory")
                 .contentsAsUtf8String();
-        // the bean's @Singleton lands on the constructor injection point
-        source.contains("AnnotationMetadata.of(new $be$imgn$inject$Singleton$$Impl())");
-        // the parameter's @Named lands on the parameter
-        source.contains("AnnotationMetadata.of(Names.named(\"db\"))");
+        // the bean's @Singleton lands on the constructor injection point, with its scoping stereotype
+        source.contains("AnnotationValue.of(Singleton.class, Map.of(), Set.of(ScopingAnnotation.class))");
+        // the parameter's @Named lands on the parameter, with its qualifying stereotype
+        source.contains("AnnotationValue.of(Named.class, Map.ofEntries(Map.entry(\"value\", \"db\"))");
+        source.contains("Set.of(QualifyingAnnotation.class)");
     }
 
     @Test
@@ -61,6 +62,38 @@ class AnnotationMetadataGenerationTest {
                 .generatedSourceFile("example.$Plain$$Factory")
                 .contentsAsUtf8String()
                 .contains("AnnotationMetadata.empty()");
+    }
+
+    @Test
+    void metadataNeedsNoGeneratedImplementationClass() {
+        JavaFileObject scope = JavaFileObjects.forSourceString("example.Job", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.ScopingAnnotation;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+
+                public class Job {
+                    @ScopingAnnotation
+                    @Retention(RetentionPolicy.RUNTIME)
+                    public @interface Batched {
+                        int size();
+                    }
+
+                    @Inject
+                    public Job() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(scope);
+
+        assertThat(compilation).succeeded();
+        // scoping/injecting annotations are recorded as data, so no implementation class is emitted for them
+        assertThat(compilation)
+                .generatedSourceFile("example.$Job$$Factory")
+                .contentsAsUtf8String()
+                .doesNotContain("$$Impl");
     }
 
     @Test

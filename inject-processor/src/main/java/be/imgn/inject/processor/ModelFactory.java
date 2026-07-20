@@ -96,7 +96,7 @@ final class ModelFactory {
                 methods.add(new MethodModel(
                         method.getSimpleName().toString(),
                         parameters(method, bean, types, elements, packageOf(bean)),
-                        Annotations.metadata(List.of(method), elements, packageOf(bean), annotationImplRequests)));
+                        Annotations.metadata(List.of(method), elements)));
             }
         }
         RenderedQualifier beanQualifier = Annotations.qualifier(bean, elements, packageOf(bean), annotationImplRequests)
@@ -109,7 +109,7 @@ final class ModelFactory {
                 GeneratedNames.factoryName(enclosingChain(bean)),
                 ClassName.get(bean),
                 constructorParameters,
-                Annotations.metadata(constructorSites, elements, packageOf(bean), annotationImplRequests),
+                Annotations.metadata(constructorSites, elements),
                 List.copyOf(fields),
                 List.copyOf(methods),
                 pluginFields(bean),
@@ -127,7 +127,7 @@ final class ModelFactory {
                 GeneratedNames.factoryName(enclosingChain(type)),
                 ClassName.get(type),
                 List.of(),
-                Annotations.metadata(List.of(type), elements, packageOf(type), annotationImplRequests),
+                Annotations.metadata(List.of(type), elements),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -150,7 +150,7 @@ final class ModelFactory {
                 name,
                 method.getModifiers().contains(Modifier.STATIC),
                 parameters(method, host, types, elements, packageOf(host)),
-                Annotations.metadata(List.of(host, method), elements, packageOf(host), annotationImplRequests),
+                Annotations.metadata(List.of(host, method), elements),
                 Annotations.scope(method).orElse(null),
                 qualifier,
                 exposedTypesForProvides(method, method.getReturnType(), qualifier != null));
@@ -363,7 +363,7 @@ final class ModelFactory {
                             qualifier,
                             dependency.isProvider(),
                             pluginArgument,
-                            Annotations.metadata(List.of(parameter), elements, targetPackage, annotationImplRequests));
+                            Annotations.metadata(List.of(parameter), elements));
                 })
                 .toList();
     }
@@ -452,7 +452,7 @@ final class ModelFactory {
                 dependency.rawType(),
                 qualifier,
                 dependency.isProvider(),
-                Annotations.metadata(List.of(fieldElement), elements, targetPackage, annotationImplRequests));
+                Annotations.metadata(List.of(fieldElement), elements));
     }
 
     private static Dependency dependency(TypeMirror type, Types types) {

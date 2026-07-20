@@ -4,19 +4,21 @@ import static java.util.Objects.requireNonNull;
 
 import java.lang.annotation.Annotation;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The framework-related annotations captured at an injection point or provision definition: every annotation that is
- * itself meta-annotated with {@link be.imgn.inject.InjectingAnnotation}, {@link be.imgn.inject.QualifyingAnnotation},
- * or {@link be.imgn.inject.ScopingAnnotation}.
+ * The framework-related annotations captured at an injection point or provision definition: every annotation whose type
+ * carries {@link be.imgn.inject.InjectingAnnotation}, {@link be.imgn.inject.QualifyingAnnotation}, or
+ * {@link be.imgn.inject.ScopingAnnotation}.
  *
- * <p>Annotations are stored as instances, so attribute values are readable type-safely:
+ * <p>Annotations are held as {@link AnnotationValue} data computed at compile time, so inspection needs no reflection:
  *
  * <pre>{@code
- * metadata.get(Named.class).map(Named::value);
+ * metadata.get(Named.class).flatMap(AnnotationValue::stringValue);      // by type
+ * metadata.byStereotype(QualifyingAnnotation.class);                    // every qualifier at this site
  * }</pre>
  *
  * <p>At most one annotation per annotation type is held, matching the language rule for non-repeatable annotations.
@@ -24,9 +26,9 @@ import java.util.Set;
 public final class AnnotationMetadata {
     private static final AnnotationMetadata EMPTY = new AnnotationMetadata(Map.of());
 
-    private final Map<Class<? extends Annotation>, Annotation> annotations;
+    private final Map<Class<? extends Annotation>, AnnotationValue> annotations;
 
-    private AnnotationMetadata(Map<Class<? extends Annotation>, Annotation> annotations) {
+    private AnnotationMetadata(Map<Class<? extends Annotation>, AnnotationValue> annotations) {
         this.annotations = annotations;
     }
 
@@ -36,17 +38,17 @@ public final class AnnotationMetadata {
     }
 
     /**
-     * {@return metadata holding {@code annotations}, keyed by their annotation type}
+     * {@return metadata holding {@code annotations}, keyed by annotation type}
      *
-     * @param annotations the framework-related annotations present at the site
+     * @param annotations the framework-related annotations present at the site; later entries win for a repeated type
      */
-    public static AnnotationMetadata of(Annotation... annotations) {
+    public static AnnotationMetadata of(AnnotationValue... annotations) {
         requireNonNull(annotations, "annotations");
         if (annotations.length == 0) {
             return EMPTY;
         }
-        Map<Class<? extends Annotation>, Annotation> byType = new LinkedHashMap<>();
-        for (Annotation annotation : annotations) {
+        Map<Class<? extends Annotation>, AnnotationValue> byType = new LinkedHashMap<>();
+        for (AnnotationValue annotation : annotations) {
             requireNonNull(annotation, "annotation");
             byType.put(annotation.annotationType(), annotation);
         }
@@ -57,11 +59,10 @@ public final class AnnotationMetadata {
      * {@return the annotation of {@code type} present at the site, if any}
      *
      * @param type the annotation type to look up
-     * @param <A> the annotation type
      */
-    public <A extends Annotation> Optional<A> get(Class<A> type) {
+    public Optional<AnnotationValue> get(Class<? extends Annotation> type) {
         requireNonNull(type, "type");
-        return Optional.ofNullable(type.cast(annotations.get(type)));
+        return Optional.ofNullable(annotations.get(type));
     }
 
     /**
@@ -72,6 +73,28 @@ public final class AnnotationMetadata {
     public boolean isPresent(Class<? extends Annotation> type) {
         requireNonNull(type, "type");
         return annotations.containsKey(type);
+    }
+
+    /**
+     * {@return every annotation at the site whose type carries {@code stereotype}}
+     *
+     * @param stereotype the meta-annotation to filter by, such as {@code QualifyingAnnotation.class}
+     */
+    public List<AnnotationValue> byStereotype(Class<? extends Annotation> stereotype) {
+        requireNonNull(stereotype, "stereotype");
+        return annotations.values().stream()
+                .filter(annotation -> annotation.hasStereotype(stereotype))
+                .toList();
+    }
+
+    /**
+     * {@return whether any annotation at the site carries {@code stereotype}}
+     *
+     * @param stereotype the meta-annotation to test
+     */
+    public boolean hasStereotype(Class<? extends Annotation> stereotype) {
+        requireNonNull(stereotype, "stereotype");
+        return annotations.values().stream().anyMatch(annotation -> annotation.hasStereotype(stereotype));
     }
 
     /** {@return the annotation types present at the site} */
