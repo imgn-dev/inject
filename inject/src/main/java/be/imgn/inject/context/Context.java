@@ -1,5 +1,7 @@
 package be.imgn.inject.context;
 
+import java.util.Map;
+
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 
@@ -20,5 +22,14 @@ public interface Context {
     /** {@return a context loaded from all registered {@code Factory} and {@code Scope} services} */
     static Context create() {
         return new DefaultContext();
+    }
+
+    /**
+     * {@return a context loaded from all registered services, with {@code overrides} shadowing discovered bindings}
+     *
+     * @param overrides providers that replace any discovered binding for the same key; primarily a test seam
+     */
+    static Context create(Map<Key<?>, Provider<?>> overrides) {
+        return new DefaultContext(overrides);
     }
 }

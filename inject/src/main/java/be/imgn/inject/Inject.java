@@ -5,7 +5,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Marks a constructor, method, or field as an injection point. */
+/**
+ * Marks a constructor, method, or field as an injection point.
+ *
+ * <p>Prefer a single {@code @Inject} constructor: it makes dependencies final and explicit and yields a fully
+ * initialised instance. Reach for method or field injection only when constructor injection cannot express the wiring.
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.FIELD})
 public @interface Inject {}

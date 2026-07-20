@@ -29,10 +29,18 @@ final class DefaultContext implements Context {
     private final ThreadLocal<Deque<Key<?>>> stack = ThreadLocal.withInitial(ArrayDeque::new);
 
     DefaultContext() {
-        this(loadFactories(), loadScopes());
+        this(loadFactories(), loadScopes(), Map.of());
+    }
+
+    DefaultContext(Map<Key<?>, Provider<?>> overrides) {
+        this(loadFactories(), loadScopes(), overrides);
     }
 
     DefaultContext(Iterable<Factory<?>> factories, Iterable<Scope> scopes) {
+        this(factories, scopes, Map.of());
+    }
+
+    DefaultContext(Iterable<Factory<?>> factories, Iterable<Scope> scopes, Map<Key<?>, Provider<?>> overrides) {
         Map<Class<? extends Annotation>, Scope> scopesByAnnotation = new HashMap<>();
         for (Scope scope : scopes) {
             scopesByAnnotation.put(scope.annotationType(), scope);
@@ -47,6 +55,8 @@ final class DefaultContext implements Context {
                 }
             }
         }
+        // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
+        built.putAll(overrides);
         this.registry = Map.copyOf(built);
     }
 
