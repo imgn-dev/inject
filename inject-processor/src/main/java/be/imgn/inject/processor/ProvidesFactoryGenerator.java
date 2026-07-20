@@ -70,12 +70,12 @@ final class ProvidesFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(ParameterizedTypeName.get(OPTIONAL, CONSTRUCTOR_IP))
                 .addStatement(
-                        "return $T.of(new $T(this, $T.of($L), $T.empty()))",
+                        "return $T.of(new $T(this, $T.of($L), $L))",
                         OPTIONAL,
                         CONSTRUCTOR_IP,
                         LIST,
                         parameters,
-                        ANNOTATION_METADATA)
+                        model.metadata())
                 .build();
     }
 
@@ -140,13 +140,13 @@ final class ProvidesFactoryGenerator {
     private static CodeBlock parameter(ParameterModel parameter) {
         RenderedQualifier qualifier = parameter.qualifier();
         return CodeBlock.of(
-                "new $T($S, $T.class, $L, $L, $T.empty(), $L)",
+                "new $T($S, $T.class, $L, $L, $L, $L)",
                 PARAMETER,
                 parameter.name(),
                 parameter.rawType(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
-                ANNOTATION_METADATA,
+                parameter.metadata(),
                 parameter.isProvider());
     }
 }

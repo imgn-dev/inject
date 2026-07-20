@@ -1,5 +1,6 @@
 package be.imgn.inject.processor;
 
+import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
@@ -11,5 +12,7 @@ import org.jspecify.annotations.Nullable;
  * @param rawType the erased field type (used as a {@code Class} literal; the inner type when {@code isProvider})
  * @param qualifier the rendered qualifier, or {@code null} if unqualified
  * @param isProvider whether the declared field is a {@code Provider} of {@code rawType}
+ * @param metadata an {@code AnnotationMetadata} expression for the field's framework-related annotations
  */
-record FieldModel(String name, TypeName rawType, @Nullable RenderedQualifier qualifier, boolean isProvider) {}
+record FieldModel(
+        String name, TypeName rawType, @Nullable RenderedQualifier qualifier, boolean isProvider, CodeBlock metadata) {}

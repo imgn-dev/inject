@@ -3,6 +3,7 @@ package be.imgn.inject.processor;
 import java.util.List;
 
 import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
@@ -14,6 +15,8 @@ import org.jspecify.annotations.Nullable;
  * @param factorySimpleName the generated factory's simple name
  * @param beanType the bean type the factory builds
  * @param constructorParameters the injectable constructor's parameters, in order (empty for a no-arg constructor)
+ * @param constructorMetadata an {@code AnnotationMetadata} expression for the constructor's framework-related
+ *     annotations, including those on the bean type
  * @param fields the context-resolved {@code @Inject} fields, in order
  * @param methods the {@code @Inject} methods, in order
  * @param pluginFields the plugin-initialized fields (via an {@code @InjectingAnnotation}), in order
@@ -26,6 +29,7 @@ record BeanModel(
         String factorySimpleName,
         ClassName beanType,
         List<ParameterModel> constructorParameters,
+        CodeBlock constructorMetadata,
         List<FieldModel> fields,
         List<MethodModel> methods,
         List<PluginField> pluginFields,

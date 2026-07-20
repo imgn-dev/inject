@@ -23,33 +23,43 @@ import com.palantir.javapoet.WildcardTypeName;
  * without reflection. The generated class honours the {@link Annotation} equality and hash-code contract, so two
  * instances with the same attribute values compare equal regardless of the implementation class.
  */
-final class QualifierImplGenerator {
+final class AnnotationImplGenerator {
 
     private static final ClassName ANNOTATION = ClassName.get("java.lang.annotation", "Annotation");
     private static final ClassName CLASS = ClassName.get("java.lang", "Class");
     private static final ClassName OBJECTS = ClassName.get("java.util", "Objects");
 
-    private QualifierImplGenerator() {}
+    private AnnotationImplGenerator() {}
 
-    /** {@return the simple name of the generated implementation for {@code annotationType}} */
+    /**
+     * {@return the simple name of the generated implementation for {@code annotationType}}
+     *
+     * <p>The annotation's qualified name is mangled into the simple name so implementations for same-named annotations
+     * from different packages can coexist in one target package.
+     */
     static String implSimpleName(TypeElement annotationType) {
-        return annotationType.getSimpleName() + "__Qualifier";
+        return "$" + annotationType.getQualifiedName().toString().replace('.', '$') + "$$Impl";
     }
 
-    /** {@return the fully-qualified name of the generated implementation for {@code annotationType}} */
-    static ClassName implClassName(TypeElement annotationType, String packageName) {
-        return ClassName.get(packageName, implSimpleName(annotationType));
+    /**
+     * {@return the name of the generated implementation, emitted into {@code targetPackage}}
+     *
+     * <p>Implementations are emitted into the package of the factory that uses them, never the annotation's own
+     * package: the annotation may live in another module, and generating into it would split that package.
+     */
+    static ClassName implClassName(TypeElement annotationType, String targetPackage) {
+        return ClassName.get(targetPackage, implSimpleName(annotationType));
     }
 
-    static JavaFile generate(TypeElement annotationType, String packageName) {
+    static JavaFile generate(TypeElement annotationType, String targetPackage) {
         ClassName annotationName = ClassName.get(annotationType);
         List<ExecutableElement> members = ElementFilter.methodsIn(annotationType.getEnclosedElements());
 
         TypeSpec.Builder type = TypeSpec.classBuilder(implSimpleName(annotationType))
-                .addModifiers(Modifier.FINAL)
+                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .addSuperinterface(annotationName);
 
-        MethodSpec.Builder constructor = MethodSpec.constructorBuilder();
+        MethodSpec.Builder constructor = MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC);
         for (ExecutableElement member : members) {
             String name = member.getSimpleName().toString();
             TypeName memberType = TypeName.get(member.getReturnType());
@@ -70,7 +80,7 @@ final class QualifierImplGenerator {
                 .addMethod(hashCode(members))
                 .addMethod(toString(annotationType, members));
 
-        return JavaFile.builder(packageName, type.build()).build();
+        return JavaFile.builder(targetPackage, type.build()).build();
     }
 
     private static MethodSpec annotationTypeMethod(ClassName annotationName) {

@@ -31,7 +31,7 @@ import be.imgn.inject.processor.spi.InjectPlugin;
 public final class InjectProcessor extends AbstractProcessor {
 
     private final List<String> factoryNames = new ArrayList<>();
-    private final Set<String> emittedQualifierImpls = new HashSet<>();
+    private final Set<String> emittedAnnotationImpls = new HashSet<>();
 
     private @Nullable ModelFactory modelFactory;
     private @Nullable GatherStage gatherStage;
@@ -74,20 +74,17 @@ public final class InjectProcessor extends AbstractProcessor {
             writeFactory(ProvidesFactoryGenerator.generate(model));
             factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }
-        writeQualifierImpls();
+        writeAnnotationImpls();
         return false;
     }
 
-    private void writeQualifierImpls() {
-        for (TypeElement qualifierType : Objects.requireNonNull(modelFactory).drainQualifierImplTypes()) {
-            String packageName = processingEnv
-                    .getElementUtils()
-                    .getPackageOf(qualifierType)
-                    .getQualifiedName()
-                    .toString();
-            String qualifiedName = packageName + "." + QualifierImplGenerator.implSimpleName(qualifierType);
-            if (emittedQualifierImpls.add(qualifiedName)) {
-                writeFactory(QualifierImplGenerator.generate(qualifierType, packageName));
+    private void writeAnnotationImpls() {
+        for (AnnotationImplRequest request :
+                Objects.requireNonNull(modelFactory).drainAnnotationImplRequests()) {
+            String qualifiedName =
+                    request.targetPackage() + "." + AnnotationImplGenerator.implSimpleName(request.annotationType());
+            if (emittedAnnotationImpls.add(qualifiedName)) {
+                writeFactory(AnnotationImplGenerator.generate(request.annotationType(), request.targetPackage()));
             }
         }
     }

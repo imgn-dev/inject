@@ -62,7 +62,7 @@ final class ModelFactory {
     private final ProcessingEnvironment environment;
     private final List<InjectPlugin> plugins;
     private final Diagnostics diagnostics;
-    private final Set<TypeElement> qualifierImplTypes = new LinkedHashSet<>();
+    private final Set<AnnotationImplRequest> annotationImplRequests = new LinkedHashSet<>();
 
     ModelFactory(ProcessingEnvironment environment, List<InjectPlugin> plugins, Diagnostics diagnostics) {
         this.environment = environment;
@@ -70,10 +70,10 @@ final class ModelFactory {
         this.diagnostics = diagnostics;
     }
 
-    /** {@return the attributed-qualifier annotation types encountered since the last drain, then clears them} */
-    Set<TypeElement> drainQualifierImplTypes() {
-        Set<TypeElement> drained = new LinkedHashSet<>(qualifierImplTypes);
-        qualifierImplTypes.clear();
+    /** {@return the annotation implementations requested since the last drain, then clears them} */
+    Set<AnnotationImplRequest> drainAnnotationImplRequests() {
+        Set<AnnotationImplRequest> drained = new LinkedHashSet<>(annotationImplRequests);
+        annotationImplRequests.clear();
         return drained;
     }
 
@@ -81,7 +81,7 @@ final class ModelFactory {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
         List<ParameterModel> constructorParameters = injectConstructor(bean)
-                .map(constructor -> parameters(constructor, bean, types, elements))
+                .map(constructor -> parameters(constructor, bean, types, elements, packageOf(bean)))
                 .orElse(List.of());
         List<FieldModel> fields = new ArrayList<>();
         List<MethodModel> methods = new ArrayList<>();
@@ -90,20 +90,26 @@ final class ModelFactory {
                 continue;
             }
             if (enclosed.getKind() == ElementKind.FIELD) {
-                fields.add(field((VariableElement) enclosed, types, elements));
+                fields.add(field((VariableElement) enclosed, types, elements, packageOf(bean)));
             } else if (enclosed.getKind() == ElementKind.METHOD) {
                 ExecutableElement method = (ExecutableElement) enclosed;
-                methods.add(
-                        new MethodModel(method.getSimpleName().toString(), parameters(method, bean, types, elements)));
+                methods.add(new MethodModel(
+                        method.getSimpleName().toString(),
+                        parameters(method, bean, types, elements, packageOf(bean)),
+                        Annotations.metadata(List.of(method), elements, packageOf(bean), annotationImplRequests)));
             }
         }
-        RenderedQualifier beanQualifier =
-                Annotations.qualifier(bean, elements, qualifierImplTypes).orElse(null);
+        RenderedQualifier beanQualifier = Annotations.qualifier(bean, elements, packageOf(bean), annotationImplRequests)
+                .orElse(null);
+        List<Element> constructorSites = new ArrayList<>();
+        constructorSites.add(bean);
+        injectConstructor(bean).ifPresent(constructorSites::add);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
                 ClassName.get(bean),
                 constructorParameters,
+                Annotations.metadata(constructorSites, elements, packageOf(bean), annotationImplRequests),
                 List.copyOf(fields),
                 List.copyOf(methods),
                 pluginFields(bean),
@@ -113,13 +119,15 @@ final class ModelFactory {
     }
 
     BeanModel defaultModel(TypeElement type) {
-        RenderedQualifier beanQualifier = Annotations.qualifier(type, environment.getElementUtils(), qualifierImplTypes)
+        Elements elements = environment.getElementUtils();
+        RenderedQualifier beanQualifier = Annotations.qualifier(type, elements, packageOf(type), annotationImplRequests)
                 .orElse(null);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
                 ClassName.get(type),
                 List.of(),
+                Annotations.metadata(List.of(type), elements, packageOf(type), annotationImplRequests),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -132,8 +140,8 @@ final class ModelFactory {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
         String name = method.getSimpleName().toString();
-        RenderedQualifier qualifier =
-                Annotations.qualifier(method, elements, qualifierImplTypes).orElse(null);
+        RenderedQualifier qualifier = Annotations.qualifier(method, elements, packageOf(host), annotationImplRequests)
+                .orElse(null);
         return new ProvidesModel(
                 packageOf(host),
                 GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
@@ -141,7 +149,8 @@ final class ModelFactory {
                 ClassName.get(host),
                 name,
                 method.getModifiers().contains(Modifier.STATIC),
-                parameters(method, host, types, elements),
+                parameters(method, host, types, elements, packageOf(host)),
+                Annotations.metadata(List.of(host, method), elements, packageOf(host), annotationImplRequests),
                 Annotations.scope(method).orElse(null),
                 qualifier,
                 exposedTypesForProvides(method, method.getReturnType(), qualifier != null));
@@ -324,7 +333,11 @@ final class ModelFactory {
     }
 
     private List<ParameterModel> parameters(
-            ExecutableElement executable, TypeElement declaringType, Types types, Elements elements) {
+            ExecutableElement executable,
+            TypeElement declaringType,
+            Types types,
+            Elements elements,
+            String targetPackage) {
         return executable.getParameters().stream()
                 .map(parameter -> {
                     CodeBlock pluginArgument = null;
@@ -341,14 +354,16 @@ final class ModelFactory {
                         }
                     }
                     Dependency dependency = dependency(parameter.asType(), types);
-                    RenderedQualifier qualifier = Annotations.qualifier(parameter, elements, qualifierImplTypes)
+                    RenderedQualifier qualifier = Annotations.qualifier(
+                                    parameter, elements, targetPackage, annotationImplRequests)
                             .orElse(null);
                     return new ParameterModel(
                             parameter.getSimpleName().toString(),
                             dependency.rawType(),
                             qualifier,
                             dependency.isProvider(),
-                            pluginArgument);
+                            pluginArgument,
+                            Annotations.metadata(List.of(parameter), elements, targetPackage, annotationImplRequests));
                 })
                 .toList();
     }
@@ -427,12 +442,17 @@ final class ModelFactory {
         return Optional.empty();
     }
 
-    private FieldModel field(VariableElement fieldElement, Types types, Elements elements) {
+    private FieldModel field(VariableElement fieldElement, Types types, Elements elements, String targetPackage) {
         Dependency dependency = dependency(fieldElement.asType(), types);
-        RenderedQualifier qualifier = Annotations.qualifier(fieldElement, elements, qualifierImplTypes)
+        RenderedQualifier qualifier = Annotations.qualifier(
+                        fieldElement, elements, targetPackage, annotationImplRequests)
                 .orElse(null);
         return new FieldModel(
-                fieldElement.getSimpleName().toString(), dependency.rawType(), qualifier, dependency.isProvider());
+                fieldElement.getSimpleName().toString(),
+                dependency.rawType(),
+                qualifier,
+                dependency.isProvider(),
+                Annotations.metadata(List.of(fieldElement), elements, targetPackage, annotationImplRequests));
     }
 
     private static Dependency dependency(TypeMirror type, Types types) {

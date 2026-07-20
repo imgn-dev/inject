@@ -14,10 +14,12 @@ import org.jspecify.annotations.Nullable;
  * @param isProvider whether the declared parameter is a {@code Provider} of {@code rawType}
  * @param pluginInitializer a plugin-supplied argument expression (for an {@code @InjectingAnnotation} parameter), or
  *     {@code null} when the argument is resolved from the context
+ * @param metadata an {@code AnnotationMetadata} expression for the parameter's framework-related annotations
  */
 record ParameterModel(
         String name,
         TypeName rawType,
         @Nullable RenderedQualifier qualifier,
         boolean isProvider,
-        @Nullable CodeBlock pluginInitializer) {}
+        @Nullable CodeBlock pluginInitializer,
+        CodeBlock metadata) {}

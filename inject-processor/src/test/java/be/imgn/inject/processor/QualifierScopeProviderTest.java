@@ -118,7 +118,7 @@ class QualifierScopeProviderTest {
                 .generatedSourceFile("example.$Widget$$Factory")
                 .contentsAsUtf8String();
         source.contains("Key.of(Widget.class,");
-        source.contains("new Tag__Qualifier(\"primary\")");
+        source.contains("$example$Tag$$Impl(\"primary\")");
     }
 
     @Test
@@ -150,7 +150,7 @@ class QualifierScopeProviderTest {
         StringSubject source = assertThat(compilation)
                 .generatedSourceFile("example.$Task$$Factory")
                 .contentsAsUtf8String();
-        source.contains("new Priority__Qualifier(5)");
-        assertThat(compilation).generatedSourceFile("example.Priority__Qualifier");
+        source.contains("$example$Priority$$Impl(5)");
+        assertThat(compilation).generatedSourceFile("example.$example$Priority$$Impl");
     }
 }

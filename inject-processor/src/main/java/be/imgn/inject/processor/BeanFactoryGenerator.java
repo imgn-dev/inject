@@ -72,12 +72,12 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(ParameterizedTypeName.get(OPTIONAL, CONSTRUCTOR_IP))
                 .addStatement(
-                        "return $T.of(new $T(this, $T.of($L), $T.empty()))",
+                        "return $T.of(new $T(this, $T.of($L), $L))",
                         OPTIONAL,
                         CONSTRUCTOR_IP,
                         LIST,
                         parameterList(model.constructorParameters()),
-                        ANNOTATION_METADATA)
+                        model.constructorMetadata())
                 .build();
     }
 
@@ -125,12 +125,12 @@ final class BeanFactoryGenerator {
     private static MethodSpec methodInjectionPoints(BeanModel model) {
         CodeBlock points = model.methods().stream()
                 .map(method -> CodeBlock.of(
-                        "new $T(this, $S, $T.of($L), $T.empty())",
+                        "new $T(this, $S, $T.of($L), $L)",
                         METHOD_IP,
                         method.name(),
                         LIST,
                         parameterList(method.parameters()),
-                        ANNOTATION_METADATA))
+                        method.metadata()))
                 .collect(CodeBlock.joining(", "));
         return MethodSpec.methodBuilder("methodInjectionPoints")
                 .addAnnotation(Override.class)
@@ -218,26 +218,26 @@ final class BeanFactoryGenerator {
     private static CodeBlock parameter(ParameterModel parameter) {
         RenderedQualifier qualifier = parameter.qualifier();
         return CodeBlock.of(
-                "new $T($S, $T.class, $L, $L, $T.empty(), $L)",
+                "new $T($S, $T.class, $L, $L, $L, $L)",
                 PARAMETER,
                 parameter.name(),
                 parameter.rawType(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
-                ANNOTATION_METADATA,
+                parameter.metadata(),
                 parameter.isProvider());
     }
 
     private static CodeBlock fieldPoint(FieldModel field) {
         RenderedQualifier qualifier = field.qualifier();
         return CodeBlock.of(
-                "new $T(this, $S, $T.class, $L, $L, $T.empty(), $L)",
+                "new $T(this, $S, $T.class, $L, $L, $L, $L)",
                 FIELD_IP,
                 field.name(),
                 field.rawType(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
-                ANNOTATION_METADATA,
+                field.metadata(),
                 field.isProvider());
     }
 }
