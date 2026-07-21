@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <!--
+      Integration-test settings. The framework's own artifacts are installed into the isolated local repository
+      (target/local-repo) by the invoker plugin's install goal; everything else resolves from the developer's real
+      ~/.m2, mirrored read-only so the tests run offline.
+    -->
+    <mirrors>
+        <mirror>
+            <id>local-m2-mirror</id>
+            <url>file://${user.home}/.m2/repository</url>
+            <mirrorOf>external:*</mirrorOf>
+        </mirror>
+    </mirrors>
+</settings>

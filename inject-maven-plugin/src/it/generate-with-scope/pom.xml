@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>be.imgn.inject.it</groupId>
+    <artifactId>generate-with-scope</artifactId>
+    <version>1.0</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>be.imgn.inject</groupId>
+            <artifactId>inject</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>@maven-compiler-plugin.version@</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>be.imgn.inject</groupId>
+                            <artifactId>inject-processor</artifactId>
+                            <version>@project.version@</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>be.imgn.inject</groupId>
+                <artifactId>inject-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <configuration>
+                    <moduleName>it.generated</moduleName>
+                    <generateModuleInfo>true</generateModuleInfo>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>register-factories</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

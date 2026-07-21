@@ -44,4 +44,11 @@
         <property name="checks" value="RegexpSinglelineJava"/>
         <property name="id" value="NoFQNInCode"/>
     </module>
+    <!-- The Maven plugin manipulates module descriptors: framework service-interface names and generated
+         provider class names appear as string data, which the FQN rule cannot distinguish from code. -->
+    <module name="SuppressionSingleFilter">
+        <property name="files" value="[\\/]inject-maven-plugin[\\/]src[\\/]"/>
+        <property name="checks" value="RegexpSinglelineJava"/>
+        <property name="id" value="NoFQNInCode"/>
+    </module>
 </module>
