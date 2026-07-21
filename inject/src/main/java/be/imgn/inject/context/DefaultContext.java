@@ -13,6 +13,8 @@ import java.util.ServiceLoader;
 import java.util.StringJoiner;
 
 import be.imgn.inject.CircularDependencyException;
+import be.imgn.inject.ConditionResolutionException;
+import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
@@ -31,27 +33,51 @@ final class DefaultContext implements Context {
     private final ThreadLocal<Deque<Key<?>>> stack = ThreadLocal.withInitial(ArrayDeque::new);
 
     DefaultContext() {
-        this(loadFactories(), loadScopes(), Map.of());
+        this(loadFactories(), loadScopes(), loadConditions(), systemProperties(), Map.of());
     }
 
     DefaultContext(Map<Key<?>, Provider<?>> overrides) {
-        this(loadFactories(), loadScopes(), overrides);
+        this(loadFactories(), loadScopes(), loadConditions(), systemProperties(), overrides);
     }
 
     DefaultContext(Iterable<Factory<?>> factories, Iterable<Scope> scopes) {
-        this(factories, scopes, Map.of());
+        this(factories, scopes, List.of(), name -> Optional.empty(), Map.of());
     }
 
     DefaultContext(Iterable<Factory<?>> factories, Iterable<Scope> scopes, Map<Key<?>, Provider<?>> overrides) {
+        this(factories, scopes, List.of(), name -> Optional.empty(), overrides);
+    }
+
+    DefaultContext(
+            Iterable<Factory<?>> factories,
+            Iterable<Scope> scopes,
+            Iterable<Condition> conditions,
+            Map<String, String> properties) {
+        this(factories, scopes, conditions, name -> Optional.ofNullable(properties.get(name)), Map.of());
+    }
+
+    DefaultContext(
+            Iterable<Factory<?>> factories,
+            Iterable<Scope> scopes,
+            Iterable<Condition> conditions,
+            ConditionContext conditionContext,
+            Map<Key<?>, Provider<?>> overrides) {
         Map<Class<? extends Annotation>, Scope> scopesByAnnotation = new HashMap<>();
         for (Scope scope : scopes) {
             scopesByAnnotation.put(scope.annotationType(), scope);
+        }
+        Map<Class<? extends Annotation>, Condition> conditionsByAnnotation = new HashMap<>();
+        for (Condition condition : conditions) {
+            conditionsByAnnotation.put(condition.annotationType(), condition);
         }
 
         Map<Key<?>, Provider<?>> built = new HashMap<>();
         Map<Key<?>, BeanDefinition> definitionsByKey = new HashMap<>();
         List<BeanDefinition> definitionList = new ArrayList<>();
         for (Factory<?> factory : factories) {
+            if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
+                continue; // an unmatched condition removes the bean from the graph entirely
+            }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
             for (Key<?> key : factory.exposedKeys()) {
                 if (built.putIfAbsent(key, provider) != null) {
@@ -68,6 +94,24 @@ final class DefaultContext implements Context {
         this.allDefinitions = List.copyOf(definitionList);
     }
 
+    private static boolean conditionsPass(
+            Factory<?> factory,
+            Map<Class<? extends Annotation>, Condition> conditions,
+            ConditionContext conditionContext) {
+        for (AnnotationValue annotation : factory.annotationMetadata().byStereotype(ConditioningAnnotation.class)) {
+            Condition condition = conditions.get(annotation.annotationType());
+            if (condition == null) {
+                throw new ConditionResolutionException("No condition registered for @"
+                        + annotation.annotationType().getSimpleName() + " on "
+                        + factory.type().getName());
+            }
+            if (!condition.matches(conditionContext, annotation)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static List<Factory<?>> loadFactories() {
         List<Factory<?>> factories = new ArrayList<>();
         for (Factory<?> factory : ServiceLoader.load(Factory.class)) {
@@ -82,6 +126,18 @@ final class DefaultContext implements Context {
             scopes.add(scope);
         }
         return scopes;
+    }
+
+    private static List<Condition> loadConditions() {
+        List<Condition> conditions = new ArrayList<>();
+        for (Condition condition : ServiceLoader.load(Condition.class)) {
+            conditions.add(condition);
+        }
+        return conditions;
+    }
+
+    private static ConditionContext systemProperties() {
+        return name -> Optional.ofNullable(System.getProperty(name));
     }
 
     private <T> Provider<T> wrap(Factory<T> factory, Map<Class<? extends Annotation>, Scope> scopes) {

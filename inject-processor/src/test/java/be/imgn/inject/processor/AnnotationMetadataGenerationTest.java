@@ -41,6 +41,33 @@ class AnnotationMetadataGenerationTest {
     }
 
     @Test
+    void capturesConditioningAnnotationWithItsStereotype() {
+        JavaFileObject service = JavaFileObjects.forSourceString("example.Feature", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.ConditionalOnProperty;
+
+                @ConditionalOnProperty(value = "feature.on", havingValue = "true")
+                public class Feature {
+                    @Inject
+                    public Feature() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Feature$$Factory")
+                .contentsAsUtf8String();
+        source.contains("public AnnotationMetadata annotationMetadata()");
+        source.contains("AnnotationValue.of(ConditionalOnProperty.class");
+        source.contains("Map.entry(\"value\", \"feature.on\")");
+        source.contains("Set.of(ConditioningAnnotation.class)");
+    }
+
+    @Test
     void capturesQualifierAndScopeAnnotationsAtTheirSites() {
         JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
                 package example;

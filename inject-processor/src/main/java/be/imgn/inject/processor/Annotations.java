@@ -21,6 +21,7 @@ import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 
+import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.ScopingAnnotation;
@@ -35,6 +36,7 @@ final class Annotations {
     private static final ClassName QUALIFYING_ANNOTATION = ClassName.get("be.imgn.inject", "QualifyingAnnotation");
     private static final ClassName SCOPING_ANNOTATION = ClassName.get("be.imgn.inject", "ScopingAnnotation");
     private static final ClassName INJECTING_ANNOTATION = ClassName.get("be.imgn.inject", "InjectingAnnotation");
+    private static final ClassName CONDITIONING_ANNOTATION = ClassName.get("be.imgn.inject", "ConditioningAnnotation");
     private static final ClassName MAP = ClassName.get("java.util", "Map");
     private static final ClassName SET = ClassName.get("java.util", "Set");
     private static final ClassName LIST = ClassName.get("java.util", "List");
@@ -90,7 +92,8 @@ final class Annotations {
     private static boolean isFrameworkRelated(TypeElement annotationType) {
         return annotationType.getAnnotation(QualifyingAnnotation.class) != null
                 || annotationType.getAnnotation(ScopingAnnotation.class) != null
-                || annotationType.getAnnotation(InjectingAnnotation.class) != null;
+                || annotationType.getAnnotation(InjectingAnnotation.class) != null
+                || annotationType.getAnnotation(ConditioningAnnotation.class) != null;
     }
 
     /** {@return an {@code AnnotationValue.of(...)} expression describing the annotation} */
@@ -119,6 +122,9 @@ final class Annotations {
         }
         if (annotationType.getAnnotation(InjectingAnnotation.class) != null) {
             present.add(CodeBlock.of("$T.class", INJECTING_ANNOTATION));
+        }
+        if (annotationType.getAnnotation(ConditioningAnnotation.class) != null) {
+            present.add(CodeBlock.of("$T.class", CONDITIONING_ANNOTATION));
         }
         return CodeBlock.of("$T.of($L)", SET, present.stream().collect(CodeBlock.joining(", ")));
     }

@@ -67,6 +67,20 @@ class ExamplesClasspathTest {
     }
 
     @Test
+    void conditionalBeanFollowsTheProperty() {
+        // absent by default
+        assertThat(Injector.create().getBeanDefinition(Key.of(PremiumFeature.class)))
+                .isEmpty();
+
+        System.setProperty("examples.premium", "true");
+        try {
+            assertThat(Injector.create().getInstance(PremiumFeature.class)).isNotNull();
+        } finally {
+            System.clearProperty("examples.premium");
+        }
+    }
+
+    @Test
     void exposeAsMakesBeanInjectableOnlyAsListedType() {
         Injector injector = Injector.create();
 
