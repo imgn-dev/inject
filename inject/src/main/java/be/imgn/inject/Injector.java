@@ -1,9 +1,13 @@
 package be.imgn.inject;
 
+import java.lang.annotation.Annotation;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
+import be.imgn.inject.context.BeanDefinition;
 import be.imgn.inject.context.Context;
 
 /**
@@ -66,6 +70,25 @@ public interface Injector {
      * @param <T> the requested type
      */
     <T> Provider<T> getProvider(Key<T> key);
+
+    /**
+     * {@return the definition bound to {@code key}, if any}
+     *
+     * <p>A read-only view for inspecting the graph — the bean's key, declared framework annotations, and injection
+     * points — not for building instances.
+     *
+     * @param key the binding key, qualified or not
+     */
+    Optional<BeanDefinition> getBeanDefinition(Key<?> key);
+
+    /**
+     * {@return every bean annotated with an annotation carrying {@code stereotype}}
+     *
+     * <p>For example {@code getBeanDefinitionsByStereotype(ScopingAnnotation.class)} lists every scoped bean.
+     *
+     * @param stereotype the meta-annotation to filter by
+     */
+    List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype);
 
     /** {@return a new injector backed by all registered factories and scopes} */
     static Injector create() {

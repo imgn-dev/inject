@@ -1,6 +1,7 @@
 package be.imgn.inject.context;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,9 +13,12 @@ import be.imgn.inject.Provider;
  * Base class for per-bean factories. Generated subclasses live in the bean's own package so they can access
  * package-private members with zero reflection.
  *
+ * <p>A factory is also the {@link BeanDefinition} for its bean: the read-only introspection view exposed through the
+ * container is this instance.
+ *
  * @param <T> the built type
  */
-public abstract class Factory<T> {
+public abstract class Factory<T> implements BeanDefinition {
     private final Class<T> type;
 
     /** @param type the built type */
@@ -25,6 +29,33 @@ public abstract class Factory<T> {
     /** {@return the built type} */
     public final Class<T> type() {
         return type;
+    }
+
+    /** {@return the bean's primary (unqualified) key} */
+    @Override
+    public final Key<T> key() {
+        return Key.of(type);
+    }
+
+    /**
+     * {@return the framework annotations declared on the bean itself; none by default}
+     *
+     * <p>Generated factories override this with the annotations meta-annotated by one of the framework's root
+     * annotations that appear on the bean type or its {@code @Provides} method.
+     */
+    @Override
+    public AnnotationMetadata annotationMetadata() {
+        return AnnotationMetadata.empty();
+    }
+
+    /** {@return the bean's injection points: its constructor (when it injects), then methods, then fields} */
+    @Override
+    public final List<InjectionPoint> injectionPoints() {
+        List<InjectionPoint> points = new ArrayList<>();
+        constructorInjectionPoint().ifPresent(points::add);
+        points.addAll(methodInjectionPoints());
+        points.addAll(fieldInjectionPoints());
+        return List.copyOf(points);
     }
 
     /**

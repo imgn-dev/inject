@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
  * @param methodParameters the method's parameters, in order
  * @param metadata an {@code AnnotationMetadata} expression for the provision's framework-related annotations, including
  *     those on the declaring type
+ * @param definitionMetadata an {@code AnnotationMetadata} expression for the framework-related annotations declared on
+ *     the {@code @Provides} method itself, exposed through {@code BeanDefinition}
  * @param scopeAnnotation the method's scoping annotation type, or {@code null} for prototype scope
  * @param qualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the result is exposed as; empty means "use the factory's default single key"
@@ -33,6 +35,7 @@ record ProvidesModel(
         boolean isStatic,
         List<ParameterModel> methodParameters,
         CodeBlock metadata,
+        CodeBlock definitionMetadata,
         @Nullable ClassName scopeAnnotation,
         @Nullable RenderedQualifier qualifier,
         List<TypeName> exposedTypes) {}

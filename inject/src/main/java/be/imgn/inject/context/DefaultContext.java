@@ -26,6 +26,8 @@ import be.imgn.inject.UnsatisfiedDependencyException;
  */
 final class DefaultContext implements Context {
     private final Map<Key<?>, Provider<?>> registry;
+    private final Map<Key<?>, BeanDefinition> definitions;
+    private final List<BeanDefinition> allDefinitions;
     private final ThreadLocal<Deque<Key<?>>> stack = ThreadLocal.withInitial(ArrayDeque::new);
 
     DefaultContext() {
@@ -47,17 +49,23 @@ final class DefaultContext implements Context {
         }
 
         Map<Key<?>, Provider<?>> built = new HashMap<>();
+        Map<Key<?>, BeanDefinition> definitionsByKey = new HashMap<>();
+        List<BeanDefinition> definitionList = new ArrayList<>();
         for (Factory<?> factory : factories) {
             Provider<?> provider = wrap(factory, scopesByAnnotation);
             for (Key<?> key : factory.exposedKeys()) {
                 if (built.putIfAbsent(key, provider) != null) {
                     throw new DuplicateBindingException("Duplicate binding for " + key);
                 }
+                definitionsByKey.put(key, factory);
             }
+            definitionList.add(factory);
         }
         // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
         built.putAll(overrides);
         this.registry = Map.copyOf(built);
+        this.definitions = Map.copyOf(definitionsByKey);
+        this.allDefinitions = List.copyOf(definitionList);
     }
 
     private static List<Factory<?>> loadFactories() {
@@ -100,6 +108,20 @@ final class DefaultContext implements Context {
             throw new UnsatisfiedDependencyException("No binding for " + key + requiredBySuffix());
         }
         return (Provider<T>) provider;
+    }
+
+    @Override
+    public Optional<BeanDefinition> getBeanDefinition(Key<?> key) {
+        Objects.requireNonNull(key, "key");
+        return Optional.ofNullable(definitions.get(key));
+    }
+
+    @Override
+    public List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
+        Objects.requireNonNull(stereotype, "stereotype");
+        return allDefinitions.stream()
+                .filter(definition -> definition.annotationMetadata().hasStereotype(stereotype))
+                .toList();
     }
 
     private String requiredBySuffix() {

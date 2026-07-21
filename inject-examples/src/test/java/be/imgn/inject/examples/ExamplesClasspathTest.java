@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test;
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
+import be.imgn.inject.ScopingAnnotation;
+import be.imgn.inject.Singleton;
 import be.imgn.inject.UnsatisfiedDependencyException;
+import be.imgn.inject.context.BeanDefinition;
 
 class ExamplesClasspathTest {
 
@@ -42,6 +45,25 @@ class ExamplesClasspathTest {
         Injector injector = Injector.create();
         assertThat(injector.getInstance(Key.of(String.class, Names.named("greeting"))))
                 .isEqualTo("Hello");
+    }
+
+    @Test
+    void introspectsBeanDefinitions() {
+        Injector injector = Injector.create();
+
+        // scoped beans are discoverable by their scoping stereotype
+        assertThat(injector.getBeanDefinitionsByStereotype(ScopingAnnotation.class))
+                .extracting(BeanDefinition::key)
+                .contains(Key.of(Registry.class), Key.of(V8Engine.class));
+
+        // a definition carries its own scope annotation and its constructor injection point
+        assertThat(injector.getBeanDefinition(Key.of(Registry.class))).hasValueSatisfying(definition -> {
+            assertThat(definition.annotationMetadata().isPresent(Singleton.class))
+                    .isTrue();
+            assertThat(definition.injectionPoints()).isNotEmpty();
+        });
+
+        assertThat(injector.getBeanDefinition(Key.of(Long.class))).isEmpty();
     }
 
     @Test

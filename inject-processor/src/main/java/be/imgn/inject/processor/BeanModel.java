@@ -17,6 +17,8 @@ import org.jspecify.annotations.Nullable;
  * @param constructorParameters the injectable constructor's parameters, in order (empty for a no-arg constructor)
  * @param constructorMetadata an {@code AnnotationMetadata} expression for the constructor's framework-related
  *     annotations, including those on the bean type
+ * @param definitionMetadata an {@code AnnotationMetadata} expression for the framework-related annotations declared on
+ *     the bean type itself, exposed through {@code BeanDefinition}
  * @param fields the context-resolved {@code @Inject} fields, in order
  * @param methods the {@code @Inject} methods, in order
  * @param pluginFields the plugin-initialized fields (via an {@code @InjectingAnnotation}), in order
@@ -30,6 +32,7 @@ record BeanModel(
         ClassName beanType,
         List<ParameterModel> constructorParameters,
         CodeBlock constructorMetadata,
+        CodeBlock definitionMetadata,
         List<FieldModel> fields,
         List<MethodModel> methods,
         List<PluginField> pluginFields,

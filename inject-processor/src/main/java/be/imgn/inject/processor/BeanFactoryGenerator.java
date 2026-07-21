@@ -37,7 +37,8 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(ParameterizedTypeName.get(FACTORY, model.beanType()))
                 .addMethod(constructor(model))
-                .addMethod(createInstance(model));
+                .addMethod(createInstance(model))
+                .addMethod(annotationMetadata(model));
         if (!model.constructorParameters().isEmpty()) {
             type.addMethod(constructorInjectionPoint(model));
         }
@@ -78,6 +79,15 @@ final class BeanFactoryGenerator {
                         LIST,
                         parameterList(model.constructorParameters()),
                         model.constructorMetadata())
+                .build();
+    }
+
+    private static MethodSpec annotationMetadata(BeanModel model) {
+        return MethodSpec.methodBuilder("annotationMetadata")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(ANNOTATION_METADATA)
+                .addStatement("return $L", model.definitionMetadata())
                 .build();
     }
 

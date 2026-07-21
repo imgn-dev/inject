@@ -1,7 +1,11 @@
 package be.imgn.inject;
 
+import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
+import be.imgn.inject.context.BeanDefinition;
 import be.imgn.inject.context.Context;
 
 /** Default {@link Injector} delegating everything to a {@link Context}. */
@@ -40,5 +44,15 @@ final class DefaultInjector implements Injector {
     @Override
     public <T> Provider<T> getProvider(Key<T> key) {
         return context.getProvider(Objects.requireNonNull(key, "key"));
+    }
+
+    @Override
+    public Optional<BeanDefinition> getBeanDefinition(Key<?> key) {
+        return context.getBeanDefinition(Objects.requireNonNull(key, "key"));
+    }
+
+    @Override
+    public List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
+        return context.getBeanDefinitionsByStereotype(Objects.requireNonNull(stereotype, "stereotype"));
     }
 }

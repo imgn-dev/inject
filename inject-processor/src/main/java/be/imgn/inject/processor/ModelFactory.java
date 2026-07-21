@@ -110,6 +110,7 @@ final class ModelFactory {
                 ClassName.get(bean),
                 constructorParameters,
                 Annotations.metadata(constructorSites, elements),
+                Annotations.metadata(List.of(bean), elements),
                 List.copyOf(fields),
                 List.copyOf(methods),
                 pluginFields(bean),
@@ -127,6 +128,7 @@ final class ModelFactory {
                 GeneratedNames.factoryName(enclosingChain(type)),
                 ClassName.get(type),
                 List.of(),
+                Annotations.metadata(List.of(type), elements),
                 Annotations.metadata(List.of(type), elements),
                 List.of(),
                 List.of(),
@@ -151,6 +153,7 @@ final class ModelFactory {
                 method.getModifiers().contains(Modifier.STATIC),
                 parameters(method, host, types, elements, packageOf(host)),
                 Annotations.metadata(List.of(host, method), elements),
+                Annotations.metadata(List.of(method), elements),
                 Annotations.scope(method).orElse(null),
                 qualifier,
                 exposedTypesForProvides(method, method.getReturnType(), qualifier != null));

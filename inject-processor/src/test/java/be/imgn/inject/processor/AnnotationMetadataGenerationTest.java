@@ -14,6 +14,33 @@ import org.junit.jupiter.api.Test;
 class AnnotationMetadataGenerationTest {
 
     @Test
+    void generatesBeanDefinitionMetadataOverride() {
+        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Singleton;
+
+                @Singleton
+                public class Service {
+                    @Inject
+                    public Service() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
+
+        assertThat(compilation).succeeded();
+        StringSubject source = assertThat(compilation)
+                .generatedSourceFile("example.$Service$$Factory")
+                .contentsAsUtf8String();
+        // the bean's own @Singleton is exposed through BeanDefinition.annotationMetadata(), even with a no-arg
+        // constructor (which emits no constructor injection point)
+        source.contains("public AnnotationMetadata annotationMetadata()");
+        source.contains("AnnotationValue.of(Singleton.class, Map.of(), Set.of(ScopingAnnotation.class))");
+    }
+
+    @Test
     void capturesQualifierAndScopeAnnotationsAtTheirSites() {
         JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
                 package example;

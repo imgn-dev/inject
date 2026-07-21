@@ -36,7 +36,8 @@ final class ProvidesFactoryGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(ParameterizedTypeName.get(FACTORY, model.producedType()))
                 .addMethod(constructor(model))
-                .addMethod(createInstance(model));
+                .addMethod(createInstance(model))
+                .addMethod(annotationMetadata(model));
         if (!model.isStatic() || !model.methodParameters().isEmpty()) {
             type.addMethod(constructorInjectionPoint(model));
         }
@@ -53,6 +54,15 @@ final class ProvidesFactoryGenerator {
         return MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addStatement("super($T.class)", model.producedType())
+                .build();
+    }
+
+    private static MethodSpec annotationMetadata(ProvidesModel model) {
+        return MethodSpec.methodBuilder("annotationMetadata")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(ANNOTATION_METADATA)
+                .addStatement("return $L", model.definitionMetadata())
                 .build();
     }
 
