@@ -218,7 +218,7 @@ git commit -m "feat(inject): Types.setOf/mapOf with JDK-compatible structural eq
 
 **Interfaces:**
 - Consumes: `Key`, `Types` (Task 1).
-- Produces: `@IntoSet(Class value)`, `@IntoMap(Class value, String key)`, `public record Contribution(Key<?> collectionKey, @Nullable String mapKey)`, `public Optional<Contribution> Factory.contribution()` (default empty). Task 3 reads `contribution()`; Task 5 generates overrides of it.
+- Produces: `@IntoSet(Class value)`, `@IntoMap(Class value, String key)`, `public record Contribution(Key<?> collectionKey, @Nullable String mapKey)`, `protected Optional<Contribution> Factory.contribution()` (default empty; protected grants same-package access to `DefaultContext` and override access to generated subclasses). Task 3 reads `contribution()`; Task 5 generates overrides of it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -355,7 +355,7 @@ In `Factory.java`, directly after the `exposedKeys()` method:
      *
      * <p>A contributing factory exposes no keys of its own; its bean is reachable only through the collection.
      */
-    public Optional<Contribution> contribution() {
+    protected Optional<Contribution> contribution() {
         return Optional.empty();
     }
 ```
@@ -428,12 +428,12 @@ class MultibindingTest {
         }
 
         @Override
-        public List<Key<?>> exposedKeys() {
+        protected List<Key<?>> exposedKeys() {
             return List.of();
         }
 
         @Override
-        public Optional<Contribution> contribution() {
+        protected Optional<Contribution> contribution() {
             return Optional.of(contribution);
         }
     }
@@ -496,7 +496,7 @@ class MultibindingTest {
             }
 
             @Override
-            public List<Key<?>> exposedKeys() {
+            protected List<Key<?>> exposedKeys() {
                 return List.of(SET_KEY);
             }
         };
@@ -520,7 +520,7 @@ class MultibindingTest {
 }
 ```
 
-Note `ContribFactory` overrides `exposedKeys()`/`contribution()` as `public` — Task 2 declared them public; `exposedKeys()` is currently `protected`, widen it to `public` in this task (generated code already overrides it; widening is source-compatible). If you prefer not to widen, make the test's overrides `protected` and keep visibility as-is — but `DefaultContext` already calls both, so either works; **widen `exposedKeys()` to `public`** for symmetry with `contribution()` and `annotationMetadata()`.
+Visibility note: `exposedKeys()` and `contribution()` stay `protected`. `MultibindingTest` lives in `be.imgn.inject.context`, so its overrides may stay `protected` too (or widen to `public` locally — both legal). Do NOT widen `Factory` members: generators emit `protected` overrides until Task 5, and a `public` base method would break every full-reactor build in between.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -596,7 +596,7 @@ Add the private helpers (imports: `java.util.LinkedHashMap`, `java.util.stream.C
     }
 ```
 
-Also in `Factory.java`: change `protected List<Key<?>> exposedKeys()` to `public List<Key<?>> exposedKeys()` (Javadoc unchanged). Mixing set and map contributors under one key cannot happen: set and map contributions use different collection keys (`Set<T>` vs `Map<String,T>`), so a group is homogeneous by construction — `NullAway` may still flag `mapKey()` in the map branch; it is non-null there by the same argument, use a local with `Objects.requireNonNull` if it complains.
+Mixing set and map contributors under one key cannot happen: set and map contributions use different collection keys (`Set<T>` vs `Map<String,T>`), so a group is homogeneous by construction — `NullAway` may still flag `mapKey()` in the map branch; it is non-null there by the same argument, use a local with `Objects.requireNonNull` if it complains.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -635,7 +635,6 @@ Run: `./mvnw -q clean test -pl inject > /tmp/t3.log 2>&1; echo EXIT=$?` — Expe
 
 ```bash
 git add inject/src/main/java/be/imgn/inject/context/DefaultContext.java \
-  inject/src/main/java/be/imgn/inject/context/Factory.java \
   inject/src/test/java/be/imgn/inject/context/MultibindingTest.java
 git commit -m "feat(context): aggregate @IntoSet/@IntoMap contributions in DefaultContext"
 ```
@@ -1327,7 +1326,7 @@ Generators — in both `BeanFactoryGenerator.generate` and `ProvidesFactoryGener
                 LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
         return MethodSpec.methodBuilder("exposedKeys")
                 .addAnnotation(Override.class)
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(Modifier.PROTECTED)
                 .returns(keys)
                 .addStatement("return $T.of()", LIST)
                 .build();
@@ -1342,14 +1341,14 @@ Generators — in both `BeanFactoryGenerator.generate` and `ProvidesFactoryGener
         CodeBlock mapKey = contribution.mapKey() == null ? CodeBlock.of("null") : CodeBlock.of("$S", contribution.mapKey());
         return MethodSpec.methodBuilder("contribution")
                 .addAnnotation(Override.class)
-                .addModifiers(Modifier.PUBLIC)
+                .addModifiers(Modifier.PROTECTED)
                 .returns(ParameterizedTypeName.get(OPTIONAL, CONTRIBUTION))
                 .addStatement("return $T.of(new $T($L, $L))", OPTIONAL, CONTRIBUTION, collectionKey, mapKey)
                 .build();
     }
 ```
 
-Note: Task 3 widened `exposedKeys()` to `public`, so the generated override is `PUBLIC`; the existing generated `exposedKeys` override in the non-contribution branch must switch from `PROTECTED` to `PUBLIC` in the same commit (one-word change in the existing `exposedKeys(model)` method builders of both generators).
+Visibility: both overrides are `PROTECTED`, matching the existing generated `exposedKeys`/`scope` overrides.
 
 - [ ] **Step 4: Run to verify green**
 
@@ -1670,5 +1669,5 @@ git commit -m "feat(examples): Set multibinding on the module path"
 ## Self-Review Notes
 
 - Spec coverage: markers ✔ (T2/T5), `Types` ✔ (T1), runtime aggregation + duplicate map key + direct-binding collision + absent-is-error ✔ (T3), site detection + shape errors + `Provider<Set>` ✔ (T4), all seven compile errors ✔ (T4 site shapes; T5 the rest), conditions interplay ✔ (T3 test + T6 example), introspection interplay ✔ (T3 `collectionKeyHasNoBeanDefinition`), e2e classpath + module path ✔ (T6/T7).
-- Type consistency: `Contribution(Key<?>, @Nullable String)` (T2) used by T3 aggregation and T5 generation; `ContributionModel(TypeName, @Nullable String)` (T5) only inside the processor; `Dependency(CodeBlock type, boolean isProvider)` and `ParameterModel.type()`/`FieldModel.type()` renames (T4) used by both generators; `exposedKeys()` widened to `public` in T3, generators emit `PUBLIC` from T5 on.
+- Type consistency: `Contribution(Key<?>, @Nullable String)` (T2) used by T3 aggregation and T5 generation; `ContributionModel(TypeName, @Nullable String)` (T5) only inside the processor; `Dependency(CodeBlock type, boolean isProvider)` and `ParameterModel.type()`/`FieldModel.type()` renames (T4) used by both generators; `exposedKeys()`/`contribution()` stay `protected` throughout; generators emit `PROTECTED`.
 - Known ripple: `FieldInjectionPoint.fieldType` widens `Class<?>` → `Type` (T4); `InjectionPointTest` and `Factory` compile unchanged since `X.class` is a `Type` and `key()` already routed through `Key.of(Type, ...)`.
