@@ -118,4 +118,12 @@ class ExamplesClasspathTest {
             System.clearProperty("examples.push");
         }
     }
+
+    @Test
+    void injectsTheInjectorItself() {
+        Injector injector = Injector.create();
+        BeanLocator locator = injector.getInstance(BeanLocator.class);
+        assertThat(locator.injector()).isSameAs(injector);
+        assertThat(locator.locateRegistry()).isSameAs(injector.getInstance(Registry.class));
+    }
 }
