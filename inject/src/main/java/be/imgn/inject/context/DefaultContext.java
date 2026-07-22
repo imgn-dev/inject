@@ -5,12 +5,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.ConditionResolutionException;
@@ -74,11 +76,20 @@ final class DefaultContext implements Context {
         Map<Key<?>, Provider<?>> built = new HashMap<>();
         Map<Key<?>, BeanDefinition> definitionsByKey = new HashMap<>();
         List<BeanDefinition> definitionList = new ArrayList<>();
+        Map<Key<?>, List<Contributor>> contributions = new LinkedHashMap<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
                 continue; // an unmatched condition removes the bean from the graph entirely
             }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
+            Optional<Contribution> contribution = factory.contribution();
+            if (contribution.isPresent()) {
+                contributions
+                        .computeIfAbsent(contribution.get().collectionKey(), key -> new ArrayList<>())
+                        .add(new Contributor(contribution.get(), provider));
+                definitionList.add(factory);
+                continue;
+            }
             for (Key<?> key : factory.exposedKeys()) {
                 if (built.putIfAbsent(key, provider) != null) {
                     throw new DuplicateBindingException("Duplicate binding for " + key);
@@ -87,6 +98,11 @@ final class DefaultContext implements Context {
             }
             definitionList.add(factory);
         }
+        contributions.forEach((key, contributors) -> {
+            if (built.putIfAbsent(key, aggregate(key, contributors)) != null) {
+                throw new DuplicateBindingException("Duplicate binding for " + key);
+            }
+        });
         // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
         built.putAll(overrides);
         this.registry = Map.copyOf(built);
@@ -203,5 +219,27 @@ final class DefaultContext implements Context {
 
     void exit(Key<?> key) {
         stack.get().pop();
+    }
+
+    /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
+    private record Contributor(Contribution contribution, Provider<?> provider) {}
+
+    /** {@return the aggregate provider for one collection key: a set provider, or a map provider when keys exist} */
+    private static Provider<?> aggregate(Key<?> collectionKey, List<Contributor> contributors) {
+        if (contributors.get(0).contribution().mapKey() == null) {
+            List<Provider<?>> providers =
+                    contributors.stream().map(Contributor::provider).toList();
+            return () -> providers.stream().map(Provider::get).collect(Collectors.toUnmodifiableSet());
+        }
+        Map<String, Provider<?>> byKey = new LinkedHashMap<>();
+        for (Contributor contributor : contributors) {
+            String mapKey = Objects.requireNonNull(contributor.contribution().mapKey());
+            if (byKey.putIfAbsent(mapKey, contributor.provider()) != null) {
+                throw new DuplicateBindingException("Duplicate map key \"" + mapKey + "\" for " + collectionKey);
+            }
+        }
+        return () -> byKey.entrySet().stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey, entry -> entry.getValue().get()));
     }
 }
