@@ -35,9 +35,11 @@ final class PlanStage {
             diagnostics.error("Dependency cycle detected: " + path, cycle.get(0));
             return false;
         }
-        // Duplicate bindings that arise within one compilation fall through to the runtime DuplicateBindingException.
-        // Cross-module duplicates are undetectable at compile time under the ServiceLoader architecture, so runtime
-        // detection is the single, consistent safety net.
+        // Duplicate ordinary bindings that arise within one compilation fall through to the runtime
+        // DuplicateBindingException: cross-module duplicates are undetectable at compile time under the
+        // ServiceLoader architecture, so runtime detection is the single, consistent safety net. @IntoMap keys
+        // are the exception - duplicates visible in this compilation fail fast here, and the runtime check
+        // still catches cross-module collisions.
         return checkDuplicateMapKeys(gathered);
     }
 
