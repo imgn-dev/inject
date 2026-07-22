@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Factories for the parameterized {@link Type}s used as collection binding keys.
  *
@@ -62,8 +64,7 @@ public final class Types {
         }
 
         @Override
-        @SuppressWarnings("NullAway")
-        public Type getOwnerType() {
+        public @Nullable Type getOwnerType() {
             return null;
         }
 
