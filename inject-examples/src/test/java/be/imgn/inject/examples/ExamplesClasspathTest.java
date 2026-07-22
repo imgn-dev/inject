@@ -99,4 +99,23 @@ class ExamplesClasspathTest {
         // resolving to the same singleton.
         assertThat(injector.getInstance(Audited.class)).isNotNull().isSameAs(injector.getInstance(Registry.class));
     }
+
+    @Test
+    void collectsMultibindings() {
+        NotificationCenter center = Injector.create().getInstance(NotificationCenter.class);
+        assertThat(center.notifiers())
+                .hasSize(2)
+                .hasAtLeastOneElementOfType(EmailNotifier.class)
+                .hasAtLeastOneElementOfType(SmsNotifier.class);
+        assertThat(center.formatters()).containsOnlyKeys("json", "xml");
+
+        System.setProperty("examples.push", "true");
+        try {
+            assertThat(Injector.create().getInstance(NotificationCenter.class).notifiers())
+                    .hasSize(3)
+                    .hasAtLeastOneElementOfType(PushNotifier.class);
+        } finally {
+            System.clearProperty("examples.push");
+        }
+    }
 }
