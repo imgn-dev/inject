@@ -228,10 +228,10 @@ final class BeanFactoryGenerator {
     private static CodeBlock parameter(ParameterModel parameter) {
         RenderedQualifier qualifier = parameter.qualifier();
         return CodeBlock.of(
-                "new $T($S, $T.class, $L, $L, $L, $L)",
+                "new $T($S, $L, $L, $L, $L, $L)",
                 PARAMETER,
                 parameter.name(),
-                parameter.rawType(),
+                parameter.type(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
                 parameter.metadata(),
@@ -241,10 +241,10 @@ final class BeanFactoryGenerator {
     private static CodeBlock fieldPoint(FieldModel field) {
         RenderedQualifier qualifier = field.qualifier();
         return CodeBlock.of(
-                "new $T(this, $S, $T.class, $L, $L, $L, $L)",
+                "new $T(this, $S, $L, $L, $L, $L, $L)",
                 FIELD_IP,
                 field.name(),
-                field.rawType(),
+                field.type(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
                 field.metadata(),

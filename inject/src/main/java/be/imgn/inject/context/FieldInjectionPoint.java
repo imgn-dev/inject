@@ -24,7 +24,7 @@ import be.imgn.inject.Key;
 public record FieldInjectionPoint(
         Factory<?> factory,
         String fieldName,
-        Class<?> fieldType,
+        Type fieldType,
         @Nullable Class<? extends Annotation> qualifierType,
         @Nullable Annotation qualifier,
         AnnotationMetadata annotationMetadata,
@@ -54,7 +54,7 @@ public record FieldInjectionPoint(
      * @param annotationMetadata annotations present on the field
      */
     public FieldInjectionPoint(
-            Factory<?> factory, String fieldName, Class<?> fieldType, AnnotationMetadata annotationMetadata) {
+            Factory<?> factory, String fieldName, Type fieldType, AnnotationMetadata annotationMetadata) {
         this(factory, fieldName, fieldType, null, null, annotationMetadata, false);
     }
 
@@ -68,7 +68,7 @@ public record FieldInjectionPoint(
     public FieldInjectionPoint(
             Factory<?> factory,
             String fieldName,
-            Class<?> fieldType,
+            Type fieldType,
             Class<? extends Annotation> qualifierType,
             AnnotationMetadata annotationMetadata) {
         this(factory, fieldName, fieldType, qualifierType, null, annotationMetadata, false);
@@ -84,7 +84,7 @@ public record FieldInjectionPoint(
     public FieldInjectionPoint(
             Factory<?> factory,
             String fieldName,
-            Class<?> fieldType,
+            Type fieldType,
             Annotation qualifier,
             AnnotationMetadata annotationMetadata) {
         this(factory, fieldName, fieldType, null, qualifier, annotationMetadata, false);
@@ -102,6 +102,6 @@ public record FieldInjectionPoint(
      */
     @SuppressWarnings("unchecked")
     public <T> Key<T> key() {
-        return (Key<T>) (qualifier != null ? Key.of(fieldType, qualifier) : Key.of((Type) fieldType, qualifierType));
+        return (Key<T>) (qualifier != null ? Key.of(fieldType, qualifier) : Key.of(fieldType, qualifierType));
     }
 }

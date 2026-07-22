@@ -8,6 +8,7 @@ import java.util.Deque;
 import java.util.EventListener;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -45,6 +46,10 @@ import be.imgn.inject.processor.spi.InjectionSite;
 final class ModelFactory {
 
     private static final String PROVIDER = Provider.class.getCanonicalName();
+    private static final String SET = Set.class.getName();
+    private static final String MAP = Map.class.getName();
+    private static final String STRING = String.class.getName();
+    private static final ClassName TYPES = ClassName.get("be.imgn.inject", "Types");
 
     // Types never exposed by the default (no-@ExposeAs) supertype closure: universal supertypes and common marker
     // interfaces that would collide across unrelated beans. @ExposeAs can still expose these explicitly.
@@ -356,13 +361,13 @@ final class ModelFactory {
                             pluginArgument = supplied.get();
                         }
                     }
-                    Dependency dependency = dependency(parameter.asType(), types);
+                    Dependency dependency = dependency(parameter.asType(), types, parameter);
                     RenderedQualifier qualifier = Annotations.qualifier(
                                     parameter, elements, targetPackage, annotationImplRequests)
                             .orElse(null);
                     return new ParameterModel(
                             parameter.getSimpleName().toString(),
-                            dependency.rawType(),
+                            dependency.type(),
                             qualifier,
                             dependency.isProvider(),
                             pluginArgument,
@@ -446,24 +451,62 @@ final class ModelFactory {
     }
 
     private FieldModel field(VariableElement fieldElement, Types types, Elements elements, String targetPackage) {
-        Dependency dependency = dependency(fieldElement.asType(), types);
+        Dependency dependency = dependency(fieldElement.asType(), types, fieldElement);
         RenderedQualifier qualifier = Annotations.qualifier(
                         fieldElement, elements, targetPackage, annotationImplRequests)
                 .orElse(null);
         return new FieldModel(
                 fieldElement.getSimpleName().toString(),
-                dependency.rawType(),
+                dependency.type(),
                 qualifier,
                 dependency.isProvider(),
                 Annotations.metadata(List.of(fieldElement), elements));
     }
 
-    private static Dependency dependency(TypeMirror type, Types types) {
-        Optional<TypeMirror> inner = providerInner(type);
-        if (inner.isPresent()) {
-            return new Dependency(TypeName.get(types.erasure(inner.get())), true);
+    private Dependency dependency(TypeMirror type, Types types, Element site) {
+        Optional<TypeMirror> providerInner = providerInner(type);
+        if (providerInner.isPresent()) {
+            return new Dependency(typeExpression(providerInner.get(), types, site), true);
         }
-        return new Dependency(TypeName.get(types.erasure(type)), false);
+        return new Dependency(typeExpression(type, types, site), false);
+    }
+
+    /** {@return the runtime type expression for a dependency: a class literal, or a Types factory call} */
+    private CodeBlock typeExpression(TypeMirror type, Types types, Element site) {
+        if (type instanceof DeclaredType declared && declared.asElement() instanceof TypeElement element) {
+            String name = element.getQualifiedName().toString();
+            if (name.equals(SET)) {
+                if (declared.getTypeArguments().size() != 1) {
+                    diagnostics.error("Cannot inject a raw Set; declare an element type.", site);
+                } else if (providerInner(declared.getTypeArguments().get(0)).isPresent()) {
+                    diagnostics.error("Set<Provider<T>> is not supported; inject Provider<Set<T>> instead.", site);
+                } else {
+                    return CodeBlock.of(
+                            "$T.setOf($T.class)",
+                            TYPES,
+                            TypeName.get(
+                                    types.erasure(declared.getTypeArguments().get(0))));
+                }
+            }
+            if (name.equals(MAP)) {
+                if (declared.getTypeArguments().size() != 2) {
+                    diagnostics.error("Cannot inject a raw Map; declare key and value types.", site);
+                } else if (!types.erasure(declared.getTypeArguments().get(0))
+                        .toString()
+                        .equals(STRING)) {
+                    diagnostics.error("Injected Maps use String keys.", site);
+                } else {
+                    return CodeBlock.of(
+                            "$T.mapOf($T.class, $T.class)",
+                            TYPES,
+                            TypeName.get(
+                                    types.erasure(declared.getTypeArguments().get(0))),
+                            TypeName.get(
+                                    types.erasure(declared.getTypeArguments().get(1))));
+                }
+            }
+        }
+        return CodeBlock.of("$T.class", TypeName.get(types.erasure(type)));
     }
 
     private static Optional<TypeMirror> providerInner(TypeMirror type) {
@@ -486,5 +529,5 @@ final class ModelFactory {
         return List.copyOf(chain);
     }
 
-    private record Dependency(TypeName rawType, boolean isProvider) {}
+    private record Dependency(CodeBlock type, boolean isProvider) {}
 }

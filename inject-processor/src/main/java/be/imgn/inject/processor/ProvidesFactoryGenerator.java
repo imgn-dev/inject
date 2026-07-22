@@ -150,10 +150,10 @@ final class ProvidesFactoryGenerator {
     private static CodeBlock parameter(ParameterModel parameter) {
         RenderedQualifier qualifier = parameter.qualifier();
         return CodeBlock.of(
-                "new $T($S, $T.class, $L, $L, $L, $L)",
+                "new $T($S, $L, $L, $L, $L, $L)",
                 PARAMETER,
                 parameter.name(),
-                parameter.rawType(),
+                parameter.type(),
                 Qualifiers.markerArgument(qualifier),
                 Qualifiers.instanceArgument(qualifier),
                 parameter.metadata(),
