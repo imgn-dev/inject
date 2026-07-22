@@ -17,6 +17,8 @@ import javax.lang.model.element.TypeElement;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.IntoMap;
+import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provides;
 
 /** Stage 1: discovers injectable types and {@code @Provides} methods and builds their models. */
@@ -51,6 +53,14 @@ final class GatherStage {
         for (Element element : roundEnv.getElementsAnnotatedWith(ExposeAs.class)) {
             if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
                 diagnostics.error("@ExposeAs on a method is only allowed together with @Provides.", element);
+            }
+        }
+        Set<Element> markerElements = new LinkedHashSet<>();
+        markerElements.addAll(roundEnv.getElementsAnnotatedWith(IntoSet.class));
+        markerElements.addAll(roundEnv.getElementsAnnotatedWith(IntoMap.class));
+        for (Element element : markerElements) {
+            if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
+                diagnostics.error("@IntoSet/@IntoMap on a method requires @Provides.", element);
             }
         }
 

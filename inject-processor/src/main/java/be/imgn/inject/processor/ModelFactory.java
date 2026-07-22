@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -20,6 +21,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
@@ -34,7 +36,10 @@ import org.jspecify.annotations.Nullable;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.IntoMap;
+import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provider;
+import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
 
@@ -104,11 +109,15 @@ final class ModelFactory {
                         Annotations.metadata(List.of(method), elements)));
             }
         }
-        RenderedQualifier beanQualifier = Annotations.qualifier(bean, elements, packageOf(bean), annotationImplRequests)
-                .orElse(null);
+        ContributionModel contribution = contribution(bean, bean.asType(), types);
+        RenderedQualifier beanQualifier = contribution != null
+                ? null
+                : Annotations.qualifier(bean, elements, packageOf(bean), annotationImplRequests)
+                        .orElse(null);
         List<Element> constructorSites = new ArrayList<>();
         constructorSites.add(bean);
         injectConstructor(bean).ifPresent(constructorSites::add);
+        List<TypeName> exposedTypes = contribution != null ? List.of() : exposedTypes(bean, beanQualifier != null);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
@@ -121,7 +130,8 @@ final class ModelFactory {
                 pluginFields(bean),
                 Annotations.scope(bean).orElse(null),
                 beanQualifier,
-                exposedTypes(bean, beanQualifier != null));
+                exposedTypes,
+                contribution);
     }
 
     BeanModel defaultModel(TypeElement type) {
@@ -140,15 +150,22 @@ final class ModelFactory {
                 List.of(),
                 Annotations.scope(type).orElse(null),
                 beanQualifier,
-                exposedTypes(type, beanQualifier != null));
+                exposedTypes(type, beanQualifier != null),
+                null);
     }
 
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
         String name = method.getSimpleName().toString();
-        RenderedQualifier qualifier = Annotations.qualifier(method, elements, packageOf(host), annotationImplRequests)
-                .orElse(null);
+        ContributionModel contribution = contribution(method, method.getReturnType(), types);
+        RenderedQualifier qualifier = contribution != null
+                ? null
+                : Annotations.qualifier(method, elements, packageOf(host), annotationImplRequests)
+                        .orElse(null);
+        List<TypeName> exposedTypes = contribution != null
+                ? List.of()
+                : exposedTypesForProvides(method, method.getReturnType(), qualifier != null);
         return new ProvidesModel(
                 packageOf(host),
                 GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
@@ -161,7 +178,8 @@ final class ModelFactory {
                 Annotations.metadata(List.of(method), elements),
                 Annotations.scope(method).orElse(null),
                 qualifier,
-                exposedTypesForProvides(method, method.getReturnType(), qualifier != null));
+                exposedTypes,
+                contribution);
     }
 
     boolean validateBean(TypeElement bean) {
@@ -298,6 +316,63 @@ final class ModelFactory {
             return List.of(TypeName.get(types.erasure(producedType)));
         }
         return List.of();
+    }
+
+    /** {@return the element's collection contribution, or {@code null}; reports marker misuse} */
+    private @Nullable ContributionModel contribution(Element element, TypeMirror contributedType, Types types) {
+        IntoSet intoSet = element.getAnnotation(IntoSet.class);
+        IntoMap intoMap = element.getAnnotation(IntoMap.class);
+        if (intoSet == null && intoMap == null) {
+            return null;
+        }
+        if (intoSet != null && intoMap != null) {
+            diagnostics.error("Use only one collection marker (@IntoSet or @IntoMap).", element);
+            return null;
+        }
+        if (element.getAnnotation(ExposeAs.class) != null) {
+            diagnostics.error("A collection contribution cannot also use @ExposeAs.", element);
+            return null;
+        }
+        if (hasQualifier(element)) {
+            diagnostics.error("Collection bindings are unqualified; remove the qualifier.", element);
+            return null;
+        }
+        TypeMirror elementType =
+                intoSet != null ? annotationClassValue(intoSet::value) : annotationClassValue(intoMap::value);
+        if (!types.isAssignable(types.erasure(contributedType), types.erasure(elementType))) {
+            diagnostics.error(
+                    "The bean is not assignable to the collection element type " + types.erasure(elementType) + ".",
+                    element);
+            return null;
+        }
+        String mapKey = intoMap != null ? intoMap.key() : null;
+        if (mapKey != null && mapKey.isBlank()) {
+            diagnostics.error("@IntoMap key must not be blank.", element);
+            return null;
+        }
+        return new ContributionModel(TypeName.get(types.erasure(elementType)), mapKey);
+    }
+
+    /** {@return the TypeMirror of a Class-valued annotation member (the standard MirroredTypeException dance)} */
+    private static TypeMirror annotationClassValue(Supplier<Class<?>> accessor) {
+        try {
+            var unused = accessor.get();
+            throw new IllegalStateException("annotation Class member did not throw");
+        } catch (MirroredTypeException e) {
+            return e.getTypeMirror();
+        }
+    }
+
+    /** {@return whether the element carries a qualifying annotation, without rendering it or registering an impl} */
+    private static boolean hasQualifier(Element element) {
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            TypeElement annotationType =
+                    (TypeElement) mirror.getAnnotationType().asElement();
+            if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<PluginField> pluginFields(TypeElement bean) {

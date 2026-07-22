@@ -38,6 +38,38 @@ final class PlanStage {
         // Duplicate bindings that arise within one compilation fall through to the runtime DuplicateBindingException.
         // Cross-module duplicates are undetectable at compile time under the ServiceLoader architecture, so runtime
         // detection is the single, consistent safety net.
+        return checkDuplicateMapKeys(gathered);
+    }
+
+    /** {@return {@code true} if no two contributions in this compilation share an {@code @IntoMap} key} */
+    private boolean checkDuplicateMapKeys(Gathered gathered) {
+        Set<String> seenSlots = new HashSet<>();
+        for (Map.Entry<TypeElement, BeanModel> entry : gathered.beans().entrySet()) {
+            ContributionModel contribution = entry.getValue().contribution();
+            if (contribution == null || contribution.mapKey() == null) {
+                continue;
+            }
+            String slot = contribution.elementType() + "#" + contribution.mapKey();
+            if (!seenSlots.add(slot)) {
+                diagnostics.error(
+                        "Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for " + contribution.elementType()
+                                + ".",
+                        entry.getKey());
+                return false;
+            }
+        }
+        for (ProvidesModel provides : gathered.provides()) {
+            ContributionModel contribution = provides.contribution();
+            if (contribution == null || contribution.mapKey() == null) {
+                continue;
+            }
+            String slot = contribution.elementType() + "#" + contribution.mapKey();
+            if (!seenSlots.add(slot)) {
+                diagnostics.error("Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for "
+                        + contribution.elementType() + ".");
+                return false;
+            }
+        }
         return true;
     }
 

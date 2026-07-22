@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
  * @param scopeAnnotation the method's scoping annotation type, or {@code null} for prototype scope
  * @param qualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the result is exposed as; empty means "use the factory's default single key"
+ * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
  */
 record ProvidesModel(
         String packageName,
@@ -38,4 +39,5 @@ record ProvidesModel(
         CodeBlock definitionMetadata,
         @Nullable ClassName scopeAnnotation,
         @Nullable RenderedQualifier qualifier,
-        List<TypeName> exposedTypes) {}
+        List<TypeName> exposedTypes,
+        @Nullable ContributionModel contribution) {}

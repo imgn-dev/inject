@@ -28,6 +28,9 @@ final class ProvidesFactoryGenerator {
     private static final ClassName OPTIONAL = ClassName.get("java.util", "Optional");
     private static final ClassName CLASS = ClassName.get("java.lang", "Class");
     private static final ClassName ANNOTATION = ClassName.get("java.lang.annotation", "Annotation");
+    private static final ClassName CONTRIBUTION = ClassName.get("be.imgn.inject.context", "Contribution");
+    private static final ClassName TYPES = ClassName.get("be.imgn.inject", "Types");
+    private static final ClassName STRING_CLASS = ClassName.get("java.lang", "String");
 
     private ProvidesFactoryGenerator() {}
 
@@ -44,7 +47,9 @@ final class ProvidesFactoryGenerator {
         if (model.scopeAnnotation() != null) {
             type.addMethod(scope(model.scopeAnnotation()));
         }
-        if (!model.exposedTypes().isEmpty()) {
+        if (model.contribution() != null) {
+            type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(model.contribution()));
+        } else if (!model.exposedTypes().isEmpty()) {
             type.addMethod(exposedKeys(model));
         }
         return JavaFile.builder(model.packageName(), type.build()).build();
@@ -133,6 +138,32 @@ final class ProvidesFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
                 .addStatement("return $T.of($L)", LIST, keys)
+                .build();
+    }
+
+    private static MethodSpec emptyExposedKeys() {
+        TypeName keys = ParameterizedTypeName.get(
+                LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
+        return MethodSpec.methodBuilder("exposedKeys")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(keys)
+                .addStatement("return $T.of()", LIST)
+                .build();
+    }
+
+    private static MethodSpec contributionMethod(ContributionModel contribution) {
+        CodeBlock collectionKey = contribution.mapKey() == null
+                ? CodeBlock.of("$T.of($T.setOf($T.class))", KEY, TYPES, contribution.elementType())
+                : CodeBlock.of(
+                        "$T.of($T.mapOf($T.class, $T.class))", KEY, TYPES, STRING_CLASS, contribution.elementType());
+        CodeBlock mapKey =
+                contribution.mapKey() == null ? CodeBlock.of("null") : CodeBlock.of("$S", contribution.mapKey());
+        return MethodSpec.methodBuilder("contribution")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(ParameterizedTypeName.get(OPTIONAL, CONTRIBUTION))
+                .addStatement("return $T.of(new $T($L, $L))", OPTIONAL, CONTRIBUTION, collectionKey, mapKey)
                 .build();
     }
 
