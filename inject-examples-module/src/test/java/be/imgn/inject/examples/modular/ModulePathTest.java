@@ -22,4 +22,13 @@ class ModulePathTest {
         Injector injector = Injector.create();
         assertThat(injector.getInstance(Widget.class)).isSameAs(injector.getInstance(Widget.class));
     }
+
+    @Test
+    void collectsSetContributionsOnTheModulePath() {
+        PluginHost host = Injector.create().getInstance(PluginHost.class);
+        assertThat(host.plugins())
+                .hasSize(2)
+                .hasAtLeastOneElementOfType(AlphaPlugin.class)
+                .hasAtLeastOneElementOfType(BetaPlugin.class);
+    }
 }

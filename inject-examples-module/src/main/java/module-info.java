@@ -10,5 +10,8 @@ module be.imgn.inject.examples.modular {
     // (one entry per @Inject/@Provides class). A processor cannot write the consumer's module descriptor.
     provides be.imgn.inject.context.Factory with
             be.imgn.inject.examples.modular.$Widget$$Factory,
-            be.imgn.inject.examples.modular.$Service$$Factory;
+            be.imgn.inject.examples.modular.$Service$$Factory,
+            be.imgn.inject.examples.modular.$AlphaPlugin$$Factory,
+            be.imgn.inject.examples.modular.$BetaPlugin$$Factory,
+            be.imgn.inject.examples.modular.$PluginHost$$Factory;
 }
