@@ -36,10 +36,13 @@ import org.jspecify.annotations.Nullable;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.Injector;
 import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provider;
 import be.imgn.inject.QualifyingAnnotation;
+import be.imgn.inject.context.Context;
+import be.imgn.inject.context.Factory;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
 
@@ -54,6 +57,9 @@ final class ModelFactory {
     private static final String SET = Set.class.getName();
     private static final String MAP = Map.class.getName();
     private static final String STRING = String.class.getName();
+    private static final String INJECTOR = Injector.class.getCanonicalName();
+    private static final String CONTEXT = Context.class.getCanonicalName();
+    private static final String FACTORY = Factory.class.getCanonicalName();
     private static final ClassName TYPES = ClassName.get("be.imgn.inject", "Types");
 
     // Types never exposed by the default (no-@ExposeAs) supertype closure: universal supertypes and common marker
@@ -67,7 +73,10 @@ final class ModelFactory {
             AutoCloseable.class.getName(),
             Closeable.class.getName(),
             Iterable.class.getName(),
-            EventListener.class.getName());
+            EventListener.class.getName(),
+            Injector.class.getName(),
+            Context.class.getName(),
+            Factory.class.getName());
 
     private final ProcessingEnvironment environment;
     private final List<InjectPlugin> plugins;
@@ -157,6 +166,11 @@ final class ModelFactory {
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
+        if (method.getReturnType() instanceof DeclaredType declaredReturn
+                && declaredReturn.asElement() instanceof TypeElement returnElement
+                && isFrameworkType(returnElement)) {
+            diagnostics.error(returnElement.getSimpleName() + " is a framework type and cannot be bound.", method);
+        }
         String name = method.getSimpleName().toString();
         ContributionModel contribution = contribution(method, method.getReturnType(), types);
         RenderedQualifier qualifier = contribution != null
@@ -275,7 +289,12 @@ final class ModelFactory {
             }
             List<TypeName> result = new ArrayList<>();
             for (TypeMirror exposed : declared) {
-                if (types.isAssignable(bean.asType(), exposed)) {
+                if (exposed instanceof DeclaredType declaredExposed
+                        && declaredExposed.asElement() instanceof TypeElement exposedElement
+                        && isFrameworkType(exposedElement)) {
+                    diagnostics.error(
+                            exposedElement.getSimpleName() + " is a framework type and cannot be bound.", bean);
+                } else if (types.isAssignable(bean.asType(), exposed)) {
                     result.add(TypeName.get(types.erasure(exposed)));
                 } else {
                     diagnostics.error(
@@ -305,7 +324,12 @@ final class ModelFactory {
             }
             List<TypeName> result = new ArrayList<>();
             for (TypeMirror exposed : declared) {
-                if (types.isAssignable(producedType, exposed)) {
+                if (exposed instanceof DeclaredType declaredExposed
+                        && declaredExposed.asElement() instanceof TypeElement exposedElement
+                        && isFrameworkType(exposedElement)) {
+                    diagnostics.error(
+                            exposedElement.getSimpleName() + " is a framework type and cannot be bound.", method);
+                } else if (types.isAssignable(producedType, exposed)) {
                     result.add(TypeName.get(types.erasure(exposed)));
                 } else {
                     diagnostics.error(
@@ -343,6 +367,13 @@ final class ModelFactory {
         }
         TypeMirror elementType =
                 intoSet != null ? annotationClassValue(intoSet::value) : annotationClassValue(intoMap::value);
+        if (elementType instanceof DeclaredType declaredElementType
+                && declaredElementType.asElement() instanceof TypeElement elementTypeElement
+                && isFrameworkType(elementTypeElement)) {
+            diagnostics.error(
+                    elementTypeElement.getSimpleName() + " is a framework type and cannot be bound.", element);
+            return null;
+        }
         if (!types.isAssignable(types.erasure(contributedType), types.erasure(elementType))) {
             diagnostics.error(
                     "The bean is not assignable to the collection element type " + types.erasure(elementType) + ".",
@@ -365,6 +396,12 @@ final class ModelFactory {
         } catch (MirroredTypeException e) {
             return e.getTypeMirror();
         }
+    }
+
+    /** {@return whether {@code element} is one of the framework types that can never be bound or injected} */
+    private static boolean isFrameworkType(TypeElement element) {
+        String qualified = element.getQualifiedName().toString();
+        return qualified.equals(INJECTOR) || qualified.equals(CONTEXT) || qualified.equals(FACTORY);
     }
 
     /** {@return whether the element carries a qualifying annotation, without rendering it or registering an impl} */
@@ -554,6 +591,11 @@ final class ModelFactory {
     private CodeBlock typeExpression(TypeMirror type, Types types, Element site) {
         if (type instanceof DeclaredType declared && declared.asElement() instanceof TypeElement element) {
             String name = element.getQualifiedName().toString();
+            if (name.equals(CONTEXT)) {
+                diagnostics.error("Context cannot be injected; inject Injector instead.", site);
+            } else if (name.equals(FACTORY)) {
+                diagnostics.error("Factory cannot be injected.", site);
+            }
             if (name.equals(SET)) {
                 if (declared.getTypeArguments().size() != 1) {
                     diagnostics.error("Cannot inject a raw Set; declare an element type.", site);
