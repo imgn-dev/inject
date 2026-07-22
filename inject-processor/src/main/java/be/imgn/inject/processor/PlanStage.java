@@ -51,7 +51,7 @@ final class PlanStage {
             if (contribution == null || contribution.mapKey() == null) {
                 continue;
             }
-            String slot = contribution.elementType() + "#" + contribution.mapKey();
+            String slot = slot(contribution);
             if (!seenSlots.add(slot)) {
                 diagnostics.error(
                         "Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for " + contribution.elementType()
@@ -65,7 +65,7 @@ final class PlanStage {
             if (contribution == null || contribution.mapKey() == null) {
                 continue;
             }
-            String slot = contribution.elementType() + "#" + contribution.mapKey();
+            String slot = slot(contribution);
             if (!seenSlots.add(slot)) {
                 diagnostics.error("Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for "
                         + contribution.elementType() + ".");
@@ -73,6 +73,11 @@ final class PlanStage {
             }
         }
         return true;
+    }
+
+    /** {@return the seen-slot identity for a contribution: its element type and map key} */
+    private static String slot(ContributionModel contribution) {
+        return contribution.elementType() + "#" + contribution.mapKey();
     }
 
     private void planDefaultFactories(Gathered gathered, RoundEnvironment roundEnv) {

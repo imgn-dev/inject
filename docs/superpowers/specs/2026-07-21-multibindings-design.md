@@ -83,8 +83,10 @@ collection key (`Key.of(Types.setOf(Handler.class))`, with the map key for `@Int
    immutable `Set`. Prototype contributors yield fresh instances per `get()`; singletons are shared.
 4. Each map group does the same into an immutable `Map`; a duplicate map key across contributors (cross-module
    included) throws `DuplicateBindingException` at build.
-5. A direct binding of the same collection type (for example a `@Provides Set<Handler>`) alongside contributions
-   collides in the registry and throws the existing `DuplicateBindingException`.
+5. A `@Provides` method returning `Set<E>`/`Map<String, V>` directly (no `@ExposeAs`, qualifier, or contribution)
+   exposes the parameterized collection key (`Key.of(Types.setOf(E.class))`, etc.) instead of a raw-type key: it both
+   satisfies plain collection injection and, alongside contributions to the same key, collides in the registry and
+   throws the existing `DuplicateBindingException`.
 
 Introspection: contributors still appear in `getBeanDefinitionsByStereotype` (they are definitions); the collection
 key itself has no `BeanDefinition` — it is an aggregate, not a bean, and `getBeanDefinition` returns empty for it.
@@ -96,8 +98,12 @@ existing cycle guard, with the full path in the message.
 
 - **Site detection**: `ModelFactory.dependency(TypeMirror)` learns `Set<E>` and `Map<String, V>` alongside the
   existing `Provider<T>` unwrap (which composes: `Provider<Set<E>>` works). The dependency's reflective type is
-  rendered as `Types.setOf(...)`/`Types.mapOf(...)`; `Parameter`/`FieldInjectionPoint` are unchanged — they already
-  carry `java.lang.reflect.Type`, and `Parameter.key()` already builds the right key.
+  rendered as `Types.setOf(...)`/`Types.mapOf(...)`; `Parameter.key()` already builds the right key.
+  `FieldInjectionPoint.fieldType` widened from `Class<?>` to `java.lang.reflect.Type` to carry the same reflective
+  type for fields.
+- A `@Provides` method returning `Set<E>`/`Map<String, V>` directly, with no `@ExposeAs`, qualifier, or contribution,
+  gets the same treatment on the exposing side: the generated factory overrides `exposedKeys()` to return the single
+  parameterized collection key instead of the erased raw-type key.
 - **Marker reading**: `@IntoSet`/`@IntoMap` read off the bean type or `@Provides` method; new
   `ContributionModel(TypeName elementType, @Nullable String mapKey)` on `BeanModel`/`ProvidesModel`.
 - **Validation**: the error table above, emitted through `Diagnostics.error` in the existing validate paths.
