@@ -71,8 +71,8 @@ class DefaultContextTest {
     }
 
     @Test
-    void createWiresUpServiceLoaderContextWithoutThrowing() {
-        Context context = Context.create();
+    void noArgConstructorWiresUpServiceLoaderContextWithoutThrowing() {
+        Context context = new DefaultContext();
         assertThatExceptionOfType(UnsatisfiedDependencyException.class)
                 .isThrownBy(() -> context.getProvider(Key.of(Long.class)).get())
                 .withMessageContaining("Long");

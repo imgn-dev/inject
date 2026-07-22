@@ -6,24 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import org.junit.jupiter.api.Test;
 
-import be.imgn.inject.context.Context;
-
 class InjectorTest {
-    private static final class StubContext implements Context {
-        @Override
-        public <T> Provider<T> getProvider(Key<T> key) {
-            if (key.equals(Key.of(String.class))) {
-                @SuppressWarnings("unchecked")
-                Provider<T> provider = (Provider<T>) (Provider<String>) () -> "leaf";
-                return provider;
-            }
-            throw new UnsatisfiedDependencyException("No binding for " + key);
-        }
-    }
-
     @Test
     void convenienceMethodsDelegateToProviderByKey() {
-        Injector injector = new DefaultInjector(new StubContext());
+        Injector injector = Injector.builder().bind(String.class, "leaf").build();
         assertThat(injector.getInstance(String.class)).isEqualTo("leaf");
         assertThat(injector.getProvider(Key.of(String.class)).get()).isEqualTo("leaf");
         assertThat(injector.getInstance(Key.of(String.class))).isEqualTo("leaf");
@@ -32,7 +18,7 @@ class InjectorTest {
     @Test
     @SuppressWarnings("NullAway")
     void nullArgumentsRejected() {
-        Injector injector = new DefaultInjector(new StubContext());
+        Injector injector = Injector.builder().bind(String.class, "leaf").build();
         assertThatNullPointerException().isThrownBy(() -> injector.getInstance((Class<?>) null));
         assertThatNullPointerException().isThrownBy(() -> injector.getProvider((Key<?>) null));
     }

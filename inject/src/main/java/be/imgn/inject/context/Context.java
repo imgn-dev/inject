@@ -2,7 +2,6 @@ package be.imgn.inject.context;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import be.imgn.inject.Key;
@@ -10,7 +9,7 @@ import be.imgn.inject.Provider;
 
 /**
  * The internal resolution engine. Richer than {@code Injector} but accessible to {@link Factory} so generated factories
- * can resolve their dependencies.
+ * can resolve their dependencies. The default implementation is {@link DefaultContext}.
  */
 public interface Context {
     /**
@@ -40,19 +39,5 @@ public interface Context {
      */
     default List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
         return List.of();
-    }
-
-    /** {@return a context loaded from all registered {@code Factory} and {@code Scope} services} */
-    static Context create() {
-        return new DefaultContext();
-    }
-
-    /**
-     * {@return a context loaded from all registered services, with {@code overrides} shadowing discovered bindings}
-     *
-     * @param overrides providers that replace any discovered binding for the same key; primarily a test seam
-     */
-    static Context create(Map<Key<?>, Provider<?>> overrides) {
-        return new DefaultContext(overrides);
     }
 }

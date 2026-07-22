@@ -1,6 +1,8 @@
 package be.imgn.inject;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +11,8 @@ import java.util.Optional;
 
 import be.imgn.inject.context.BeanDefinition;
 import be.imgn.inject.context.Context;
+import be.imgn.inject.context.DefaultContext;
+import be.imgn.inject.context.Factory;
 
 /**
  * The user-facing entry point for obtaining instances and providers.
@@ -21,6 +25,10 @@ import be.imgn.inject.context.Context;
  * final, explicit, and available the moment it is constructed. Field and method injection exist for cases constructor
  * injection cannot reach (e.g. framework-managed or cyclic wiring) and leave a window where the bean is only partly
  * initialised.
+ *
+ * <p>The injector itself is injectable: any bean may declare an {@code Injector} (or {@code Provider<Injector>})
+ * dependency and receives the injector that built it. {@code Injector}, {@code Context}, and {@code Factory} can never
+ * be bound.
  */
 public interface Injector {
     /**
@@ -92,7 +100,7 @@ public interface Injector {
 
     /** {@return a new injector backed by all registered factories and scopes} */
     static Injector create() {
-        return new DefaultInjector(Context.create());
+        return new DefaultInjector(new DefaultContext());
     }
 
     /** {@return a builder for an injector whose instance bindings shadow discovered ones (a test seam)} */
@@ -131,13 +139,23 @@ public interface Injector {
         public <T> Builder bind(Key<T> key, T instance) {
             Objects.requireNonNull(key, "key");
             Objects.requireNonNull(instance, "instance");
+            requireBindable(key);
             overrides.put(key, () -> instance);
             return this;
         }
 
         /** {@return a new injector applying the configured overrides} */
         public Injector build() {
-            return new DefaultInjector(Context.create(Map.copyOf(overrides)));
+            return new DefaultInjector(new DefaultContext(Map.copyOf(overrides)));
+        }
+
+        private static void requireBindable(Key<?> key) {
+            Type type = key.type();
+            Type raw = type instanceof ParameterizedType parameterized ? parameterized.getRawType() : type;
+            if (raw == Injector.class || raw == Context.class || raw == Factory.class) {
+                throw new IllegalArgumentException(
+                        ((Class<?>) raw).getSimpleName() + " is a framework type and cannot be bound.");
+            }
         }
     }
 }

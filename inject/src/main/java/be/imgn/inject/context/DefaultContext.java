@@ -14,10 +14,13 @@ import java.util.ServiceLoader;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
+
 import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
+import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 import be.imgn.inject.ScopeResolutionException;
@@ -27,18 +30,31 @@ import be.imgn.inject.UnsatisfiedDependencyException;
  * Default {@link Context}: loads all {@code Factory} and {@code Scope} services, wraps each factory provider with a
  * cycle guard and its declared scope, and resolves keys lazily. The registry is immutable after construction;
  * resolution is thread-safe.
+ *
+ * <p>{@code new DefaultContext()} loads all registered {@code Factory}, {@code Scope}, and {@code Condition} services.
+ * The injector that owns this context attaches itself via {@link #setInjector(Injector)} immediately after
+ * construction, which is what lets {@code Key.of(Injector.class)} resolve.
  */
-final class DefaultContext implements Context {
+public final class DefaultContext implements Context {
+    private static final Key<?> INJECTOR_KEY = Key.of(Injector.class);
+
     private final Map<Key<?>, Provider<?>> registry;
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
     private final ThreadLocal<Deque<Key<?>>> stack = ThreadLocal.withInitial(ArrayDeque::new);
+    private @Nullable Injector injector;
 
-    DefaultContext() {
+    /** {@return a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services} */
+    public DefaultContext() {
         this(loadFactories(), loadScopes(), loadConditions(), systemProperties(), Map.of());
     }
 
-    DefaultContext(Map<Key<?>, Provider<?>> overrides) {
+    /**
+     * {@return a context loaded from all registered services, with {@code overrides} shadowing discovered bindings}
+     *
+     * @param overrides providers that replace any discovered binding for the same key; primarily a test seam
+     */
+    public DefaultContext(Map<Key<?>, Provider<?>> overrides) {
         this(loadFactories(), loadScopes(), loadConditions(), systemProperties(), overrides);
     }
 
@@ -105,6 +121,9 @@ final class DefaultContext implements Context {
         });
         // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
         built.putAll(overrides);
+        // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
+        // BeanDefinition and joins no stereotype query.
+        built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
@@ -194,6 +213,29 @@ final class DefaultContext implements Context {
         return allDefinitions.stream()
                 .filter(definition -> definition.annotationMetadata().hasStereotype(stereotype))
                 .toList();
+    }
+
+    /**
+     * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to. Called once by the
+     * injector that owns this context, immediately after construction.
+     *
+     * @param injector the owning injector
+     * @throws IllegalStateException if an injector is already attached
+     */
+    public void setInjector(Injector injector) {
+        Objects.requireNonNull(injector, "injector");
+        if (this.injector != null) {
+            throw new IllegalStateException("An Injector is already attached to this Context.");
+        }
+        this.injector = injector;
+    }
+
+    private Injector requireInjector() {
+        Injector attached = injector;
+        if (attached == null) {
+            throw new IllegalStateException("There is no Injector attached to this Context.");
+        }
+        return attached;
     }
 
     private String requiredBySuffix() {
