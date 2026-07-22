@@ -128,6 +128,62 @@ class CollectionInjectionTest {
     }
 
     @Test
+    void providesReturningParameterizedSetExposesTheCollectionKey() {
+        JavaFileObject handler = JavaFileObjects.forSourceString("example.Handler", """
+                package example;
+
+                public interface Handler {}
+                """);
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import java.util.Set;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static Set<Handler> handlers() {
+                        return Set.of();
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(handler, config);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Config$handlers$$Factory")
+                .contentsAsUtf8String()
+                .contains("Key.of(Types.setOf(Handler.class))");
+    }
+
+    @Test
+    void providesReturningRawSetCompilesWithoutTheCollectionKeyOverride() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import java.util.Set;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    @SuppressWarnings("rawtypes")
+                    public static Set handlers() {
+                        return Set.of();
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Config$handlers$$Factory")
+                .contentsAsUtf8String()
+                .doesNotContain("exposedKeys");
+    }
+
+    @Test
     void setOfProviderIsAnError() {
         JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
                 package example;

@@ -26,6 +26,8 @@ import org.jspecify.annotations.Nullable;
  * @param qualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the result is exposed as; empty means "use the factory's default single key"
  * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
+ * @param producedKeyType the parameterized collection key type expression for a Set/Map-returning method, or
+ *     {@code null}
  */
 record ProvidesModel(
         String packageName,
@@ -40,4 +42,5 @@ record ProvidesModel(
         @Nullable ClassName scopeAnnotation,
         @Nullable RenderedQualifier qualifier,
         List<TypeName> exposedTypes,
-        @Nullable ContributionModel contribution) {}
+        @Nullable ContributionModel contribution,
+        @Nullable CodeBlock producedKeyType) {}

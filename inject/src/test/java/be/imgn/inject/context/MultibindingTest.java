@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,7 @@ import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
+import be.imgn.inject.Singleton;
 import be.imgn.inject.Types;
 import be.imgn.inject.UnsatisfiedDependencyException;
 
@@ -48,8 +50,44 @@ class MultibindingTest {
         }
     }
 
+    /**
+     * A contributing factory producing a fresh {@link Object} per {@code createInstance} call, with a configurable
+     * scope.
+     */
+    static class ObjectContribFactory extends Factory<Object> {
+        private final Contribution contribution;
+        private final Optional<Class<? extends Annotation>> scope;
+
+        ObjectContribFactory(Contribution contribution, Optional<Class<? extends Annotation>> scope) {
+            super(Object.class);
+            this.contribution = contribution;
+            this.scope = scope;
+        }
+
+        @Override
+        protected Object createInstance(Context context) {
+            return new Object();
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return List.of();
+        }
+
+        @Override
+        protected Optional<Contribution> contribution() {
+            return Optional.of(contribution);
+        }
+
+        @Override
+        protected Optional<Class<? extends Annotation>> scope() {
+            return scope;
+        }
+    }
+
     private static final Key<?> SET_KEY = Key.of(Types.setOf(CharSequence.class));
     private static final Key<?> MAP_KEY = Key.of(Types.mapOf(String.class, CharSequence.class));
+    private static final Key<?> OBJECT_SET_KEY = Key.of(Types.setOf(Object.class));
 
     private static ContribFactory intoSet(String value) {
         return new ContribFactory(value, new Contribution(SET_KEY, null));
@@ -100,6 +138,8 @@ class MultibindingTest {
 
     @Test
     void directBindingOfTheCollectionTypeCollides() {
+        // Mirrors what the generator emits for a @Provides Set<...> method with no @ExposeAs, qualifier, or
+        // contribution: exposedKeys() overridden to the single parameterized collection key.
         Factory<Object> direct = new Factory<>(Object.class) {
             @Override
             protected Object createInstance(Context context) {
@@ -118,9 +158,24 @@ class MultibindingTest {
     @Test
     @SuppressWarnings("unchecked")
     void prototypeContributorsAreFreshPerGet() {
-        Context context = new DefaultContext(List.of(intoSet("a")), List.of());
-        Provider<?> provider = context.getProvider(SET_KEY);
-        assertThat((Set<CharSequence>) provider.get()).isEqualTo(provider.get());
+        Context context = new DefaultContext(
+                List.of(new ObjectContribFactory(new Contribution(OBJECT_SET_KEY, null), Optional.empty())), List.of());
+        Provider<?> provider = context.getProvider(OBJECT_SET_KEY);
+        Set<Object> first = (Set<Object>) provider.get();
+        Set<Object> second = (Set<Object>) provider.get();
+        assertThat(first.iterator().next()).isNotSameAs(second.iterator().next());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void singletonContributorsAreSharedAcrossGets() {
+        Context context = new DefaultContext(
+                List.of(new ObjectContribFactory(new Contribution(OBJECT_SET_KEY, null), Optional.of(Singleton.class))),
+                List.of(new SingletonScope()));
+        Provider<?> provider = context.getProvider(OBJECT_SET_KEY);
+        Set<Object> first = (Set<Object>) provider.get();
+        Set<Object> second = (Set<Object>) provider.get();
+        assertThat(first.iterator().next()).isSameAs(second.iterator().next());
     }
 
     @Test

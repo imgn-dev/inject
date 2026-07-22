@@ -166,6 +166,9 @@ final class ModelFactory {
         List<TypeName> exposedTypes = contribution != null
                 ? List.of()
                 : exposedTypesForProvides(method, method.getReturnType(), qualifier != null);
+        CodeBlock producedKeyType = qualifier == null && exposedTypes.isEmpty() && contribution == null
+                ? collectionKeyExpression(method.getReturnType(), types)
+                : null;
         return new ProvidesModel(
                 packageOf(host),
                 GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
@@ -179,7 +182,8 @@ final class ModelFactory {
                 Annotations.scope(method).orElse(null),
                 qualifier,
                 exposedTypes,
-                contribution);
+                contribution,
+                producedKeyType);
     }
 
     boolean validateBean(TypeElement bean) {
@@ -566,9 +570,7 @@ final class ModelFactory {
             if (name.equals(MAP)) {
                 if (declared.getTypeArguments().size() != 2) {
                     diagnostics.error("Cannot inject a raw Map; declare key and value types.", site);
-                } else if (!types.erasure(declared.getTypeArguments().get(0))
-                        .toString()
-                        .equals(STRING)) {
+                } else if (!isStringType(declared.getTypeArguments().get(0))) {
                     diagnostics.error("Injected Maps use String keys.", site);
                 } else {
                     return CodeBlock.of(
@@ -582,6 +584,42 @@ final class ModelFactory {
             }
         }
         return CodeBlock.of("$T.class", TypeName.get(types.erasure(type)));
+    }
+
+    /**
+     * {@return the parameterized collection key type expression for a {@code Set<E>}/{@code Map<String, V>} type, or
+     * {@code null} when {@code type} isn't exactly one of those (raw, wrong arity, non-String map key, or a
+     * {@code Provider} element); emits no diagnostics, unlike {@link #typeExpression}}
+     */
+    private @Nullable CodeBlock collectionKeyExpression(TypeMirror type, Types types) {
+        if (!(type instanceof DeclaredType declared) || !(declared.asElement() instanceof TypeElement element)) {
+            return null;
+        }
+        String name = element.getQualifiedName().toString();
+        if (name.equals(SET) && declared.getTypeArguments().size() == 1) {
+            TypeMirror elementType = declared.getTypeArguments().get(0);
+            if (providerInner(elementType).isPresent()) {
+                return null;
+            }
+            return CodeBlock.of("$T.setOf($T.class)", TYPES, TypeName.get(types.erasure(elementType)));
+        }
+        if (name.equals(MAP)
+                && declared.getTypeArguments().size() == 2
+                && isStringType(declared.getTypeArguments().get(0))) {
+            return CodeBlock.of(
+                    "$T.mapOf($T.class, $T.class)",
+                    TYPES,
+                    TypeName.get(types.erasure(declared.getTypeArguments().get(0))),
+                    TypeName.get(types.erasure(declared.getTypeArguments().get(1))));
+        }
+        return null;
+    }
+
+    /** {@return whether {@code type} is exactly {@link String}} */
+    private static boolean isStringType(TypeMirror type) {
+        return type instanceof DeclaredType declared
+                && declared.asElement() instanceof TypeElement element
+                && element.getQualifiedName().contentEquals(STRING);
     }
 
     private static Optional<TypeMirror> providerInner(TypeMirror type) {

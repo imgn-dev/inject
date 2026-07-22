@@ -51,6 +51,8 @@ final class ProvidesFactoryGenerator {
             type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(model.contribution()));
         } else if (!model.exposedTypes().isEmpty()) {
             type.addMethod(exposedKeys(model));
+        } else if (model.producedKeyType() != null) {
+            type.addMethod(collectionExposedKeys(model.producedKeyType()));
         }
         return JavaFile.builder(model.packageName(), type.build()).build();
     }
@@ -138,6 +140,17 @@ final class ProvidesFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
                 .addStatement("return $T.of($L)", LIST, keys)
+                .build();
+    }
+
+    private static MethodSpec collectionExposedKeys(CodeBlock producedKeyType) {
+        TypeName returnType = ParameterizedTypeName.get(
+                LIST, ParameterizedTypeName.get(KEY, WildcardTypeName.subtypeOf(Object.class)));
+        return MethodSpec.methodBuilder("exposedKeys")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(returnType)
+                .addStatement("return $T.of($T.of($L))", LIST, KEY, producedKeyType)
                 .build();
     }
 
