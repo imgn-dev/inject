@@ -122,6 +122,15 @@ public abstract class Factory<T> implements BeanDefinition {
     }
 
     /**
+     * {@return this factory's collection contribution, or empty when the bean binds under its own keys}
+     *
+     * <p>A contributing factory exposes no keys of its own; its bean is reachable only through the collection.
+     */
+    protected Optional<Contribution> contribution() {
+        return Optional.empty();
+    }
+
+    /**
      * {@return the provider for the {@code paramIndex}-th constructor parameter}
      *
      * @param paramIndex the zero-based parameter index
