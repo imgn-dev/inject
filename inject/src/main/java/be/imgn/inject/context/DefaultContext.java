@@ -5,12 +5,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
@@ -126,11 +128,11 @@ public final class DefaultContext implements Context {
         });
         // Defaults join last: a default claims only keys no live binding took. Two live defaults for one key are
         // a configuration error even when a real binding wins that key.
-        Map<Key<?>, Provider<?>> defaultClaims = new HashMap<>();
+        Set<Key<?>> defaultClaims = new HashSet<>();
         for (PendingDefault pending : defaults) {
             boolean winner = false;
             for (Key<?> key : pending.factory().exposedKeys()) {
-                if (defaultClaims.putIfAbsent(key, pending.provider()) != null) {
+                if (!defaultClaims.add(key)) {
                     throw new DuplicateBindingException("Duplicate default binding for " + key);
                 }
                 if (built.putIfAbsent(key, pending.provider()) == null) {

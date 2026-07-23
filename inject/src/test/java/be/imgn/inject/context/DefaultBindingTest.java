@@ -78,6 +78,28 @@ class DefaultBindingTest {
         }
     }
 
+    /** A default factory exposing two keys, competing with a real binding that claims only one of them. */
+    static final class MultiKeyFallbackFactory extends Factory<String> {
+        MultiKeyFallbackFactory() {
+            super(String.class);
+        }
+
+        @Override
+        protected String createInstance(Context context) {
+            return "fallback";
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return List.of(Key.of(String.class), Key.of(CharSequence.class));
+        }
+
+        @Override
+        protected boolean isDefault() {
+            return true;
+        }
+    }
+
     private static AnnotationValue onProperty(String name, String havingValue) {
         return AnnotationValue.of(
                 ConditionalOnProperty.class,
@@ -155,5 +177,24 @@ class DefaultBindingTest {
         GatedFactory real = new GatedFactory(onProperty("feature.x", "on"));
         Context context = context(Map.of("feature.x", "on"), real, new FallbackFactory());
         assertThat(context.getBeanDefinition(Key.of(String.class))).containsSame(real);
+    }
+
+    @Test
+    void multiKeyDefaultWinsOnlyTheKeyTheRealBindingDoesNotClaim() {
+        GatedFactory real = new GatedFactory(onProperty("feature.x", "on"));
+        MultiKeyFallbackFactory fallback = new MultiKeyFallbackFactory();
+        Context context = context(Map.of("feature.x", "on"), real, fallback);
+
+        assertThat(context.getProvider(Key.of(String.class)).get()).isEqualTo("real");
+        assertThat(context.getProvider(Key.of(CharSequence.class)).get()).isEqualTo("fallback");
+        assertThat(context.getBeanDefinition(Key.of(String.class))).containsSame(real);
+        assertThat(context.getBeanDefinition(Key.of(CharSequence.class))).containsSame(fallback);
+    }
+
+    @Test
+    void duplicateLiveDefaultsThrowWithNoRealBinding() {
+        assertThatExceptionOfType(DuplicateBindingException.class)
+                .isThrownBy(() -> context(Map.of(), new FallbackFactory(), new FallbackFactory()))
+                .withMessageContaining("Duplicate default binding");
     }
 }

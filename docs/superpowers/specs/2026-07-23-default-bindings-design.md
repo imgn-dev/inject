@@ -1,8 +1,5 @@
 # Default bindings — Design
 
-**Date:** 2026-07-23
-**Status:** Approved design, pre-implementation
-
 ## 1. Overview
 
 A binding may be marked as a **default**: a fallback recipe used only when no other
