@@ -151,6 +151,16 @@ class ChildContextTest {
     }
 
     @Test
+    void nestedChildSeesNearestAncestorShadowOfDiscoveredBeans() {
+        DefaultContext parent = new DefaultContext(List.of(new ParentStringFactory(), new HolderFactory()), List.of());
+        ChildContext mid = child(parent, Map.of(Key.of(String.class), () -> "mid"));
+        ChildContext grand = child(mid, Map.of());
+        assertThat(grand.getProvider(Key.of(String.class)).get()).isEqualTo("mid");
+        assertThat(((Holder) grand.getProvider(Key.of(Holder.class)).get()).value())
+                .isEqualTo("mid");
+    }
+
+    @Test
     void introspectionDelegatesToParent() {
         DefaultContext parent = new DefaultContext(List.of(new ParentStringFactory()), List.of());
         ChildContext context = child(parent, Map.of(Key.of(Integer.class), () -> 1));

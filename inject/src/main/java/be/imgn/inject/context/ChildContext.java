@@ -14,9 +14,10 @@ import be.imgn.inject.Provider;
 import be.imgn.inject.ScopingAnnotation;
 
 /**
- * A child {@link Context}: local instance/provider bindings first, then the parent. Unscoped parent beans are rebuilt
- * with this context so their dependencies see child bindings; scoped beans and everything without a
- * {@link BeanDefinition} anchor to the parent unchanged.
+ * A child {@link Context}: nearest-ancestor local bindings first (walking up through any intermediate
+ * {@code ChildContext}s), then the parent. Unscoped parent beans are rebuilt at this — the deepest — context so their
+ * dependencies see the full child binding stack; scoped beans and everything without a {@link BeanDefinition} anchor to
+ * the parent unchanged.
  */
 public final class ChildContext implements Context {
 
@@ -58,9 +59,9 @@ public final class ChildContext implements Context {
         if (INJECTOR_KEY.equals(key)) {
             return (Provider<T>) (Provider<Injector>) this::requireInjector;
         }
-        Provider<?> local = bindings.get(key);
-        if (local != null) {
-            return (Provider<T>) local;
+        Provider<?> layered = localLookup(key);
+        if (layered != null) {
+            return (Provider<T>) layered;
         }
         Optional<BeanDefinition> definition = parent.getBeanDefinition(key);
         if (definition.isPresent()
@@ -70,6 +71,16 @@ public final class ChildContext implements Context {
             return new CycleGuardProvider<>(key, (Provider<T>) (Provider<?>) () -> factory.build(this), stack);
         }
         return parent.getProvider(key);
+    }
+
+    /** {@return the nearest local binding for {@code key} in this context or an ancestor child, or {@code null}} */
+    @Nullable
+    Provider<?> localLookup(Key<?> key) {
+        Provider<?> local = bindings.get(key);
+        if (local != null) {
+            return local;
+        }
+        return parent instanceof ChildContext child ? child.localLookup(key) : null;
     }
 
     @Override

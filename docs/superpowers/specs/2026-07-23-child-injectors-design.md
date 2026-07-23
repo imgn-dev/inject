@@ -68,7 +68,7 @@ Children nest: `child.childBuilder()` layers again; the nearest binding wins on 
 | Same key bound twice in one `ChildBuilder` | `IllegalArgumentException` at the second `bind` — layering over the parent is intentional, double-binding within one builder is a typo. (The root builder's documented last-wins behavior is unchanged.) |
 | Binding `Injector`/`Context`/`Factory` | `IllegalArgumentException` (existing `requireBindable` rule) |
 | Null key/instance/provider | `NullPointerException` |
-| Unsatisfied key | existing `UnsatisfiedDependencyException`, after the full parent chain misses |
+| Unsatisfied key | existing `UnsatisfiedDependencyException`, after the full parent chain misses — the requester-chain suffix may omit child rebuild frames when the miss surfaces in the parent (each context keeps its own resolution stack) |
 | Dependency cycle through a child rebuild | existing `CircularDependencyException`, guarded on the child's resolution path |
 
 ## Runtime model
@@ -91,7 +91,9 @@ child's injector reference:
 
 `BeanDefinition` exposure needed for step 1 already exists (`Context.getBeanDefinition`); the factory reference is
 the definition itself (`Factory` implements `BeanDefinition`), so no new runtime surface is required beyond
-`ChildBuilder`, `ChildContext`, and the `Injector.childBuilder()` method.
+`ChildBuilder`, `ChildContext`, and the `Injector.childBuilder()` method. `ChildContext` decides rebuild-vs-anchor
+from the definition's `ScopingAnnotation` stereotype while `DefaultContext` wraps scopes from `Factory.scope()`;
+generated factories derive both from the same annotation, which keeps the two views consistent.
 
 ## Testing
 
