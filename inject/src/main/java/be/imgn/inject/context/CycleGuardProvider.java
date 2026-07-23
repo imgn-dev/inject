@@ -9,21 +9,21 @@ import be.imgn.inject.Provider;
 final class CycleGuardProvider<T> implements Provider<T> {
     private final Key<?> key;
     private final Provider<T> delegate;
-    private final DefaultContext context;
+    private final ResolutionStack stack;
 
-    CycleGuardProvider(Key<?> key, Provider<T> delegate, DefaultContext context) {
+    CycleGuardProvider(Key<?> key, Provider<T> delegate, ResolutionStack stack) {
         this.key = Objects.requireNonNull(key, "key");
         this.delegate = Objects.requireNonNull(delegate, "delegate");
-        this.context = Objects.requireNonNull(context, "context");
+        this.stack = Objects.requireNonNull(stack, "stack");
     }
 
     @Override
     public T get() {
-        context.enter(key);
+        stack.enter(key);
         try {
             return delegate.get();
         } finally {
-            context.exit(key);
+            stack.exit();
         }
     }
 }
