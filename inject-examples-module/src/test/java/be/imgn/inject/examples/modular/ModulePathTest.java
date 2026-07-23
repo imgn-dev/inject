@@ -31,4 +31,11 @@ class ModulePathTest {
                 .hasAtLeastOneElementOfType(AlphaPlugin.class)
                 .hasAtLeastOneElementOfType(BetaPlugin.class);
     }
+
+    @Test
+    void assistedFactoryWorksOnTheModulePath() {
+        Injector injector = Injector.create();
+        Ticket ticket = injector.getInstance(TicketFactory.class).create("vip");
+        assertThat(ticket).returns("vip", Ticket::label).returns(injector.getInstance(Widget.class), Ticket::widget);
+    }
 }

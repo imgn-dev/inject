@@ -13,5 +13,6 @@ module be.imgn.inject.examples.modular {
             be.imgn.inject.examples.modular.$Service$$Factory,
             be.imgn.inject.examples.modular.$AlphaPlugin$$Factory,
             be.imgn.inject.examples.modular.$BetaPlugin$$Factory,
-            be.imgn.inject.examples.modular.$PluginHost$$Factory;
+            be.imgn.inject.examples.modular.$PluginHost$$Factory,
+            be.imgn.inject.examples.modular.$TicketFactory$$Factory;
 }
