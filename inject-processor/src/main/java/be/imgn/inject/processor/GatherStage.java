@@ -72,6 +72,8 @@ final class GatherStage {
                 diagnostics.error("@Default requires @Provides.", element);
             } else if (element.getAnnotation(IntoSet.class) != null || element.getAnnotation(IntoMap.class) != null) {
                 diagnostics.error("@Default cannot join a collection contribution (@IntoSet/@IntoMap).", element);
+            } else if (element instanceof ExecutableElement method && ModelFactory.isAssisted(method)) {
+                diagnostics.error("@Default cannot mark an assisted recipe.", element);
             }
         }
 

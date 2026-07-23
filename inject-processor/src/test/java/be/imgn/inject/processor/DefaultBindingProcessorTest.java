@@ -132,4 +132,28 @@ class DefaultBindingProcessorTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("@Default cannot join a collection contribution");
     }
+
+    @Test
+    void defaultOnAnAssistedRecipeIsAnError() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Default;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    @Default
+                    public static String provideName(@Assisted String seed) {
+                        return seed;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("@Default cannot mark an assisted recipe.");
+    }
 }
