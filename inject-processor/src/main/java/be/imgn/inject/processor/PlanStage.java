@@ -35,6 +35,9 @@ final class PlanStage {
             diagnostics.error("Dependency cycle detected: " + path, cycle.get(0));
             return false;
         }
+        if (!checkNoDirectAssistedInjection(gathered)) {
+            return false;
+        }
         // Duplicate ordinary bindings that arise within one compilation fall through to the runtime
         // DuplicateBindingException: cross-module duplicates are undetectable at compile time under the
         // ServiceLoader architecture, so runtime detection is the single, consistent safety net. @IntoMap keys
@@ -70,6 +73,28 @@ final class PlanStage {
                 diagnostics.error("Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for "
                         + contribution.elementType() + ".");
                 return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@return {@code true} if no edge injects an assisted bean directly}
+     *
+     * <p>{@code Provider<AssistedBean>} sites never appear in {@link Gathered#edges()} (the Provider-breaks-cycle
+     * rule), so they are not caught here; they fail at runtime instead, as a missing binding.
+     */
+    private boolean checkNoDirectAssistedInjection(Gathered gathered) {
+        for (Map.Entry<TypeElement, List<TypeElement>> entry : gathered.edges().entrySet()) {
+            for (TypeElement dependency : entry.getValue()) {
+                if (gathered.assistedBeanNames()
+                        .contains(dependency.getQualifiedName().toString())) {
+                    diagnostics.error(
+                            dependency.getSimpleName()
+                                    + " has assisted parameters and is only available through an @AssistedFactory.",
+                            entry.getKey());
+                    return false;
+                }
             }
         }
         return true;

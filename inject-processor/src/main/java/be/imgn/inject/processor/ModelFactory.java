@@ -33,6 +33,7 @@ import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
 
+import be.imgn.inject.Assisted;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -116,6 +117,14 @@ final class ModelFactory {
                         method.getSimpleName().toString(),
                         parameters(method, bean, types, elements, packageOf(bean)),
                         Annotations.metadata(List.of(method), elements)));
+                for (VariableElement parameter : method.getParameters()) {
+                    if (parameter.getAnnotation(Assisted.class) != null) {
+                        diagnostics.error(
+                                "@Assisted is misplaced: only @Inject constructors and @Provides methods take"
+                                        + " assisted parameters.",
+                                parameter);
+                    }
+                }
             }
         }
         ContributionModel contribution = contribution(bean, bean.asType(), types);
@@ -264,6 +273,30 @@ final class ModelFactory {
             }
         }
         return Optional.empty();
+    }
+
+    /** {@return whether {@code executable} has at least one @Assisted parameter} */
+    static boolean isAssisted(ExecutableElement executable) {
+        return executable.getParameters().stream()
+                .anyMatch(parameter -> parameter.getAnnotation(Assisted.class) != null);
+    }
+
+    /** Reports every annotation that contradicts a recipe having no binding of its own. */
+    void validateAssistedRecipe(Element annotated) {
+        if (Annotations.scope(annotated).isPresent()) {
+            diagnostics.error(
+                    "An assisted recipe cannot be scoped; every factory call builds a fresh instance.", annotated);
+        }
+        if (hasQualifier(annotated)) {
+            diagnostics.error("An assisted recipe cannot be qualified; it has no binding key.", annotated);
+        }
+        if (annotated.getAnnotation(ExposeAs.class) != null) {
+            diagnostics.error("An assisted recipe cannot use @ExposeAs; it has no binding key.", annotated);
+        }
+        if (annotated.getAnnotation(IntoSet.class) != null || annotated.getAnnotation(IntoMap.class) != null) {
+            diagnostics.error(
+                    "An assisted recipe cannot contribute to a collection; it has no binding key.", annotated);
+        }
     }
 
     boolean hasAccessibleNoArgConstructor(TypeElement type) {
