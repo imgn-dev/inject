@@ -2,6 +2,7 @@ package be.imgn.inject.processor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.lang.model.element.TypeElement;
 
 /**
@@ -11,9 +12,21 @@ import javax.lang.model.element.TypeElement;
  * @param provides the {@code @Provides} factories to generate
  * @param edges the bean dependency graph used for cycle detection (mutable)
  * @param seeds every dependency type referenced, used to plan default factories
+ * @param assistedRecipes factory-only construction recipes, keyed by owner qualified name (constructor recipes) or
+ *     {@code owner qualified name + "#" + method name} (provides recipes); more than one entry under a key is an
+ *     ambiguous set of assisted {@code @Provides} overloads
+ * @param assistedBeanNames qualified names of in-compilation beans reachable only through an {@code @AssistedFactory},
+ *     not by direct injection
+ * @param assistedFactories the resolved {@code @AssistedFactory} interfaces to implement
+ * @param assistedReferences container-resolved parameter sites (a {@code @Provides} method parameter, or another
+ *     assisted recipe's container parameter) whose declared type may be an assisted bean, checked by the plan stage
  */
 record Gathered(
         Map<TypeElement, BeanModel> beans,
         List<ProvidesModel> provides,
         Map<TypeElement, List<TypeElement>> edges,
-        List<TypeElement> seeds) {}
+        List<TypeElement> seeds,
+        Map<String, List<AssistedRecipe>> assistedRecipes,
+        Set<String> assistedBeanNames,
+        List<AssistedFactoryModel> assistedFactories,
+        List<AssistedReference> assistedReferences) {}

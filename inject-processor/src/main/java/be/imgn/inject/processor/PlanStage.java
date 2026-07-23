@@ -35,6 +35,9 @@ final class PlanStage {
             diagnostics.error("Dependency cycle detected: " + path, cycle.get(0));
             return false;
         }
+        if (!checkNoDirectAssistedInjection(gathered)) {
+            return false;
+        }
         // Duplicate ordinary bindings that arise within one compilation fall through to the runtime
         // DuplicateBindingException: cross-module duplicates are undetectable at compile time under the
         // ServiceLoader architecture, so runtime detection is the single, consistent safety net. @IntoMap keys
@@ -73,6 +76,45 @@ final class PlanStage {
             }
         }
         return true;
+    }
+
+    /**
+     * {@return {@code true} if no edge, {@code @Provides} parameter, or other assisted recipe's container parameter
+     * injects an assisted bean directly}
+     *
+     * <p>{@code Provider<AssistedBean>} sites on a bean's own {@code @Inject} constructor/members never appear in
+     * {@link Gathered#edges()} (the Provider-breaks-cycle rule), so they are not caught here; they fail at runtime
+     * instead, as a missing binding.
+     */
+    private boolean checkNoDirectAssistedInjection(Gathered gathered) {
+        for (Map.Entry<TypeElement, List<TypeElement>> entry : gathered.edges().entrySet()) {
+            for (TypeElement dependency : entry.getValue()) {
+                if (gathered.assistedBeanNames()
+                        .contains(dependency.getQualifiedName().toString())) {
+                    diagnostics.error(
+                            dependency.getSimpleName()
+                                    + " has assisted parameters and is only available through an @AssistedFactory.",
+                            entry.getKey());
+                    return false;
+                }
+            }
+        }
+        for (AssistedReference reference : gathered.assistedReferences()) {
+            if (gathered.assistedBeanNames().contains(reference.typeName())) {
+                diagnostics.error(
+                        simpleName(reference.typeName())
+                                + " has assisted parameters and is only available through an @AssistedFactory.",
+                        reference.site());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** {@return the simple-name suffix of a qualified type name} */
+    private static String simpleName(String qualifiedName) {
+        int lastDot = qualifiedName.lastIndexOf('.');
+        return lastDot < 0 ? qualifiedName : qualifiedName.substring(lastDot + 1);
     }
 
     /** {@return the seen-slot identity for a contribution: its element type and map key} */

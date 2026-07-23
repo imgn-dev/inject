@@ -74,6 +74,13 @@ public final class InjectProcessor extends AbstractProcessor {
             writeFactory(ProvidesFactoryGenerator.generate(model));
             factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }
+        for (AssistedFactoryModel model : gathered.assistedFactories()) {
+            AssistedFactoryGenerator.Generated generated = AssistedFactoryGenerator.generate(
+                    model, Objects.requireNonNull(modelFactory), processingEnv.getElementUtils());
+            writeFactory(generated.implFile());
+            writeFactory(generated.factoryFile());
+            factoryNames.add(generated.factoryQualifiedName());
+        }
         writeAnnotationImpls();
         return false;
     }

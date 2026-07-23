@@ -143,4 +143,40 @@ class ExamplesClasspathTest {
         assertThat(locator.injector()).isSameAs(injector);
         assertThat(locator.locateRegistry()).isSameAs(injector.getInstance(Registry.class));
     }
+
+    @Test
+    void assistedFactoriesMixContainerAndCallerArguments() {
+        Injector injector = Injector.create();
+
+        BadgeFactory badges = injector.getInstance(BadgeFactory.class);
+        Badge badge = badges.create("olivier", "admin");
+        assertThat(badge)
+                .returns("olivier", Badge::owner)
+                .returns("admin", Badge::role)
+                .returns(injector.getInstance(Registry.class), Badge::registry); // singleton respected
+        assertThat(badges.create("olivier", "admin")).isNotSameAs(badge); // fresh per call
+
+        LegacyStamp stamp = injector.getInstance(StampFactory.class).create("world");
+        assertThat(stamp.text()).isEqualTo("Hello world");
+    }
+
+    @Test
+    void childInjectorLayersRequestData() {
+        Injector app = Injector.create();
+        Injector requestA = app.childBuilder()
+                .bind(RequestContext.class, new RequestContext("ada"))
+                .build();
+        Injector requestB = app.childBuilder()
+                .bind(RequestContext.class, new RequestContext("bob"))
+                .build();
+
+        RequestGreeter greeterA = requestA.getInstance(RequestGreeter.class);
+        RequestGreeter greeterB = requestB.getInstance(RequestGreeter.class);
+        assertThat(greeterA.request().user()).isEqualTo("ada");
+        assertThat(greeterB.request().user()).isEqualTo("bob");
+        // the singleton registry is shared across children (scope anchoring)
+        assertThat(greeterA.registry()).isSameAs(greeterB.registry()).isSameAs(app.getInstance(Registry.class));
+        // the application-level default RequestContext
+        assertThat(app.getInstance(RequestGreeter.class).request().user()).isEqualTo("anonymous");
+    }
 }
