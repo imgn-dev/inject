@@ -233,4 +233,28 @@ class AssistedRecipeTest {
         assertThat(compilation).succeeded();
         assertThat(compilation).generatedSourceFile("example.$SomeConfig$$Factory");
     }
+
+    @Test
+    void hostOfInstanceAssistedProvidesGetsADefaultFactory() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.HostConfig", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Provides;
+
+                public class HostConfig {
+                    public HostConfig() {}
+
+                    @Provides
+                    public Long legacy(@Assisted int id) {
+                        return (long) id;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation).generatedSourceFile("example.$HostConfig$$Factory");
+    }
 }

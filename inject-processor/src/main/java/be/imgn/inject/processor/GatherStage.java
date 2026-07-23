@@ -121,6 +121,9 @@ final class GatherStage {
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(host, method, method));
                 seeds.addAll(models.containerDependencies(method));
+                if (!method.getModifiers().contains(Modifier.STATIC)) {
+                    seeds.add(host);
+                }
                 continue;
             }
             int index = indices.merge(key, 0, (existing, ignored) -> existing + 1);
