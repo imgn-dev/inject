@@ -71,11 +71,19 @@ Selection happens once, at `Context` bootstrap, after conditions are evaluated:
 2. No live non-default binding → the live default is used.
 3. Two or more live non-default bindings for one key →
    `DuplicateBindingException`, unchanged.
-4. Two or more live defaults for one key → `DuplicateBindingException`. When the
-   processor can see both in one compilation, it reports the conflict at compile
-   time instead.
+4. Two or more live defaults for one key → `DuplicateBindingException` at
+   bootstrap, even when a non-default binding wins the key: duplicate defaults
+   are a configuration error regardless of which provider is selected. Detection
+   is runtime-only, matching ordinary duplicate bindings — a compile-time check
+   would be unsound (a default may carry a condition, and cross-jar defaults are
+   invisible to one compilation).
 5. A key whose only binding is a default with a failing condition is unsatisfied →
    `UnsatisfiedDependencyException` at resolution, unchanged.
+
+A discarded default is out of the graph entirely: it contributes no
+`BeanDefinition` and joins no stereotype query. A default exposing several keys
+(`@ExposeAs`) is selected per key and remains a bean definition when it wins at
+least one.
 
 Consumers — `@Inject` sites, `Provider<T>` dependencies, multibinding
 *consumers* (`Set<T>`/`Map<K, V>` injection) — are oblivious: they see the
@@ -94,9 +102,9 @@ processor-side validation.
 
 ## 5. Runtime carrier
 
-- `Factory<T>` gains `public boolean isDefault()` returning `false`; the
-  generated factory for a `@Default @Provides` method overrides it to return
-  `true`.
+- `Factory<T>` gains `protected boolean isDefault()` returning `false` —
+  protected like its siblings `scope()` and `contribution()`; the generated
+  factory for a `@Default @Provides` method overrides it to return `true`.
 - `DefaultContext`, while building the registry, partitions each key's live
   factories into non-defaults and defaults, then applies the selection rules of
   §3. No new exception type; no change to `Injector`, `Key`, or resolution.
@@ -108,7 +116,6 @@ processor-side validation.
   `DuplicateBindingException`; a scoped default is wrapped once; default-only key
   with failing condition throws `UnsatisfiedDependencyException`.
 - **Processor (`google-compile-testing`):** the prohibition matrix of §4; the
-  generated factory overrides `isDefault()`; duplicate defaults visible in one
-  compilation fail the build.
+  generated factory overrides `isDefault()`.
 - **Examples:** `inject-examples` adds a conditional bean plus its noop default;
   `inject-examples-module` mirrors it on the module path.
