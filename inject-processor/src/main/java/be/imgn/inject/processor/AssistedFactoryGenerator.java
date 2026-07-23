@@ -122,21 +122,22 @@ final class AssistedFactoryGenerator {
             MethodSpec.Builder method, AssistedRecipe recipe, CodeBlock arguments, MemberInjection members) {
         ClassName beanType = ClassName.get(recipe.owner());
         method.addStatement("$T instance = new $T($L)", beanType, beanType, arguments);
-        // Mirrors Factory.build(): construct, then @Inject methods, then fields.
+        // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
+        // injectFields emits them).
         for (MethodModel injected : members.methods()) {
             CodeBlock args = injected.parameters().stream()
                     .map(AssistedFactoryGenerator::resolve)
                     .collect(CodeBlock.joining(", "));
             method.addStatement("instance.$L($L)", injected.name(), args);
         }
-        for (PluginField pluginField : members.pluginFields()) {
-            method.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
-        }
         for (FieldModel field : members.fields()) {
             method.addStatement(
                     "instance.$L = $L",
                     field.name(),
                     resolve(field.type(), field.qualifier(), field.isProvider(), null));
+        }
+        for (PluginField pluginField : members.pluginFields()) {
+            method.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
         }
         method.addStatement("return instance");
     }

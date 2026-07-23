@@ -108,7 +108,7 @@ public interface LegacyReportFactory {
 |---|---|
 | Injecting an assisted bean directly (visible in-compilation) | "only available through an @AssistedFactory" |
 | Scope, qualifier, `@ExposeAs`, `@IntoSet`/`@IntoMap` on an assisted bean or assisted `@Provides` method | "assisted" + "cannot" |
-| `@Assisted` on an `@Inject` method/field parameter, or any non-recipe location | "misplaced" |
+| `@Assisted` on an `@Inject` method parameter | "misplaced" |
 | Factory method ↔ recipe parameter mismatch (missing, extra, tag, type) | "does not match" |
 | `@AssistedFactory` whose return type is not assignable from the implementation / recipe return | "not assignable" |
 | `method()` set with default `value()` | "requires the declaring class" |
@@ -116,6 +116,7 @@ public interface LegacyReportFactory {
 | `value()` class having no assisted `@Inject` constructor (when `method()` empty) | "no assisted constructor" |
 | Abstract non-`@AssistedFactory` method in an interface that has `@AssistedFactory` methods | "cannot be implemented" |
 | `@AssistedFactory` on a class method or on a type | "interface method" |
+| Conditioning annotation on an assisted recipe | "factory interface" |
 
 Cross-module direct injection of an assisted bean is invisible at compile time and fails at runtime as an ordinary
 missing binding (the key never exists).
