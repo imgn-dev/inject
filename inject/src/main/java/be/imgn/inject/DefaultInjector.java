@@ -7,15 +7,13 @@ import java.util.Optional;
 
 import be.imgn.inject.context.BeanDefinition;
 import be.imgn.inject.context.Context;
-import be.imgn.inject.context.DefaultContext;
 
 /** Default {@link Injector} delegating everything to a {@link Context}. */
 final class DefaultInjector implements Injector {
     private final Context context;
 
-    DefaultInjector(DefaultContext context) {
+    DefaultInjector(Context context) {
         this.context = Objects.requireNonNull(context, "context");
-        context.setInjector(this);
     }
 
     @Override
@@ -56,5 +54,10 @@ final class DefaultInjector implements Injector {
     @Override
     public List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
         return context.getBeanDefinitionsByStereotype(Objects.requireNonNull(stereotype, "stereotype"));
+    }
+
+    @Override
+    public ChildBuilder childBuilder() {
+        return new ChildBuilder(context);
     }
 }

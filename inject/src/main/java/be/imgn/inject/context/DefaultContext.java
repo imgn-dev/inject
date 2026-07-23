@@ -1,9 +1,7 @@
 package be.imgn.inject.context;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,12 +9,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import org.jspecify.annotations.Nullable;
 
-import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
@@ -41,7 +37,7 @@ public final class DefaultContext implements Context {
     private final Map<Key<?>, Provider<?>> registry;
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
-    private final ThreadLocal<Deque<Key<?>>> stack = ThreadLocal.withInitial(ArrayDeque::new);
+    private final ResolutionStack stack = new ResolutionStack();
     private @Nullable Injector injector;
 
     /** {@return a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services} */
@@ -177,7 +173,7 @@ public final class DefaultContext implements Context {
 
     private <T> Provider<T> wrap(Factory<T> factory, Map<Class<? extends Annotation>, Scope> scopes) {
         Key<T> primary = Key.of(factory.type());
-        Provider<T> guarded = new CycleGuardProvider<>(primary, new FactoryProvider<>(this, factory), this);
+        Provider<T> guarded = new CycleGuardProvider<>(primary, new FactoryProvider<>(this, factory), stack);
         Optional<Class<? extends Annotation>> scopeAnnotation = factory.scope();
         if (scopeAnnotation.isEmpty()) {
             return guarded;
@@ -196,7 +192,7 @@ public final class DefaultContext implements Context {
         Objects.requireNonNull(key, "key");
         Provider<?> provider = registry.get(key);
         if (provider == null) {
-            throw new UnsatisfiedDependencyException("No binding for " + key + requiredBySuffix());
+            throw new UnsatisfiedDependencyException("No binding for " + key + stack.requiredBySuffix());
         }
         return (Provider<T>) provider;
     }
@@ -236,31 +232,6 @@ public final class DefaultContext implements Context {
             throw new IllegalStateException("There is no Injector attached to this Context.");
         }
         return attached;
-    }
-
-    private String requiredBySuffix() {
-        Deque<Key<?>> current = stack.get();
-        if (current.isEmpty()) {
-            return "";
-        }
-        StringJoiner path = new StringJoiner(" -> ");
-        current.descendingIterator().forEachRemaining(entered -> path.add(entered.toString()));
-        return " (required by " + path + ")";
-    }
-
-    void enter(Key<?> key) {
-        Deque<Key<?>> current = stack.get();
-        if (current.contains(key)) {
-            StringJoiner path = new StringJoiner(" -> ");
-            current.descendingIterator().forEachRemaining(entered -> path.add(entered.toString()));
-            path.add(key.toString());
-            throw new CircularDependencyException("Dependency cycle: " + path);
-        }
-        current.push(key);
-    }
-
-    void exit(Key<?> key) {
-        stack.get().pop();
     }
 
     /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
