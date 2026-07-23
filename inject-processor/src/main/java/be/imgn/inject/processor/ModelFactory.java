@@ -117,14 +117,6 @@ final class ModelFactory {
                         method.getSimpleName().toString(),
                         parameters(method, bean, types, elements, packageOf(bean)),
                         Annotations.metadata(List.of(method), elements)));
-                for (VariableElement parameter : method.getParameters()) {
-                    if (parameter.getAnnotation(Assisted.class) != null) {
-                        diagnostics.error(
-                                "@Assisted is misplaced: only @Inject constructors and @Provides methods take"
-                                        + " assisted parameters.",
-                                parameter);
-                    }
-                }
             }
         }
         ContributionModel contribution = contribution(bean, bean.asType(), types);
@@ -297,6 +289,39 @@ final class ModelFactory {
             diagnostics.error(
                     "An assisted recipe cannot contribute to a collection; it has no binding key.", annotated);
         }
+    }
+
+    /** Reports @Assisted parameters on the bean's @Inject methods; they belong only on recipes. */
+    void validateNoMisplacedAssisted(TypeElement bean) {
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD && enclosed.getAnnotation(Inject.class) != null) {
+                for (VariableElement parameter : ((ExecutableElement) enclosed).getParameters()) {
+                    if (parameter.getAnnotation(Assisted.class) != null) {
+                        diagnostics.error(
+                                "@Assisted is misplaced: only @Inject constructors and @Provides methods take"
+                                        + " assisted parameters.",
+                                parameter);
+                    }
+                }
+            }
+        }
+    }
+
+    /** {@return the container-resolved (non-assisted) declared parameter types of {@code executable}} */
+    List<TypeElement> containerDependencies(ExecutableElement executable) {
+        List<TypeElement> dependencies = new ArrayList<>();
+        for (VariableElement parameter : executable.getParameters()) {
+            if (parameter.getAnnotation(Assisted.class) != null) {
+                continue;
+            }
+            TypeMirror type = parameter.asType();
+            Optional<TypeMirror> inner = providerInner(type);
+            TypeMirror resolved = inner.orElse(type);
+            if (resolved instanceof DeclaredType declared && declared.asElement() instanceof TypeElement element) {
+                dependencies.add(element);
+            }
+        }
+        return List.copyOf(dependencies);
     }
 
     boolean hasAccessibleNoArgConstructor(TypeElement type) {

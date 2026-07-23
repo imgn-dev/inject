@@ -75,6 +75,7 @@ final class GatherStage {
                 continue;
             }
             Optional<ExecutableElement> constructor = models.injectConstructor(bean);
+            models.validateNoMisplacedAssisted(bean);
             if (constructor.isPresent() && ModelFactory.isAssisted(constructor.get())) {
                 // Assisted beans have no binding of their own: no BeanModel, no factory, no edges. They are
                 // reachable only through a generated @AssistedFactory implementation (Task 2).
@@ -84,6 +85,7 @@ final class GatherStage {
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(bean, null, constructor.get()));
                 assistedBeanNames.add(key);
+                seeds.addAll(models.containerDependencies(constructor.get()));
                 continue;
             }
             beans.put(bean, models.buildModel(bean));
@@ -93,13 +95,13 @@ final class GatherStage {
             seeds.addAll(models.dependencies(bean, true));
         }
 
-        List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes);
+        List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes, seeds);
         seeds.addAll(providesDependencies(roundEnv));
         return new Gathered(beans, provides, edges, seeds, assistedRecipes, assistedBeanNames);
     }
 
     private List<ProvidesModel> gatherProvides(
-            RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> assistedRecipes) {
+            RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> assistedRecipes, List<TypeElement> seeds) {
         Map<String, Integer> indices = new HashMap<>();
         List<ProvidesModel> result = new ArrayList<>();
         for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
@@ -118,6 +120,7 @@ final class GatherStage {
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(host, method, method));
+                seeds.addAll(models.containerDependencies(method));
                 continue;
             }
             int index = indices.merge(key, 0, (existing, ignored) -> existing + 1);

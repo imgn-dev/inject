@@ -2,13 +2,13 @@ package be.imgn.inject.processor;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import javax.tools.JavaFileObject;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class AssistedRecipeTest {
@@ -43,8 +43,8 @@ class AssistedRecipeTest {
         assertThat(compilation).succeeded();
         // the assisted bean must not get a factory; the ordinary bean still does
         assertThat(compilation).generatedSourceFile("example.$Dep$$Factory");
-        assertTrue(compilation.generatedSourceFiles().stream()
-                .noneMatch(f -> f.getName().contains("$Report$$Factory")));
+        Assertions.assertThat(compilation.generatedSourceFiles())
+                .noneMatch(f -> f.getName().contains("$Report$$Factory"));
     }
 
     @Test
@@ -133,8 +133,8 @@ class AssistedRecipeTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        assertTrue(compilation.generatedSourceFiles().stream()
-                .noneMatch(f -> f.getName().contains("$Config$legacy$$Factory")));
+        Assertions.assertThat(compilation.generatedSourceFiles())
+                .noneMatch(f -> f.getName().contains("$Config$legacy$$Factory"));
     }
 
     @Test
@@ -182,5 +182,55 @@ class AssistedRecipeTest {
 
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("misplaced");
+    }
+
+    @Test
+    void misplacedAssistedOnAssistedBeanMethodIsAnError() {
+        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Bad {
+                    @Inject
+                    public Bad(@Assisted String id) {}
+
+                    @Inject
+                    public void configure(@Assisted String x) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bad);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("misplaced");
+    }
+
+    @Test
+    void containerDependencyOfAssistedRecipeGetsADefaultFactory() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.SomeConfig", """
+                package example;
+
+                public class SomeConfig {
+                    public SomeConfig() {}
+                }
+                """);
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Report", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Report {
+                    @Inject
+                    public Report(SomeConfig config, @Assisted String id) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config, bean);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation).generatedSourceFile("example.$SomeConfig$$Factory");
     }
 }
