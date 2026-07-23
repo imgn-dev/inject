@@ -31,4 +31,21 @@ class ModulePathTest {
                 .hasAtLeastOneElementOfType(AlphaPlugin.class)
                 .hasAtLeastOneElementOfType(BetaPlugin.class);
     }
+
+    @Test
+    void defaultTelemetryFallsBackWhenLiveTelemetryIsOff() {
+        Injector injector = Injector.create();
+        assertThat(injector.getInstance(Telemetry.class).mode()).isEqualTo("off");
+    }
+
+    @Test
+    void liveTelemetryWinsOverTheDefaultWhenEnabled() {
+        System.setProperty("modular.telemetry", "on");
+        try {
+            Injector injector = Injector.create();
+            assertThat(injector.getInstance(Telemetry.class).mode()).isEqualTo("live");
+        } finally {
+            System.clearProperty("modular.telemetry");
+        }
+    }
 }
