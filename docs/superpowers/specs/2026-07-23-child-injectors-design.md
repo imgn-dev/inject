@@ -76,7 +76,8 @@ Children nest: `child.childBuilder()` layers again; the nearest binding wins on 
 A `ChildContext implements Context` holds the parent `Context`, the local `Map<Key<?>, Provider<?>>`, and the
 child's injector reference:
 
-1. `getProvider(key)`: local map hit → that provider. Miss → consult the parent's `BeanDefinition` for the key:
+1. `getProvider(key)`: nearest local binding across this context and any ancestor `ChildContext`s → that provider.
+   Miss → consult the parent's `BeanDefinition` for the key:
    - definition present and **unscoped** (`!definition.annotationMetadata().hasStereotype(ScopingAnnotation.class)`
      — the metadata already carries the bean's scoping annotations) → return a provider running
      `factory.build(childContext)` under the child's cycle guard (the rebuild path that lets prototypes see child
