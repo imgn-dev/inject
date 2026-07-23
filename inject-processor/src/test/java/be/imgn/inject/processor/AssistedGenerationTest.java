@@ -79,7 +79,7 @@ class AssistedGenerationTest {
     }
 
     @Test
-    void memberInjectionRunsInsideCreate() throws Exception {
+    void memberInjectionRunsInsideCreate() throws IOException {
         JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
                 package example;
 
@@ -116,6 +116,13 @@ class AssistedGenerationTest {
                 .contains("instance.tag = ")
                 .contains("instance.configure(")
                 .contains("return instance");
+
+        String source = compilation
+                .generatedSourceFile("example.$ReportFactory$$Impl")
+                .orElseThrow()
+                .getCharContent(false)
+                .toString();
+        assertThat(source.indexOf("instance.configure(")).isLessThan(source.indexOf("instance.tag ="));
     }
 
     @Test
