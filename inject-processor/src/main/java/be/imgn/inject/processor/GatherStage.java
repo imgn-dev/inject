@@ -71,6 +71,7 @@ final class GatherStage {
         List<TypeElement> seeds = new ArrayList<>();
         Map<String, List<AssistedRecipe>> assistedRecipes = new LinkedHashMap<>();
         Set<String> assistedBeanNames = new LinkedHashSet<>();
+        List<AssistedReference> assistedReferences = new ArrayList<>();
         for (TypeElement bean : beanTypes) {
             if (!models.validateBean(bean)) {
                 continue;
@@ -79,14 +80,16 @@ final class GatherStage {
             models.validateNoMisplacedAssisted(bean);
             if (constructor.isPresent() && ModelFactory.isAssisted(constructor.get())) {
                 // Assisted beans have no binding of their own: no BeanModel, no factory, no edges. They are
-                // reachable only through a generated @AssistedFactory implementation (Task 2).
+                // reachable only through a generated @AssistedFactory implementation.
                 models.validateAssistedRecipe(bean);
                 String key = bean.getQualifiedName().toString();
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(bean, null, constructor.get()));
                 assistedBeanNames.add(key);
-                seeds.addAll(models.containerDependencies(constructor.get()));
+                List<TypeElement> containerParams = models.containerDependencies(constructor.get());
+                seeds.addAll(containerParams);
+                assistedReferences.addAll(toAssistedReferences(constructor.get(), containerParams));
                 continue;
             }
             beans.put(bean, models.buildModel(bean));
@@ -96,10 +99,27 @@ final class GatherStage {
             seeds.addAll(models.dependencies(bean, true));
         }
 
-        List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes, seeds);
+        List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes, seeds, assistedReferences);
         seeds.addAll(providesDependencies(roundEnv));
         List<AssistedFactoryModel> assistedFactories = gatherAssistedFactories(roundEnv, assistedRecipes);
-        return new Gathered(beans, provides, edges, seeds, assistedRecipes, assistedBeanNames, assistedFactories);
+        return new Gathered(
+                beans,
+                provides,
+                edges,
+                seeds,
+                assistedRecipes,
+                assistedBeanNames,
+                assistedFactories,
+                assistedReferences);
+    }
+
+    /**
+     * {@return {@code containerDependencies}'s resolved types paired with {@code site} for the direct-injection check}
+     */
+    private static List<AssistedReference> toAssistedReferences(Element site, List<TypeElement> containerDependencies) {
+        return containerDependencies.stream()
+                .map(type -> new AssistedReference(site, type.getQualifiedName().toString()))
+                .toList();
     }
 
     private List<AssistedFactoryModel> gatherAssistedFactories(
@@ -211,7 +231,10 @@ final class GatherStage {
     }
 
     private List<ProvidesModel> gatherProvides(
-            RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> assistedRecipes, List<TypeElement> seeds) {
+            RoundEnvironment roundEnv,
+            Map<String, List<AssistedRecipe>> assistedRecipes,
+            List<TypeElement> seeds,
+            List<AssistedReference> assistedReferences) {
         Map<String, Integer> indices = new HashMap<>();
         List<ProvidesModel> result = new ArrayList<>();
         for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
@@ -225,12 +248,14 @@ final class GatherStage {
             String key = host.getQualifiedName().toString() + "#" + method.getSimpleName();
             if (ModelFactory.isAssisted(method)) {
                 // An assisted @Provides method has no binding of its own: skip factory generation, keep the
-                // recipe for Task 2's @AssistedFactory link resolution.
+                // recipe for @AssistedFactory link resolution.
                 models.validateAssistedRecipe(method);
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(host, method, method));
-                seeds.addAll(models.containerDependencies(method));
+                List<TypeElement> containerParams = models.containerDependencies(method);
+                seeds.addAll(containerParams);
+                assistedReferences.addAll(toAssistedReferences(method, containerParams));
                 if (!method.getModifiers().contains(Modifier.STATIC)) {
                     seeds.add(host);
                 }
@@ -238,6 +263,7 @@ final class GatherStage {
             }
             int index = indices.merge(key, 0, (existing, ignored) -> existing + 1);
             result.add(models.providesModel(method, host, index));
+            assistedReferences.addAll(toAssistedReferences(method, models.containerDependencies(method)));
         }
         return result;
     }

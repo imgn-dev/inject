@@ -67,6 +67,69 @@ class AssistedRecipeTest {
     }
 
     @Test
+    void providesParameterReferencingAssistedBeanIsAnError() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static Long legacy(Report report) {
+                        return 1L;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(ASSISTED_BEAN, config);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("only available through an @AssistedFactory");
+    }
+
+    @Test
+    void assistedRecipeContainerParamReferencingAssistedBeanIsAnError() {
+        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Bad {
+                    @Inject
+                    public Bad(Report report, @Assisted String id) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(ASSISTED_BEAN, bad);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("only available through an @AssistedFactory");
+    }
+
+    @Test
+    void conditionalAssistedBeanIsAnError() {
+        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.ConditionalOnProperty;
+                import be.imgn.inject.Inject;
+
+                @ConditionalOnProperty("x")
+                public class Bad {
+                    @Inject
+                    public Bad(@Assisted String id) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bad);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("factory interface");
+    }
+
+    @Test
     void scopedAssistedBeanIsAnError() {
         JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
                 package example;

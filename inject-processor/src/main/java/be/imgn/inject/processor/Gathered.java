@@ -18,6 +18,8 @@ import javax.lang.model.element.TypeElement;
  * @param assistedBeanNames qualified names of in-compilation beans reachable only through an {@code @AssistedFactory},
  *     not by direct injection
  * @param assistedFactories the resolved {@code @AssistedFactory} interfaces to implement
+ * @param assistedReferences container-resolved parameter sites (a {@code @Provides} method parameter, or another
+ *     assisted recipe's container parameter) whose declared type may be an assisted bean, checked by the plan stage
  */
 record Gathered(
         Map<TypeElement, BeanModel> beans,
@@ -26,4 +28,5 @@ record Gathered(
         List<TypeElement> seeds,
         Map<String, List<AssistedRecipe>> assistedRecipes,
         Set<String> assistedBeanNames,
-        List<AssistedFactoryModel> assistedFactories) {}
+        List<AssistedFactoryModel> assistedFactories,
+        List<AssistedReference> assistedReferences) {}

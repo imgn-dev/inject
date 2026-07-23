@@ -126,6 +126,37 @@ class AssistedGenerationTest {
     }
 
     @Test
+    void assistedParameterTypesAreNotContainerResolved() throws Exception {
+        JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.context.Context;
+
+                public class Report {
+                    @Inject
+                    public Report(String db, @Assisted Context ctx) {}
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+                import be.imgn.inject.context.Context;
+
+                public interface ReportFactory {
+                    @AssistedFactory
+                    Report create(Context ctx);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(report, factory);
+
+        CompilationSubject.assertThat(compilation).succeeded();
+    }
+
+    @Test
     void providesRecipeInvokesHost() throws Exception {
         JavaFileObject staticConfig = JavaFileObjects.forSourceString("example.Config", """
                 package example;

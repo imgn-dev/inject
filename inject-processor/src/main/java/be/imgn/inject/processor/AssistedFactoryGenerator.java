@@ -2,6 +2,8 @@ package be.imgn.inject.processor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -155,7 +157,8 @@ final class AssistedFactoryGenerator {
      * {@return the recipe's call arguments: container parameters resolved through the context, assisted ones passed
      * through by the factory-method parameter name at the matched index}
      */
-    private static CodeBlock callArguments(AssistedFactoryMethod factoryMethod, List<ParameterModel> recipeParameters) {
+    private static CodeBlock callArguments(
+            AssistedFactoryMethod factoryMethod, Map<Integer, ParameterModel> recipeParameters) {
         List<? extends VariableElement> recipeElements =
                 factoryMethod.recipe().executable().getParameters();
         List<? extends VariableElement> factoryParameters =
@@ -170,7 +173,7 @@ final class AssistedFactoryGenerator {
                         "$L",
                         factoryParameters.get(factoryIndex).getSimpleName().toString()));
             } else {
-                arguments.add(resolve(recipeParameters.get(index)));
+                arguments.add(resolve(Objects.requireNonNull(recipeParameters.get(index), "container parameter")));
             }
         }
         return arguments.stream().collect(CodeBlock.joining(", "));

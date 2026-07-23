@@ -79,10 +79,12 @@ final class PlanStage {
     }
 
     /**
-     * {@return {@code true} if no edge injects an assisted bean directly}
+     * {@return {@code true} if no edge, {@code @Provides} parameter, or other assisted recipe's container parameter
+     * injects an assisted bean directly}
      *
-     * <p>{@code Provider<AssistedBean>} sites never appear in {@link Gathered#edges()} (the Provider-breaks-cycle
-     * rule), so they are not caught here; they fail at runtime instead, as a missing binding.
+     * <p>{@code Provider<AssistedBean>} sites on a bean's own {@code @Inject} constructor/members never appear in
+     * {@link Gathered#edges()} (the Provider-breaks-cycle rule), so they are not caught here; they fail at runtime
+     * instead, as a missing binding.
      */
     private boolean checkNoDirectAssistedInjection(Gathered gathered) {
         for (Map.Entry<TypeElement, List<TypeElement>> entry : gathered.edges().entrySet()) {
@@ -97,7 +99,22 @@ final class PlanStage {
                 }
             }
         }
+        for (AssistedReference reference : gathered.assistedReferences()) {
+            if (gathered.assistedBeanNames().contains(reference.typeName())) {
+                diagnostics.error(
+                        simpleName(reference.typeName())
+                                + " has assisted parameters and is only available through an @AssistedFactory.",
+                        reference.site());
+                return false;
+            }
+        }
         return true;
+    }
+
+    /** {@return the simple-name suffix of a qualified type name} */
+    private static String simpleName(String qualifiedName) {
+        int lastDot = qualifiedName.lastIndexOf('.');
+        return lastDot < 0 ? qualifiedName : qualifiedName.substring(lastDot + 1);
     }
 
     /** {@return the seen-slot identity for a contribution: its element type and map key} */

@@ -6,6 +6,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EventListener;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import com.palantir.javapoet.TypeName;
 import org.jspecify.annotations.Nullable;
 
 import be.imgn.inject.Assisted;
+import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -134,11 +136,29 @@ final class ModelFactory {
                 contribution);
     }
 
-    /** {@return the assisted recipe executable's parameters (assisted and container alike), in declaration order} */
-    List<ParameterModel> recipeParameters(AssistedRecipe recipe) {
+    /**
+     * {@return the assisted recipe executable's container (non-{@code @Assisted}) parameters, keyed by their
+     * declaration index}
+     *
+     * <p>{@code @Assisted} parameters are skipped entirely: they are passed through verbatim by the generator and must
+     * never go through dependency/type resolution, which would report spurious diagnostics for otherwise legal
+     * caller-supplied parameter types (e.g. a framework type).
+     */
+    Map<Integer, ParameterModel> recipeParameters(AssistedRecipe recipe) {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();
-        return parameters(recipe.executable(), recipe.owner(), types, elements, packageOf(recipe.owner()));
+        TypeElement owner = recipe.owner();
+        String targetPackage = packageOf(owner);
+        List<? extends VariableElement> recipeParameters = recipe.executable().getParameters();
+        Map<Integer, ParameterModel> result = new LinkedHashMap<>();
+        for (int index = 0; index < recipeParameters.size(); index++) {
+            VariableElement parameter = recipeParameters.get(index);
+            if (parameter.getAnnotation(Assisted.class) != null) {
+                continue;
+            }
+            result.put(index, parameterModel(parameter, owner, types, elements, targetPackage));
+        }
+        return result;
     }
 
     /**
@@ -311,6 +331,22 @@ final class ModelFactory {
             diagnostics.error(
                     "An assisted recipe cannot contribute to a collection; it has no binding key.", annotated);
         }
+        if (hasConditioningAnnotation(annotated)) {
+            diagnostics.error(
+                    "An assisted recipe cannot be conditional; put the condition on the factory interface.", annotated);
+        }
+    }
+
+    /** {@return whether the element carries an annotation meta-annotated {@link ConditioningAnnotation}} */
+    private static boolean hasConditioningAnnotation(Element element) {
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            TypeElement annotationType =
+                    (TypeElement) mirror.getAnnotationType().asElement();
+            if (annotationType.getAnnotation(ConditioningAnnotation.class) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Reports @Assisted parameters on the bean's @Inject methods; they belong only on recipes. */
@@ -543,33 +579,38 @@ final class ModelFactory {
             Elements elements,
             String targetPackage) {
         return executable.getParameters().stream()
-                .map(parameter -> {
-                    CodeBlock pluginArgument = null;
-                    if (hasInjectingAnnotation(parameter)) {
-                        Optional<CodeBlock> supplied = pluginInitializer(parameter, declaringType);
-                        if (supplied.isEmpty()) {
-                            diagnostics.error(
-                                    "No plugin handles the injecting annotation on parameter "
-                                            + parameter.getSimpleName() + " of " + declaringType.getQualifiedName()
-                                            + ".",
-                                    parameter);
-                        } else {
-                            pluginArgument = supplied.get();
-                        }
-                    }
-                    Dependency dependency = dependency(parameter.asType(), types, parameter);
-                    RenderedQualifier qualifier = Annotations.qualifier(
-                                    parameter, elements, targetPackage, annotationImplRequests)
-                            .orElse(null);
-                    return new ParameterModel(
-                            parameter.getSimpleName().toString(),
-                            dependency.type(),
-                            qualifier,
-                            dependency.isProvider(),
-                            pluginArgument,
-                            Annotations.metadata(List.of(parameter), elements));
-                })
+                .map(parameter -> parameterModel(parameter, declaringType, types, elements, targetPackage))
                 .toList();
+    }
+
+    private ParameterModel parameterModel(
+            VariableElement parameter,
+            TypeElement declaringType,
+            Types types,
+            Elements elements,
+            String targetPackage) {
+        CodeBlock pluginArgument = null;
+        if (hasInjectingAnnotation(parameter)) {
+            Optional<CodeBlock> supplied = pluginInitializer(parameter, declaringType);
+            if (supplied.isEmpty()) {
+                diagnostics.error(
+                        "No plugin handles the injecting annotation on parameter " + parameter.getSimpleName() + " of "
+                                + declaringType.getQualifiedName() + ".",
+                        parameter);
+            } else {
+                pluginArgument = supplied.get();
+            }
+        }
+        Dependency dependency = dependency(parameter.asType(), types, parameter);
+        RenderedQualifier qualifier = Annotations.qualifier(parameter, elements, targetPackage, annotationImplRequests)
+                .orElse(null);
+        return new ParameterModel(
+                parameter.getSimpleName().toString(),
+                dependency.type(),
+                qualifier,
+                dependency.isProvider(),
+                pluginArgument,
+                Annotations.metadata(List.of(parameter), elements));
     }
 
     private String packageOf(TypeElement type) {
