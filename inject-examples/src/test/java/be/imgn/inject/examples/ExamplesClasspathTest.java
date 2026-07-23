@@ -126,4 +126,24 @@ class ExamplesClasspathTest {
         assertThat(locator.injector()).isSameAs(injector);
         assertThat(locator.locateRegistry()).isSameAs(injector.getInstance(Registry.class));
     }
+
+    @Test
+    void childInjectorLayersRequestData() {
+        Injector app = Injector.create();
+        Injector requestA = app.childBuilder()
+                .bind(RequestContext.class, new RequestContext("ada"))
+                .build();
+        Injector requestB = app.childBuilder()
+                .bind(RequestContext.class, new RequestContext("bob"))
+                .build();
+
+        RequestGreeter greeterA = requestA.getInstance(RequestGreeter.class);
+        RequestGreeter greeterB = requestB.getInstance(RequestGreeter.class);
+        assertThat(greeterA.request().user()).isEqualTo("ada");
+        assertThat(greeterB.request().user()).isEqualTo("bob");
+        // the singleton registry is shared across children (scope anchoring)
+        assertThat(greeterA.registry()).isSameAs(greeterB.registry()).isSameAs(app.getInstance(Registry.class));
+        // the application-level default RequestContext
+        assertThat(app.getInstance(RequestGreeter.class).request().user()).isEqualTo("anonymous");
+    }
 }
