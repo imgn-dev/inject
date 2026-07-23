@@ -14,6 +14,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 
+import be.imgn.inject.Default;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -61,6 +62,14 @@ final class GatherStage {
         for (Element element : markerElements) {
             if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
                 diagnostics.error("@IntoSet/@IntoMap on a method requires @Provides.", element);
+            }
+        }
+
+        for (Element element : roundEnv.getElementsAnnotatedWith(Default.class)) {
+            if (element.getAnnotation(Provides.class) == null) {
+                diagnostics.error("@Default requires @Provides.", element);
+            } else if (element.getAnnotation(IntoSet.class) != null || element.getAnnotation(IntoMap.class) != null) {
+                diagnostics.error("@Default cannot join a collection contribution (@IntoSet/@IntoMap).", element);
             }
         }
 

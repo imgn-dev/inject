@@ -54,6 +54,9 @@ final class ProvidesFactoryGenerator {
         } else if (model.producedKeyType() != null) {
             type.addMethod(collectionExposedKeys(model.producedKeyType()));
         }
+        if (model.isDefault()) {
+            type.addMethod(isDefaultMethod());
+        }
         return JavaFile.builder(model.packageName(), type.build()).build();
     }
 
@@ -202,5 +205,14 @@ final class ProvidesFactoryGenerator {
                 Qualifiers.instanceArgument(qualifier),
                 parameter.metadata(),
                 parameter.isProvider());
+    }
+
+    private static MethodSpec isDefaultMethod() {
+        return MethodSpec.methodBuilder("isDefault")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(boolean.class)
+                .addStatement("return true")
+                .build();
     }
 }

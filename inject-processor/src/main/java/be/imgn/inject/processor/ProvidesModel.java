@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
  * @param producedKeyType the parameterized collection key type expression for a Set/Map-returning method, or
  *     {@code null}
+ * @param isDefault whether the method is a {@code @Default} fallback recipe
  */
 record ProvidesModel(
         String packageName,
@@ -43,4 +44,5 @@ record ProvidesModel(
         @Nullable RenderedQualifier qualifier,
         List<TypeName> exposedTypes,
         @Nullable ContributionModel contribution,
-        @Nullable CodeBlock producedKeyType) {}
+        @Nullable CodeBlock producedKeyType,
+        boolean isDefault) {}

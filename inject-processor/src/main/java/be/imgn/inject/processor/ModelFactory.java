@@ -33,6 +33,7 @@ import com.palantir.javapoet.TypeName;
 
 import org.jspecify.annotations.Nullable;
 
+import be.imgn.inject.Default;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -197,7 +198,8 @@ final class ModelFactory {
                 qualifier,
                 exposedTypes,
                 contribution,
-                producedKeyType);
+                producedKeyType,
+                method.getAnnotation(Default.class) != null);
     }
 
     boolean validateBean(TypeElement bean) {
