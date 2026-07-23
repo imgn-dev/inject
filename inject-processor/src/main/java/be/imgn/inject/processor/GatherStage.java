@@ -15,6 +15,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 
+import be.imgn.inject.AssistedFactory;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -97,7 +98,116 @@ final class GatherStage {
 
         List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes, seeds);
         seeds.addAll(providesDependencies(roundEnv));
-        return new Gathered(beans, provides, edges, seeds, assistedRecipes, assistedBeanNames);
+        List<AssistedFactoryModel> assistedFactories = gatherAssistedFactories(roundEnv, assistedRecipes);
+        return new Gathered(beans, provides, edges, seeds, assistedRecipes, assistedBeanNames, assistedFactories);
+    }
+
+    private List<AssistedFactoryModel> gatherAssistedFactories(
+            RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> recipes) {
+        Map<TypeElement, List<ExecutableElement>> byInterface = new LinkedHashMap<>();
+        for (Element element : roundEnv.getElementsAnnotatedWith(AssistedFactory.class)) {
+            ExecutableElement method = (ExecutableElement) element;
+            Element enclosingElement = method.getEnclosingElement();
+            if (!(enclosingElement instanceof TypeElement enclosing) || enclosing.getKind() != ElementKind.INTERFACE) {
+                diagnostics.error("The @AssistedFactory annotation belongs on an interface method.", method);
+                continue;
+            }
+            byInterface.computeIfAbsent(enclosing, unused -> new ArrayList<>()).add(method);
+        }
+        AssistedMatcher matcher = new AssistedMatcher(models.types(), diagnostics);
+        List<AssistedFactoryModel> factories = new ArrayList<>();
+        for (Map.Entry<TypeElement, List<ExecutableElement>> entry : byInterface.entrySet()) {
+            TypeElement factoryInterface = entry.getKey();
+            Set<ExecutableElement> annotatedMethods = new LinkedHashSet<>(entry.getValue());
+            boolean valid = true;
+            for (Element enclosed : factoryInterface.getEnclosedElements()) {
+                if (enclosed.getKind() == ElementKind.METHOD
+                        && enclosed.getModifiers().contains(Modifier.ABSTRACT)
+                        && !annotatedMethods.contains(enclosed)) {
+                    diagnostics.error(
+                            enclosed.getSimpleName() + " has no @AssistedFactory and cannot be implemented.", enclosed);
+                    valid = false;
+                }
+            }
+            if (!valid) {
+                continue;
+            }
+            List<AssistedFactoryMethod> methods = new ArrayList<>();
+            for (ExecutableElement method : entry.getValue()) {
+                AssistedFactory annotation = method.getAnnotation(AssistedFactory.class);
+                if (annotation == null) {
+                    continue;
+                }
+                Map<String, List<AssistedRecipe>> withFallback =
+                        withCrossModuleFallback(method, annotation, recipes, roundEnv);
+                Optional<AssistedFactoryMethod> resolved = matcher.resolve(method, annotation, withFallback);
+                if (resolved.isEmpty()) {
+                    valid = false;
+                    continue;
+                }
+                methods.add(resolved.get());
+            }
+            if (valid) {
+                factories.add(new AssistedFactoryModel(factoryInterface, List.copyOf(methods)));
+            }
+        }
+        return List.copyOf(factories);
+    }
+
+    /**
+     * Cross-module recipes: when {@code method}'s link key is absent from {@code recipes} because the implementation
+     * class was compiled in a previous module (not part of the current round), builds its {@link AssistedRecipe}
+     * directly from the class's members and merges it in. In-round misses are left alone: a genuinely missing recipe is
+     * an error, not a fallback.
+     */
+    private Map<String, List<AssistedRecipe>> withCrossModuleFallback(
+            ExecutableElement method,
+            AssistedFactory annotation,
+            Map<String, List<AssistedRecipe>> recipes,
+            RoundEnvironment roundEnv) {
+        Optional<AssistedMatcher.Link> link = AssistedMatcher.link(method, annotation);
+        if (link.isEmpty()
+                || recipes.containsKey(link.get().key())
+                || isInRound(link.get().implementationElement(), roundEnv)) {
+            return recipes;
+        }
+        List<AssistedRecipe> fallback =
+                crossModuleRecipe(link.get().implementationElement(), link.get().recipeMethod());
+        if (fallback.isEmpty()) {
+            return recipes;
+        }
+        Map<String, List<AssistedRecipe>> merged = new LinkedHashMap<>(recipes);
+        merged.put(link.get().key(), fallback);
+        return merged;
+    }
+
+    private List<AssistedRecipe> crossModuleRecipe(TypeElement implementationElement, String recipeMethod) {
+        List<AssistedRecipe> result = new ArrayList<>();
+        for (Element enclosed : implementationElement.getEnclosedElements()) {
+            if (recipeMethod.isEmpty()) {
+                if (enclosed.getKind() == ElementKind.CONSTRUCTOR
+                        && enclosed.getAnnotation(Inject.class) != null
+                        && ModelFactory.isAssisted((ExecutableElement) enclosed)) {
+                    result.add(new AssistedRecipe(implementationElement, null, (ExecutableElement) enclosed));
+                }
+            } else if (enclosed.getKind() == ElementKind.METHOD
+                    && enclosed.getSimpleName().contentEquals(recipeMethod)
+                    && enclosed.getAnnotation(Provides.class) != null
+                    && ModelFactory.isAssisted((ExecutableElement) enclosed)) {
+                result.add(new AssistedRecipe(
+                        implementationElement, (ExecutableElement) enclosed, (ExecutableElement) enclosed));
+            }
+        }
+        return result;
+    }
+
+    /** {@return whether {@code type} is one of the sources in the current compilation round} */
+    private static boolean isInRound(TypeElement type, RoundEnvironment roundEnv) {
+        Element top = type;
+        while (top.getEnclosingElement() instanceof TypeElement enclosing) {
+            top = enclosing;
+        }
+        return roundEnv.getRootElements().contains(top);
     }
 
     private List<ProvidesModel> gatherProvides(

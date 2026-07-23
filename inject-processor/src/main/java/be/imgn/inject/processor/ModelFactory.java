@@ -97,6 +97,11 @@ final class ModelFactory {
         return drained;
     }
 
+    /** {@return the type utilities for the current processing environment} */
+    Types types() {
+        return environment.getTypeUtils();
+    }
+
     BeanModel buildModel(TypeElement bean) {
         Types types = environment.getTypeUtils();
         Elements elements = environment.getElementUtils();

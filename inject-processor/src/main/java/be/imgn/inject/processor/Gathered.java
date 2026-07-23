@@ -17,6 +17,7 @@ import javax.lang.model.element.TypeElement;
  *     ambiguous set of assisted {@code @Provides} overloads
  * @param assistedBeanNames qualified names of in-compilation beans reachable only through an {@code @AssistedFactory},
  *     not by direct injection
+ * @param assistedFactories the resolved {@code @AssistedFactory} interfaces to implement
  */
 record Gathered(
         Map<TypeElement, BeanModel> beans,
@@ -24,4 +25,5 @@ record Gathered(
         Map<TypeElement, List<TypeElement>> edges,
         List<TypeElement> seeds,
         Map<String, List<AssistedRecipe>> assistedRecipes,
-        Set<String> assistedBeanNames) {}
+        Set<String> assistedBeanNames,
+        List<AssistedFactoryModel> assistedFactories) {}

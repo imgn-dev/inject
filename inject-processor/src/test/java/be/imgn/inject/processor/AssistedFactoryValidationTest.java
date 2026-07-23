@@ -1,0 +1,295 @@
+package be.imgn.inject.processor;
+
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static com.google.testing.compile.Compiler.javac;
+
+import javax.tools.JavaFileObject;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+
+import org.junit.jupiter.api.Test;
+
+class AssistedFactoryValidationTest {
+
+    private static final JavaFileObject REPORT = JavaFileObjects.forSourceString("example.Report", """
+            package example;
+
+            import be.imgn.inject.Assisted;
+            import be.imgn.inject.Inject;
+
+            public class Report {
+                @Inject
+                public Report(String db, @Assisted String id, @Assisted("footer") String footer) {}
+            }
+            """);
+
+    @Test
+    void exactReturnFactoryCompiles() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory
+                    Report create(String id, @Assisted("footer") String footer);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void supertypeReturnViaValueCompiles() {
+        JavaFileObject doc = JavaFileObjects.forSourceString("example.Doc", """
+                package example;
+
+                public interface Doc {}
+                """);
+        JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Report implements Doc {
+                    @Inject
+                    public Report(String db, @Assisted String id, @Assisted("footer") String footer) {}
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory(Report.class)
+                    Doc create(String id, @Assisted("footer") String footer);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(doc, report, factory);
+
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void parameterMismatchIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory
+                    Report create(String id);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("does not match");
+    }
+
+    @Test
+    void tagMismatchIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory
+                    Report create(String id, @Assisted("header") String header);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("does not match");
+    }
+
+    @Test
+    void returnNotAssignableIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory(Report.class)
+                    String create(String id, @Assisted("footer") String footer);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("not assignable");
+    }
+
+    @Test
+    void methodWithoutValueIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory(method = "x")
+                    Report create(String id, @Assisted("footer") String footer);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("requires the declaring class");
+    }
+
+    @Test
+    void valueWithoutAssistedConstructorIsAnError() {
+        JavaFileObject dep = JavaFileObjects.forSourceString("example.Dep", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Dep {
+                    @Inject
+                    public Dep() {}
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.DepFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface DepFactory {
+                    @AssistedFactory(Dep.class)
+                    Dep create();
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(dep, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("no assisted constructor");
+    }
+
+    @Test
+    void providesLinkCompiles() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static Long legacy(String db, @Assisted int id) {
+                        return (long) id;
+                    }
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ConfigFactory {
+                    @AssistedFactory(value = Config.class, method = "legacy")
+                    Long create(int id);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config, factory);
+
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void providesLinkUnknownMethodIsAnError() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static Long legacy(String db, @Assisted int id) {
+                        return (long) id;
+                    }
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ConfigFactory {
+                    @AssistedFactory(value = Config.class, method = "nope")
+                    Long create(int id);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("no assisted");
+    }
+
+    @Test
+    void abstractNonFactoryMethodIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public interface ReportFactory {
+                    @AssistedFactory
+                    Report create(String id, @Assisted("footer") String footer);
+
+                    Report other();
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("cannot be implemented");
+    }
+
+    @Test
+    void assistedFactoryOnClassMethodIsAnError() {
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+
+                public class ReportFactory {
+                    @AssistedFactory
+                    public Report create(String id, @Assisted("footer") String footer) {
+                        return null;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("interface method");
+    }
+}
