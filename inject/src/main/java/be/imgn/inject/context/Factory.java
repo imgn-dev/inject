@@ -130,6 +130,11 @@ public abstract class Factory<T> implements BeanDefinition {
         return Optional.empty();
     }
 
+    /** {@return whether this factory is a fallback binding, used only when no other live binding claims its key} */
+    protected boolean isDefault() {
+        return false;
+    }
+
     /**
      * {@return the provider for the {@code paramIndex}-th constructor parameter}
      *

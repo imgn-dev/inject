@@ -28,8 +28,8 @@ import be.imgn.inject.UnsatisfiedDependencyException;
 
 /**
  * Default {@link Context}: loads all {@code Factory} and {@code Scope} services, wraps each factory provider with a
- * cycle guard and its declared scope, and resolves keys lazily. The registry is immutable after construction;
- * resolution is thread-safe.
+ * cycle guard and its declared scope, and resolves keys lazily. Fallback factories ({@code Factory#isDefault()}) bind
+ * only keys no other live factory claims. The registry is immutable after construction; resolution is thread-safe.
  *
  * <p>{@code new DefaultContext()} loads all registered {@code Factory}, {@code Scope}, and {@code Condition} services.
  * The injector that owns this context attaches itself via {@link #setInjector(Injector)} immediately after
@@ -93,6 +93,7 @@ public final class DefaultContext implements Context {
         Map<Key<?>, BeanDefinition> definitionsByKey = new HashMap<>();
         List<BeanDefinition> definitionList = new ArrayList<>();
         Map<Key<?>, List<Contributor>> contributions = new LinkedHashMap<>();
+        List<PendingDefault> defaults = new ArrayList<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
                 continue; // an unmatched condition removes the bean from the graph entirely
@@ -104,6 +105,10 @@ public final class DefaultContext implements Context {
                         .computeIfAbsent(contribution.get().collectionKey(), key -> new ArrayList<>())
                         .add(new Contributor(contribution.get(), provider));
                 definitionList.add(factory);
+                continue;
+            }
+            if (factory.isDefault()) {
+                defaults.add(new PendingDefault(factory, provider));
                 continue;
             }
             for (Key<?> key : factory.exposedKeys()) {
@@ -119,6 +124,24 @@ public final class DefaultContext implements Context {
                 throw new DuplicateBindingException("Duplicate binding for " + key);
             }
         });
+        // Defaults join last: a default claims only keys no live binding took. Two live defaults for one key are
+        // a configuration error even when a real binding wins that key.
+        Map<Key<?>, Provider<?>> defaultClaims = new HashMap<>();
+        for (PendingDefault pending : defaults) {
+            boolean winner = false;
+            for (Key<?> key : pending.factory().exposedKeys()) {
+                if (defaultClaims.putIfAbsent(key, pending.provider()) != null) {
+                    throw new DuplicateBindingException("Duplicate default binding for " + key);
+                }
+                if (built.putIfAbsent(key, pending.provider()) == null) {
+                    definitionsByKey.put(key, pending.factory());
+                    winner = true;
+                }
+            }
+            if (winner) {
+                definitionList.add(pending.factory());
+            }
+        }
         // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
         built.putAll(overrides);
         // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
@@ -265,6 +288,9 @@ public final class DefaultContext implements Context {
 
     /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
     private record Contributor(Contribution contribution, Provider<?> provider) {}
+
+    /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
+    private record PendingDefault(Factory<?> factory, Provider<?> provider) {}
 
     /** {@return the aggregate provider for one collection key: a set provider, or a map provider when keys exist} */
     private static Provider<?> aggregate(Key<?> collectionKey, List<Contributor> contributors) {
