@@ -126,4 +126,20 @@ class ExamplesClasspathTest {
         assertThat(locator.injector()).isSameAs(injector);
         assertThat(locator.locateRegistry()).isSameAs(injector.getInstance(Registry.class));
     }
+
+    @Test
+    void assistedFactoriesMixContainerAndCallerArguments() {
+        Injector injector = Injector.create();
+
+        BadgeFactory badges = injector.getInstance(BadgeFactory.class);
+        Badge badge = badges.create("olivier", "admin");
+        assertThat(badge)
+                .returns("olivier", Badge::owner)
+                .returns("admin", Badge::role)
+                .returns(injector.getInstance(Registry.class), Badge::registry); // singleton respected
+        assertThat(badges.create("olivier", "admin")).isNotSameAs(badge); // fresh per call
+
+        LegacyStamp stamp = injector.getInstance(StampFactory.class).create("world");
+        assertThat(stamp.text()).isEqualTo("Hello world");
+    }
 }
