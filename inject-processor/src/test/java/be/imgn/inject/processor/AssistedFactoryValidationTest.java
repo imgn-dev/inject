@@ -292,4 +292,41 @@ class AssistedFactoryValidationTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("interface method");
     }
+
+    @Test
+    void overloadedAssistedProvidesLinkIsAnError() {
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Overloaded", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Provides;
+
+                public class Overloaded {
+                    @Provides
+                    public static Long legacy(@Assisted int id) {
+                        return (long) id;
+                    }
+
+                    @Provides
+                    public static Long legacy(@Assisted int id, @Assisted("tag") String tag) {
+                        return (long) id;
+                    }
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.LegacyFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface LegacyFactory {
+                    @AssistedFactory(value = Overloaded.class, method = "legacy")
+                    Long create(int id);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config, factory);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("ambiguous");
+    }
 }
