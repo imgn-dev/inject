@@ -108,22 +108,7 @@ final class ModelFactory {
         List<ParameterModel> constructorParameters = injectConstructor(bean)
                 .map(constructor -> parameters(constructor, bean, types, elements, packageOf(bean)))
                 .orElse(List.of());
-        List<FieldModel> fields = new ArrayList<>();
-        List<MethodModel> methods = new ArrayList<>();
-        for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getAnnotation(Inject.class) == null) {
-                continue;
-            }
-            if (enclosed.getKind() == ElementKind.FIELD) {
-                fields.add(field((VariableElement) enclosed, types, elements, packageOf(bean)));
-            } else if (enclosed.getKind() == ElementKind.METHOD) {
-                ExecutableElement method = (ExecutableElement) enclosed;
-                methods.add(new MethodModel(
-                        method.getSimpleName().toString(),
-                        parameters(method, bean, types, elements, packageOf(bean)),
-                        Annotations.metadata(List.of(method), elements)));
-            }
-        }
+        MemberInjection members = members(bean);
         ContributionModel contribution = contribution(bean, bean.asType(), types);
         RenderedQualifier beanQualifier = contribution != null
                 ? null
@@ -140,13 +125,45 @@ final class ModelFactory {
                 constructorParameters,
                 Annotations.metadata(constructorSites, elements),
                 Annotations.metadata(List.of(bean), elements),
-                List.copyOf(fields),
-                List.copyOf(methods),
-                pluginFields(bean),
+                members.fields(),
+                members.methods(),
+                members.pluginFields(),
                 Annotations.scope(bean).orElse(null),
                 beanQualifier,
                 exposedTypes,
                 contribution);
+    }
+
+    /** {@return the assisted recipe executable's parameters (assisted and container alike), in declaration order} */
+    List<ParameterModel> recipeParameters(AssistedRecipe recipe) {
+        Types types = environment.getTypeUtils();
+        Elements elements = environment.getElementUtils();
+        return parameters(recipe.executable(), recipe.owner(), types, elements, packageOf(recipe.owner()));
+    }
+
+    /**
+     * {@return {@code bean}'s {@code @Inject} field/method and plugin-field injection, independent of its constructor}
+     */
+    MemberInjection members(TypeElement bean) {
+        Types types = environment.getTypeUtils();
+        Elements elements = environment.getElementUtils();
+        List<FieldModel> fields = new ArrayList<>();
+        List<MethodModel> methods = new ArrayList<>();
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getAnnotation(Inject.class) == null) {
+                continue;
+            }
+            if (enclosed.getKind() == ElementKind.FIELD) {
+                fields.add(field((VariableElement) enclosed, types, elements, packageOf(bean)));
+            } else if (enclosed.getKind() == ElementKind.METHOD) {
+                ExecutableElement method = (ExecutableElement) enclosed;
+                methods.add(new MethodModel(
+                        method.getSimpleName().toString(),
+                        parameters(method, bean, types, elements, packageOf(bean)),
+                        Annotations.metadata(List.of(method), elements)));
+            }
+        }
+        return new MemberInjection(List.copyOf(fields), List.copyOf(methods), pluginFields(bean));
     }
 
     BeanModel defaultModel(TypeElement type) {
@@ -737,7 +754,7 @@ final class ModelFactory {
         return Optional.empty();
     }
 
-    private static List<String> enclosingChain(TypeElement bean) {
+    static List<String> enclosingChain(TypeElement bean) {
         Deque<String> chain = new ArrayDeque<>();
         Element current = bean;
         while (current instanceof TypeElement typeElement) {

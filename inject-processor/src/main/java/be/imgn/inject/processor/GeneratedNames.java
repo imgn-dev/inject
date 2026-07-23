@@ -30,6 +30,25 @@ final class GeneratedNames {
     }
 
     /**
+     * {@return the impl name for an {@code @AssistedFactory} interface whose enclosing-class chain (outermost first) is
+     * {@code enclosingChain}}
+     *
+     * @param enclosingChain the simple names from the outermost enclosing class down to the interface
+     */
+    static String implName(List<String> enclosingChain) {
+        return "$" + String.join("$", enclosingChain) + "$$Impl";
+    }
+
+    /**
+     * {@return the impl name for a top-level {@code @AssistedFactory} interface}
+     *
+     * @param simpleName the interface's simple name
+     */
+    static String implName(String simpleName) {
+        return implName(List.of(simpleName));
+    }
+
+    /**
      * {@return the scope-binding name for a scoping annotation whose enclosing-class chain is {@code enclosingChain}}
      *
      * @param enclosingChain the simple names from the outermost enclosing class down to the annotation
