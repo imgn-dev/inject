@@ -81,6 +81,23 @@ class ExamplesClasspathTest {
     }
 
     @Test
+    void defaultTrackerFallsBackWhenMeteringIsOff() {
+        Injector injector = Injector.create();
+        assertThat(injector.getInstance(UsageTracker.class).describe()).isEqualTo("noop");
+    }
+
+    @Test
+    void meteredTrackerWinsOverTheDefaultWhenMeteringIsOn() {
+        System.setProperty("examples.metering", "true");
+        try {
+            Injector injector = Injector.create();
+            assertThat(injector.getInstance(UsageTracker.class).describe()).isEqualTo("metered");
+        } finally {
+            System.clearProperty("examples.metering");
+        }
+    }
+
+    @Test
     void exposeAsMakesBeanInjectableOnlyAsListedType() {
         Injector injector = Injector.create();
 
