@@ -3,6 +3,7 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -211,6 +212,120 @@ class MethodInterceptionTest {
         assertThatExceptionOfType(InterceptorResolutionException.class)
                 .isThrownBy(() -> minimal.interceptor(Outer.class))
                 .withMessageContaining("Outer");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodOfRejectsNullDeclaringType() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> InterceptedMethod.of(
+                        (Class<?>) null, "greet", String.class, List.of(String.class), List.of(OUTER)))
+                .withMessageContaining("declaringType");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodOfRejectsNullMethodName() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> InterceptedMethod.of(
+                        String.class, (String) null, String.class, List.of(String.class), List.of(OUTER)))
+                .withMessageContaining("methodName");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodOfRejectsNullReturnType() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> InterceptedMethod.of(
+                        String.class, "greet", (Class<?>) null, List.of(String.class), List.of(OUTER)))
+                .withMessageContaining("returnType");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodOfRejectsNullParameterTypes() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> InterceptedMethod.of(
+                        String.class, "greet", String.class, (List<Class<?>>) null, List.of(OUTER)))
+                .withMessageContaining("parameterTypes");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodOfRejectsNullBindings() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> InterceptedMethod.of(
+                        String.class, "greet", String.class, List.of(String.class), (List<AnnotationValue>) null))
+                .withMessageContaining("bindings");
+    }
+
+    @Test
+    void interceptedMethodOfRejectsEmptyBindings() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() ->
+                        InterceptedMethod.of(String.class, "greet", String.class, List.of(String.class), List.of()))
+                .withMessageContaining("greet");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void interceptedMethodBindRejectsNullContext() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> greet(List.of(OUTER)).bind(null))
+                .withMessageContaining("context");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void methodInterceptionInvokeRejectsNullTarget() {
+        MethodInterception chain =
+                greet(List.of(OUTER)).bind(new StubContext(Map.of(Outer.class, MethodInvocation::proceed)));
+
+        assertThatNullPointerException()
+                .isThrownBy(() -> chain.invoke((Object) null, new Object[] {"world"}, arguments -> "ok"))
+                .withMessageContaining("target");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void methodInterceptionInvokeRejectsNullArguments() {
+        MethodInterception chain =
+                greet(List.of(OUTER)).bind(new StubContext(Map.of(Outer.class, MethodInvocation::proceed)));
+
+        assertThatNullPointerException()
+                .isThrownBy(() -> chain.invoke("target", (Object[]) null, arguments -> "ok"))
+                .withMessageContaining("arguments");
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void methodInterceptionInvokeRejectsNullJoinpoint() {
+        MethodInterception chain =
+                greet(List.of(OUTER)).bind(new StubContext(Map.of(Outer.class, MethodInvocation::proceed)));
+
+        assertThatNullPointerException()
+                .isThrownBy(() -> chain.invoke("target", new Object[] {"world"}, (Joinpoint) null))
+                .withMessageContaining("joinpoint");
+    }
+
+    @Test
+    void anInterceptorMayCallProceedMultipleTimesForRetry() {
+        List<Integer> callCount = new ArrayList<>();
+        MethodInterceptor retryOnce = invocation -> {
+            invocation.proceed();
+            Object second = invocation.proceed();
+            return second;
+        };
+        Joinpoint counting = arguments -> {
+            callCount.add(callCount.size() + 1);
+            return "result";
+        };
+        MethodInterception chain = greet(List.of(OUTER)).bind(new StubContext(Map.of(Outer.class, retryOnce)));
+
+        Object result = invoke(chain, new Object[] {"world"}, counting);
+
+        assertThat(result).isEqualTo("result");
+        assertThat(callCount).containsExactly(1, 2);
     }
 
     /** Runs a chain, rethrowing any checked throwable as an unchecked one so tests stay readable. */
