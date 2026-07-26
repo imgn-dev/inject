@@ -26,6 +26,8 @@ import org.jspecify.annotations.Nullable;
  * @param beanQualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the bean is exposed as; empty means "use the factory's default single key"
  * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
+ * @param postConstruct the bean's {@code @PostConstruct} method name, or {@code null}
+ * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}
  */
 record BeanModel(
         String packageName,
@@ -40,4 +42,6 @@ record BeanModel(
         @Nullable ClassName scopeAnnotation,
         @Nullable RenderedQualifier beanQualifier,
         List<TypeName> exposedTypes,
-        @Nullable ContributionModel contribution) {}
+        @Nullable ContributionModel contribution,
+        @Nullable String postConstruct,
+        @Nullable String preDestroy) {}

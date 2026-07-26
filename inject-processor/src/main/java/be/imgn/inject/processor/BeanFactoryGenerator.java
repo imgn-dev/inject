@@ -57,6 +57,12 @@ final class BeanFactoryGenerator {
         if (model.scopeAnnotation() != null) {
             type.addMethod(scope(model.scopeAnnotation()));
         }
+        if (model.postConstruct() != null) {
+            type.addMethod(postConstruct(model));
+        }
+        if (model.preDestroy() != null) {
+            type.addMethod(preDestroy(model)).addMethod(hasPreDestroy());
+        }
         if (model.contribution() != null) {
             type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(model.contribution()));
         } else if (!model.exposedTypes().isEmpty()) {
@@ -199,6 +205,35 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
                 .addStatement("return $T.of($L)", LIST, keys)
+                .build();
+    }
+
+    private static MethodSpec postConstruct(BeanModel model) {
+        return MethodSpec.methodBuilder("postConstruct")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(TypeName.VOID)
+                .addParameter(model.beanType(), "instance")
+                .addStatement("instance.$L()", model.postConstruct())
+                .build();
+    }
+
+    private static MethodSpec preDestroy(BeanModel model) {
+        return MethodSpec.methodBuilder("preDestroy")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(TypeName.VOID)
+                .addParameter(model.beanType(), "instance")
+                .addStatement("instance.$L()", model.preDestroy())
+                .build();
+    }
+
+    private static MethodSpec hasPreDestroy() {
+        return MethodSpec.methodBuilder("hasPreDestroy")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(TypeName.BOOLEAN)
+                .addStatement("return true")
                 .build();
     }
 
