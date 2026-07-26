@@ -723,6 +723,7 @@ final class ModelFactory {
         return !modifiers.contains(Modifier.PRIVATE)
                 && !modifiers.contains(Modifier.STATIC)
                 && !modifiers.contains(Modifier.FINAL)
+                && !hasTypeVariableThrows(method)
                 && method.getAnnotation(Inject.class) == null
                 && method.getAnnotation(PostConstruct.class) == null
                 && method.getAnnotation(PreDestroy.class) == null
@@ -743,7 +744,23 @@ final class ModelFactory {
         if (modifiers.contains(Modifier.FINAL)) {
             return name + "() cannot be intercepted: it is final.";
         }
+        if (hasTypeVariableThrows(method)) {
+            return name + "() cannot be intercepted: a type variable in its throws clause cannot be caught.";
+        }
         return name + "() cannot be intercepted: framework callbacks are invoked by the container.";
+    }
+
+    /**
+     * {@return whether {@code method}'s throws clause contains a type variable, which Java forbids as a catch
+     * parameter}
+     */
+    private static boolean hasTypeVariableThrows(ExecutableElement method) {
+        for (TypeMirror thrown : method.getThrownTypes()) {
+            if (thrown.getKind() == TypeKind.TYPEVAR) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** {@return whether {@code method} overrides one of {@code Object}'s methods} */
@@ -775,18 +792,29 @@ final class ModelFactory {
         TypeName returnType = TypeName.get(method.getReturnType());
         List<TypeVariableName> typeVariables =
                 method.getTypeParameters().stream().map(TypeVariableName::get).toList();
+        List<ProxyParameter> parameters = proxyParameters(method);
+        boolean parametersUncheckedCast =
+                parameters.stream().anyMatch(parameter -> isUncheckedCastType(parameter.type()));
         return new InterceptedMethodModel(
                 method.getSimpleName().toString(),
                 method.getSimpleName() + "$" + index,
                 visibility(method),
                 returnType,
-                proxyParameters(method),
+                parameters,
                 thrownTypes(method),
                 declaresThrowable(method),
                 method.isVarArgs(),
-                returnType instanceof ParameterizedTypeName || returnType instanceof TypeVariableName,
+                isUncheckedCastType(returnType),
+                parametersUncheckedCast,
                 typeVariables,
                 List.copyOf(rendered));
+    }
+
+    /**
+     * {@return whether casting a value to {@code type} is an unchecked cast: a parameterized type or a type variable}
+     */
+    private static boolean isUncheckedCastType(TypeName type) {
+        return type instanceof ParameterizedTypeName || type instanceof TypeVariableName;
     }
 
     /**

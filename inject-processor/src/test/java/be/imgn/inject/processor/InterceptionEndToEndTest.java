@@ -148,6 +148,72 @@ class InterceptionEndToEndTest {
         }
     }
 
+    @Test
+    void constructorCallToAnInterceptedMethodRunsUnintercepted(@TempDir Path outputDir) throws Exception {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bootstrapping", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Singleton;
+
+                @Singleton
+                public class Bootstrapping {
+                    private final String duringConstruction;
+
+                    @Inject
+                    public Bootstrapping() {
+                        this.duringConstruction = greet();
+                    }
+
+                    @Timed
+                    public String greet() {
+                        return "hello";
+                    }
+
+                    public String duringConstruction() {
+                        return duringConstruction;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, LOG, INTERCEPTOR, bean);
+        CompilationSubject.assertThat(compilation).succeeded();
+        writeClassOutput(compilation, outputDir);
+
+        try (URLClassLoader loader = new URLClassLoader(
+                new URL[] {outputDir.toUri().toURL()}, getClass().getClassLoader())) {
+            ClassLoader previous = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(loader);
+            try (Injector injector = Injector.create()) {
+                Class<?> beanType = loader.loadClass("example.Bootstrapping");
+                Object bootstrapping = injector.getInstance(beanType);
+
+                Object duringConstruction =
+                        beanType.getMethod("duringConstruction").invoke(bootstrapping);
+                assertThat(duringConstruction).isEqualTo("hello");
+
+                Class<?> logType = loader.loadClass("example.CallLog");
+                Object log = injector.getInstance(logType);
+                Object entriesAfterConstruction = logType.getMethod("entries").invoke(log);
+                assertThat(entriesAfterConstruction)
+                        .asInstanceOf(InstanceOfAssertFactories.LIST)
+                        .as("the constructor's own call to greet() must not be intercepted")
+                        .isEmpty();
+
+                Object laterResult = beanType.getMethod("greet").invoke(bootstrapping);
+                assertThat(laterResult).isEqualTo("hello");
+
+                Object entriesAfterLaterCall = logType.getMethod("entries").invoke(log);
+                assertThat(entriesAfterLaterCall)
+                        .asInstanceOf(InstanceOfAssertFactories.LIST)
+                        .as("a call once the instance is fully constructed must be intercepted")
+                        .containsExactly("enter:greet:", "exit:greet");
+            } finally {
+                Thread.currentThread().setContextClassLoader(previous);
+            }
+        }
+    }
+
     private static void writeClassOutput(Compilation compilation, Path outputDir) throws Exception {
         String marker = "CLASS_OUTPUT/";
         for (JavaFileObject file : compilation.generatedFiles()) {

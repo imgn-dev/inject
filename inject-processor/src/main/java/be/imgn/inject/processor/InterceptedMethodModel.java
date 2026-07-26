@@ -22,6 +22,8 @@ import org.jspecify.annotations.Nullable;
  * @param declaresThrowable whether the method declares {@code Throwable}, so nothing needs wrapping
  * @param varargs whether the last parameter is a varargs parameter
  * @param uncheckedCast whether casting the chain's result needs {@code @SuppressWarnings("unchecked")}
+ * @param parametersUncheckedCast whether casting the joinpoint's unpacked arguments needs
+ *     {@code @SuppressWarnings("unchecked")}
  * @param typeVariables the method's own type variables, in order
  * @param bindings {@code AnnotationValue.of(...)} expressions for the intercepting annotations, outermost first
  */
@@ -35,5 +37,6 @@ record InterceptedMethodModel(
         boolean declaresThrowable,
         boolean varargs,
         boolean uncheckedCast,
+        boolean parametersUncheckedCast,
         List<TypeVariableName> typeVariables,
         List<CodeBlock> bindings) {}

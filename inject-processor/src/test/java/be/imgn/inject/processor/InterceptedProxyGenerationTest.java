@@ -342,5 +342,9 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Feeder$$Intercepted")
+                .contentsAsUtf8String()
+                .contains("$arguments -> super.feed((String) $arguments[0])");
     }
 }

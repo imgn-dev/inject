@@ -95,12 +95,19 @@ final class InterceptedProxyGenerator {
      * {@return the hoisted joinpoint lambda: one allocation per proxy instead of one per call}
      *
      * <p>Emitted for every method but a generic one, whose type variables are out of scope in a field initializer;
-     * {@link #override} declares that lambda as a local instead.
+     * {@link #override} declares that lambda as a local instead. Its initializer unpacks the arguments array with a
+     * cast per parameter; when one of those casts is unchecked, {@code @SuppressWarnings("unchecked")} goes on the
+     * field declaration since the override's own suppression (if any) does not reach a field initializer.
      */
     private static FieldSpec joinpointField(InterceptedMethodModel method) {
-        return FieldSpec.builder(JOINPOINT, joinpointName(method), Modifier.PRIVATE, Modifier.FINAL)
-                .initializer(joinpointLambda(method))
-                .build();
+        FieldSpec.Builder field = FieldSpec.builder(JOINPOINT, joinpointName(method), Modifier.PRIVATE, Modifier.FINAL)
+                .initializer(joinpointLambda(method));
+        if (method.parametersUncheckedCast()) {
+            field.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                    .addMember("value", "$S", "unchecked")
+                    .build());
+        }
+        return field.build();
     }
 
     /** {@return the lambda calling the bean's own implementation with the arguments unpacked from the array} */
@@ -155,7 +162,11 @@ final class InterceptedProxyGenerator {
         if (method.declaresThrowable()) {
             builder.addException(THROWABLE);
         }
-        if (method.uncheckedCast()) {
+        // The local-joinpoint (generic-method) path declares its argument-unpacking casts inside this override, so
+        // its unchecked parameter casts need covering here too; the hoisted-field path's casts live in the field
+        // initializer instead and are covered by joinpointField's own suppression.
+        boolean localJoinpointUncheckedCast = !method.typeVariables().isEmpty() && method.parametersUncheckedCast();
+        if (method.uncheckedCast() || localJoinpointUncheckedCast) {
             builder.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
                     .addMember("value", "$S", "unchecked")
                     .build());

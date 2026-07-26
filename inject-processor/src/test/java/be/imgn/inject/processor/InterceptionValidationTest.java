@@ -3,6 +3,7 @@ package be.imgn.inject.processor;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 
+import java.io.IOException;
 import javax.tools.JavaFileObject;
 
 import com.google.testing.compile.Compilation;
@@ -222,6 +223,53 @@ class InterceptionValidationTest {
 
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("final");
+    }
+
+    @Test
+    void genericThrowsMethodCannotBeIntercepted() {
+        Compilation compilation = compile("example.Bean", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Bean {
+                    @Inject
+                    public Bean() {}
+
+                    @Timed
+                    public <E extends Exception> void run() throws E {}
+                }
+                """);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("a type variable in its throws clause cannot be caught");
+    }
+
+    @Test
+    void classLevelAnnotationSkipsGenericThrowsMethodButKeepsOrdinaryOne() throws IOException {
+        Compilation compilation = compile("example.Bean", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                @Timed
+                public class Bean {
+                    @Inject
+                    public Bean() {}
+
+                    public <E extends Exception> void risky() throws E {}
+
+                    public void run() {}
+                }
+                """);
+
+        assertThat(compilation).succeeded();
+        String source = compilation
+                .generatedSourceFile("example.$Bean$$Intercepted")
+                .orElseThrow()
+                .getCharContent(true)
+                .toString();
+        Assertions.assertThat(source).contains("void run()").doesNotContain("risky");
     }
 
     @Test
