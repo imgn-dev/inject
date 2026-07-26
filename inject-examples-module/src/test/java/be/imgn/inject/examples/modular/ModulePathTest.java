@@ -55,4 +55,11 @@ class ModulePathTest {
             System.clearProperty("modular.telemetry");
         }
     }
+
+    @Test
+    void interceptsOnTheModulePath() {
+        try (Injector injector = Injector.create()) {
+            assertThat(injector.getInstance(TracedService.class).answer()).isEqualTo("traced:answer");
+        }
+    }
 }

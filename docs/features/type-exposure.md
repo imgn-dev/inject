@@ -15,7 +15,7 @@ binding (and, if scoped, the same instance):
 
 ```java
 @Singleton
-public final class Registry implements Audited {
+public final class Registry implements Cataloged {
     @Inject
     public Registry() {}
 }
@@ -24,13 +24,13 @@ public final class Registry implements Audited {
 ```java
 // both resolve to the same singleton
 Registry byClass = injector.getInstance(Registry.class);
-Audited byInterface = injector.getInstance(Audited.class);
+Cataloged byInterface = injector.getInstance(Cataloged.class);
 ```
 
 Universal contracts are excluded from that default so they never become
 accidental binding keys: `Object`, `Serializable`, `Cloneable`, `Comparable`,
-`Runnable`, `AutoCloseable`, `Closeable`, `Iterable`, `EventListener`, and the
-framework's own types.
+`Runnable`, `AutoCloseable`, `Closeable`, `Iterable`, `EventListener`,
+`MethodInterceptor`, and the framework's own types.
 
 `@ExposeAs` replaces the default with an explicit allowlist. The bean is then
 injectable **only** as the listed types — its concrete class included only if

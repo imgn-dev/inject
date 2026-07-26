@@ -19,6 +19,9 @@ solves it, examples per use case, and its limitations.
   condition matches; `@ConditionalOnProperty` and the condition SPI.
 - [Lifecycle callbacks](lifecycle-callbacks.md) — `@PostConstruct` after full
   injection and `@PreDestroy` on injector close.
+- [Method interception](interception.md) — `@InterceptingAnnotation` triggers
+  and `@Intercepts` beans running around method calls, wired by a generated
+  subclass.
 
 ## Consuming beans
 

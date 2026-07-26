@@ -112,9 +112,9 @@ class ExamplesClasspathTest {
     void defaultExposesBeanUnderAllOfItsTypes() {
         Injector injector = Injector.create();
 
-        // Registry has no @ExposeAs, so it is injectable as both its own type and its Audited supertype,
+        // Registry has no @ExposeAs, so it is injectable as both its own type and its Cataloged supertype,
         // resolving to the same singleton.
-        assertThat(injector.getInstance(Audited.class)).isNotNull().isSameAs(injector.getInstance(Registry.class));
+        assertThat(injector.getInstance(Cataloged.class)).isNotNull().isSameAs(injector.getInstance(Registry.class));
     }
 
     @Test
