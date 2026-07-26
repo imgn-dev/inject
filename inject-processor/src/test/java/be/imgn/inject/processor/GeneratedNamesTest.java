@@ -26,4 +26,10 @@ class GeneratedNamesTest {
         assertThat(GeneratedNames.providesFactoryName("Config", "provideX", 1))
                 .isEqualTo("$Config$provideX$1$$Factory");
     }
+
+    @Test
+    void buildsInterceptedProxyNames() {
+        assertThat(GeneratedNames.interceptedName("Bean")).isEqualTo("$Bean$$Intercepted");
+        assertThat(GeneratedNames.interceptedName(List.of("Outer", "Inner"))).isEqualTo("$Outer$Inner$$Intercepted");
+    }
 }

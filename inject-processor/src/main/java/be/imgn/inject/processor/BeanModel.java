@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
  * @param postConstruct the bean's {@code @PostConstruct} method name, or {@code null}
  * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}
  * @param interceptsAnnotation the annotation this bean intercepts (from {@code @Intercepts}), or {@code null}
+ * @param interception the intercepted-proxy model, or {@code null} when the bean has no intercepted method
  */
 record BeanModel(
         String packageName,
@@ -46,4 +47,5 @@ record BeanModel(
         @Nullable ContributionModel contribution,
         @Nullable String postConstruct,
         @Nullable String preDestroy,
-        @Nullable ClassName interceptsAnnotation) {}
+        @Nullable ClassName interceptsAnnotation,
+        @Nullable InterceptionModel interception) {}

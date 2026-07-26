@@ -88,4 +88,23 @@ final class GeneratedNames {
     static String providesFactoryName(String host, String methodName, int index) {
         return providesFactoryName(List.of(host), methodName, index);
     }
+
+    /**
+     * {@return the intercepted-proxy name for a bean whose enclosing-class chain (outermost first) is
+     * {@code enclosingChain}}
+     *
+     * @param enclosingChain the simple names from the outermost enclosing class down to the bean
+     */
+    static String interceptedName(List<String> enclosingChain) {
+        return "$" + String.join("$", enclosingChain) + "$$Intercepted";
+    }
+
+    /**
+     * {@return the intercepted-proxy name for a top-level bean}
+     *
+     * @param simpleName the bean's simple name
+     */
+    static String interceptedName(String simpleName) {
+        return interceptedName(List.of(simpleName));
+    }
 }

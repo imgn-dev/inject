@@ -32,7 +32,9 @@ import javax.lang.model.util.Types;
 
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.TypeVariableName;
 
 import org.jspecify.annotations.Nullable;
 
@@ -43,12 +45,14 @@ import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Injector;
+import be.imgn.inject.InterceptingAnnotation;
 import be.imgn.inject.Intercepts;
 import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.PostConstruct;
 import be.imgn.inject.PreDestroy;
 import be.imgn.inject.Provider;
+import be.imgn.inject.Provides;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
@@ -130,6 +134,7 @@ final class ModelFactory {
         constructorSites.add(bean);
         injectConstructor(bean).ifPresent(constructorSites::add);
         List<TypeName> exposedTypes = contribution != null ? List.of() : exposedTypes(bean, beanQualifier != null);
+        InterceptionModel interception = interception(bean);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
@@ -146,7 +151,8 @@ final class ModelFactory {
                 contribution,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
-                interceptsAnnotation(bean));
+                interceptsAnnotation(bean),
+                interception);
     }
 
     /**
@@ -221,7 +227,8 @@ final class ModelFactory {
                 null,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
-                interceptsAnnotation(type));
+                interceptsAnnotation(type),
+                interception(type));
     }
 
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
@@ -233,6 +240,11 @@ final class ModelFactory {
             diagnostics.error(returnElement.getSimpleName() + " is a framework type and cannot be bound.", method);
         }
         String name = method.getSimpleName().toString();
+        if (!interceptingAnnotations(method).isEmpty()) {
+            diagnostics.error(
+                    "@Provides " + name + "() cannot be intercepted: the container does not construct its result.",
+                    method);
+        }
         ContributionModel contribution = contribution(method, method.getReturnType(), types);
         RenderedQualifier qualifier = contribution != null
                 ? null
@@ -270,7 +282,10 @@ final class ModelFactory {
                     "@Inject constructor of " + bean.getQualifiedName() + " must not be private.", constructor.get());
             valid = false;
         }
-        if (constructor.isEmpty() && !hasAccessibleNoArgConstructor(bean)) {
+        // Enums are excluded: "no accessible no-argument constructor" is meaningless for a type that can never be
+        // instantiated with `new` regardless of constructor accessibility. An enum reaching this point only because
+        // of an intercepting annotation gets its own, more specific diagnostic from validateInterceptableShape.
+        if (constructor.isEmpty() && bean.getKind() != ElementKind.ENUM && !hasAccessibleNoArgConstructor(bean)) {
             diagnostics.error(
                     bean.getQualifiedName()
                             + " has @Inject members but no @Inject constructor and no accessible no-argument"
@@ -353,6 +368,12 @@ final class ModelFactory {
         if (hasConditioningAnnotation(annotated)) {
             diagnostics.error(
                     "An assisted recipe cannot be conditional; put the condition on the factory interface.", annotated);
+        }
+        if (!interceptingAnnotations(annotated).isEmpty()) {
+            diagnostics.error(
+                    "An assisted recipe cannot be intercepted: assisted instances are built per call, outside the"
+                            + " registry.",
+                    annotated);
         }
     }
 
@@ -534,6 +555,245 @@ final class ModelFactory {
             }
         }
         return null;
+    }
+
+    /**
+     * {@return {@code bean}'s interception model, or {@code null} when nothing is intercepted}
+     *
+     * <p>Reports every placement a generated subclass cannot honour. A class-level annotation sweeps declared methods
+     * that are not {@code private}, {@code static}, or {@code final}, skipping {@code Object} methods and framework
+     * callbacks; a method-level annotation applies to that method alone and replaces a class-level declaration of the
+     * same annotation type in place, so the class-level position (outermost) is preserved.
+     *
+     * @param bean the bean type
+     */
+    @Nullable
+    InterceptionModel interception(TypeElement bean) {
+        Elements elements = environment.getElementUtils();
+        List<AnnotationMirror> classLevel = interceptingAnnotations(bean);
+        List<ExecutableElement> annotatedMethods = new ArrayList<>();
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD
+                    && !interceptingAnnotations(enclosed).isEmpty()) {
+                annotatedMethods.add((ExecutableElement) enclosed);
+            }
+        }
+        if (classLevel.isEmpty() && annotatedMethods.isEmpty()) {
+            return null;
+        }
+        if (interceptsAnnotation(bean) != null) {
+            diagnostics.error(bean.getQualifiedName() + " is an interceptor and cannot itself be intercepted.", bean);
+            return null;
+        }
+        if (!validateInterceptableShape(bean)) {
+            return null;
+        }
+        List<InterceptedMethodModel> methods = new ArrayList<>();
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.METHOD) {
+                continue;
+            }
+            ExecutableElement method = (ExecutableElement) enclosed;
+            List<AnnotationMirror> own = interceptingAnnotations(method);
+            boolean eligible = isInterceptable(method);
+            if (!own.isEmpty() && !eligible) {
+                diagnostics.error(ineligibleReason(method), method);
+                return null;
+            }
+            if (!eligible || (own.isEmpty() && classLevel.isEmpty())) {
+                continue;
+            }
+            Map<String, AnnotationMirror> merged = new LinkedHashMap<>();
+            for (AnnotationMirror mirror : classLevel) {
+                merged.put(mirror.getAnnotationType().toString(), mirror);
+            }
+            for (AnnotationMirror mirror : own) {
+                merged.put(mirror.getAnnotationType().toString(), mirror);
+            }
+            methods.add(interceptedMethod(method, methods.size(), List.copyOf(merged.values()), elements));
+        }
+        if (methods.isEmpty()) {
+            diagnostics.error(
+                    bean.getQualifiedName() + " carries an intercepting annotation but declares no interceptable"
+                            + " method.",
+                    bean);
+            return null;
+        }
+        return new InterceptionModel(
+                GeneratedNames.interceptedName(enclosingChain(bean)),
+                injectConstructor(bean).map(ModelFactory::proxyParameters).orElse(List.of()),
+                List.copyOf(methods));
+    }
+
+    /** {@return the intercepting annotations declared on {@code element}, in source order} */
+    private static List<AnnotationMirror> interceptingAnnotations(Element element) {
+        List<AnnotationMirror> result = new ArrayList<>();
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            TypeElement annotationType =
+                    (TypeElement) mirror.getAnnotationType().asElement();
+            if (annotationType.getAnnotation(InterceptingAnnotation.class) != null) {
+                result.add(mirror);
+            }
+        }
+        return result;
+    }
+
+    /** {@return {@code true} if {@code bean} can be subclassed by a generated proxy; reports why not otherwise} */
+    private boolean validateInterceptableShape(TypeElement bean) {
+        if (bean.getKind() == ElementKind.RECORD) {
+            diagnostics.error(
+                    "A record cannot be intercepted: records are implicitly final and their accessors are part of"
+                            + " their identity. Use a class.",
+                    bean);
+            return false;
+        }
+        if (bean.getKind() == ElementKind.ENUM) {
+            diagnostics.error(
+                    "An enum cannot be intercepted: enum constants are created by the JVM, not by a factory.", bean);
+            return false;
+        }
+        if (bean.getModifiers().contains(Modifier.SEALED)) {
+            diagnostics.error(
+                    bean.getQualifiedName() + " cannot be intercepted: a sealed class permits only its listed"
+                            + " subclasses. Use a non-sealed class.",
+                    bean);
+            return false;
+        }
+        if (bean.getModifiers().contains(Modifier.FINAL)) {
+            diagnostics.error(
+                    bean.getQualifiedName() + " cannot be intercepted: the generated proxy must subclass it. Remove"
+                            + " final.",
+                    bean);
+            return false;
+        }
+        if (!bean.getTypeParameters().isEmpty()) {
+            diagnostics.error(
+                    bean.getQualifiedName() + " cannot be intercepted: a generic class is bound under its raw type.",
+                    bean);
+            return false;
+        }
+        return true;
+    }
+
+    /** {@return whether a class-level sweep may override {@code method}} */
+    private static boolean isInterceptable(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        return !modifiers.contains(Modifier.PRIVATE)
+                && !modifiers.contains(Modifier.STATIC)
+                && !modifiers.contains(Modifier.FINAL)
+                && method.getAnnotation(Inject.class) == null
+                && method.getAnnotation(PostConstruct.class) == null
+                && method.getAnnotation(PreDestroy.class) == null
+                && method.getAnnotation(Provides.class) == null
+                && !isObjectMethod(method);
+    }
+
+    /** {@return why {@code method} cannot be intercepted} */
+    private static String ineligibleReason(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        String name = method.getSimpleName().toString();
+        if (method.getAnnotation(Provides.class) != null) {
+            return "@Provides " + name + "() cannot be intercepted: the container does not construct its result.";
+        }
+        if (modifiers.contains(Modifier.PRIVATE)) {
+            return name + "() cannot be intercepted: it is private.";
+        }
+        if (modifiers.contains(Modifier.STATIC)) {
+            return name + "() cannot be intercepted: it is static.";
+        }
+        if (modifiers.contains(Modifier.FINAL)) {
+            return name + "() cannot be intercepted: it is final.";
+        }
+        return name + "() cannot be intercepted: framework callbacks are invoked by the container.";
+    }
+
+    /** {@return whether {@code method} overrides one of {@code Object}'s methods} */
+    private static boolean isObjectMethod(ExecutableElement method) {
+        String name = method.getSimpleName().toString();
+        int arity = method.getParameters().size();
+        return (name.equals("toString") && arity == 0)
+                || (name.equals("hashCode") && arity == 0)
+                || (name.equals("equals") && arity == 1);
+    }
+
+    /** {@return {@code executable}'s parameters as proxy signature parameters} */
+    private static List<ProxyParameter> proxyParameters(ExecutableElement executable) {
+        List<ProxyParameter> result = new ArrayList<>();
+        for (VariableElement parameter : executable.getParameters()) {
+            result.add(new ProxyParameter(parameter.getSimpleName().toString(), TypeName.get(parameter.asType())));
+        }
+        return List.copyOf(result);
+    }
+
+    /** {@return the model for one intercepted method} */
+    private InterceptedMethodModel interceptedMethod(
+            ExecutableElement method, int index, List<AnnotationMirror> bindings, Elements elements) {
+        List<CodeBlock> rendered = new ArrayList<>();
+        for (AnnotationMirror mirror : bindings) {
+            rendered.add(Annotations.annotationValue(
+                    (TypeElement) mirror.getAnnotationType().asElement(), mirror, elements));
+        }
+        TypeName returnType = TypeName.get(method.getReturnType());
+        List<TypeVariableName> typeVariables =
+                method.getTypeParameters().stream().map(TypeVariableName::get).toList();
+        return new InterceptedMethodModel(
+                method.getSimpleName().toString(),
+                method.getSimpleName() + "$" + index,
+                returnType,
+                proxyParameters(method),
+                thrownTypes(method),
+                declaresThrowable(method),
+                method.isVarArgs(),
+                returnType instanceof ParameterizedTypeName || returnType instanceof TypeVariableName,
+                typeVariables,
+                List.copyOf(rendered));
+    }
+
+    /** {@return whether {@code method} declares {@code Throwable} itself} */
+    private static boolean declaresThrowable(ExecutableElement method) {
+        for (TypeMirror thrown : method.getThrownTypes()) {
+            if (thrown.toString().equals(Throwable.class.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@return {@code method}'s declared checked exception types eligible for their own catch clause, with unchecked
+     * types and exact {@code Throwable} removed, keeping only the most general type of each hierarchy branch}
+     *
+     * <p>Unchecked types are already covered by the proxy's {@code catch (RuntimeException | Error)}, and exact
+     * {@code Throwable} is handled separately via {@link #declaresThrowable}. Rather than sorting candidates by
+     * specificity &mdash; not a well-defined total order across unrelated exception types, and therefore unsafe to sort
+     * by &mdash; this keeps a declared type only when no other declared type is its strict supertype. The result is a
+     * set of mutually unrelated types in stable declaration order, so no ordering of the emitted {@code catch} clauses
+     * can be unreachable.
+     */
+    private List<TypeName> thrownTypes(ExecutableElement method) {
+        Types types = environment.getTypeUtils();
+        Elements elements = environment.getElementUtils();
+        TypeMirror runtimeException = elements.getTypeElement(RuntimeException.class.getCanonicalName())
+                .asType();
+        TypeMirror error =
+                elements.getTypeElement(Error.class.getCanonicalName()).asType();
+        TypeMirror throwable =
+                elements.getTypeElement(Throwable.class.getCanonicalName()).asType();
+        List<TypeMirror> candidates = new ArrayList<>(method.getThrownTypes());
+        List<TypeMirror> kept = new ArrayList<>();
+        for (TypeMirror thrown : candidates) {
+            if (types.isSubtype(thrown, runtimeException)
+                    || types.isSubtype(thrown, error)
+                    || types.isSameType(thrown, throwable)) {
+                continue;
+            }
+            boolean subsumedByAnother = candidates.stream()
+                    .anyMatch(other -> !types.isSameType(other, thrown) && types.isSubtype(thrown, other));
+            if (!subsumedByAnother) {
+                kept.add(thrown);
+            }
+        }
+        return kept.stream().map(TypeName::get).toList();
     }
 
     private List<TypeName> exposedTypes(TypeElement bean, boolean qualified) {
