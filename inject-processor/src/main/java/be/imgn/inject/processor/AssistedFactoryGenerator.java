@@ -111,7 +111,7 @@ final class AssistedFactoryGenerator {
         CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe));
         ExecutableElement providesMethod = recipe.providesMethod();
         if (providesMethod == null) {
-            constructorBody(method, recipe, arguments, models.members(recipe.owner()));
+            constructorBody(method, recipe, arguments, models.members(recipe.owner()), models);
         } else {
             providesBody(method, recipe, providesMethod, arguments);
         }
@@ -119,7 +119,11 @@ final class AssistedFactoryGenerator {
     }
 
     private static void constructorBody(
-            MethodSpec.Builder method, AssistedRecipe recipe, CodeBlock arguments, MemberInjection members) {
+            MethodSpec.Builder method,
+            AssistedRecipe recipe,
+            CodeBlock arguments,
+            MemberInjection members,
+            ModelFactory models) {
         ClassName beanType = ClassName.get(recipe.owner());
         method.addStatement("$T instance = new $T($L)", beanType, beanType, arguments);
         // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
@@ -138,6 +142,10 @@ final class AssistedFactoryGenerator {
         }
         for (PluginField pluginField : members.pluginFields()) {
             method.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
+        }
+        String postConstruct = models.postConstructName(recipe.owner());
+        if (postConstruct != null) {
+            method.addStatement("instance.$L()", postConstruct);
         }
         method.addStatement("return instance");
     }

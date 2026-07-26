@@ -179,4 +179,15 @@ class ExamplesClasspathTest {
         // the application-level default RequestContext
         assertThat(app.getInstance(RequestGreeter.class).request().user()).isEqualTo("anonymous");
     }
+
+    @Test
+    void lifecycleCallbacksRunOnConstructionAndClose() {
+        Ledger ledger;
+        try (Injector app = Injector.create()) {
+            ledger = app.getInstance(Ledger.class);
+            assertThat(ledger.events()).containsExactly("opened"); // @PostConstruct ran during build
+        }
+        // close() invoked @PreDestroy on the created singleton
+        assertThat(ledger.events()).containsExactly("opened", "closed");
+    }
 }

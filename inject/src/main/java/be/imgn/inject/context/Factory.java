@@ -69,6 +69,7 @@ public abstract class Factory<T> implements BeanDefinition {
         T instance = createInstance(context);
         injectMethods(instance, context);
         injectFields(instance, context);
+        postConstruct(instance);
         return instance;
     }
 
@@ -95,6 +96,27 @@ public abstract class Factory<T> implements BeanDefinition {
      * @param context the resolution context
      */
     protected void injectFields(T instance, Context context) {}
+
+    /**
+     * Invoked by {@link #build} after field injection. Empty by default; a generated factory overrides it to call the
+     * bean's {@code @PostConstruct} method.
+     *
+     * @param instance the fully injected instance
+     */
+    protected void postConstruct(T instance) {}
+
+    /**
+     * Invoked by the owning context when the injector closes. Empty by default; a generated factory whose bean declares
+     * {@code @PreDestroy} overrides it to call that method.
+     *
+     * @param instance the instance to destroy
+     */
+    protected void preDestroy(T instance) {}
+
+    /** {@return whether this factory's bean declares a {@code @PreDestroy} callback} */
+    protected boolean hasPreDestroy() {
+        return false;
+    }
 
     /** {@return the constructor injection point, or empty when the constructor takes no injected arguments} */
     protected Optional<ConstructorInjectionPoint> constructorInjectionPoint() {

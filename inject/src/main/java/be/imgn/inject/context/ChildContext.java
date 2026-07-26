@@ -27,6 +27,7 @@ public final class ChildContext implements Context {
     private final Map<Key<?>, Provider<?>> bindings;
     private final ResolutionStack stack = new ResolutionStack();
     private @Nullable Injector injector;
+    private boolean closed;
 
     /**
      * @param parent the parent context resolutions fall back to
@@ -56,6 +57,9 @@ public final class ChildContext implements Context {
     @SuppressWarnings("unchecked")
     public <T> Provider<T> getProvider(Key<T> key) {
         Objects.requireNonNull(key, "key");
+        if (closed) {
+            throw new IllegalStateException("This Injector has been closed.");
+        }
         if (INJECTOR_KEY.equals(key)) {
             return (Provider<T>) (Provider<Injector>) this::requireInjector;
         }
@@ -99,5 +103,14 @@ public final class ChildContext implements Context {
             throw new IllegalStateException("There is no Injector attached to this Context.");
         }
         return attached;
+    }
+
+    /**
+     * Marks this child context closed, rejecting further resolution. A child owns no scoped instances, so this never
+     * destroys anything and never closes the parent. Idempotent.
+     */
+    @Override
+    public void close() {
+        closed = true;
     }
 }

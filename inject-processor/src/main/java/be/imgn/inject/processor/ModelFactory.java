@@ -2,6 +2,7 @@ package be.imgn.inject.processor;
 
 import java.io.Closeable;
 import java.io.Serializable;
+import java.lang.annotation.Annotation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -24,6 +25,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.MirroredTypesException;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -43,6 +45,8 @@ import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Injector;
 import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
+import be.imgn.inject.PostConstruct;
+import be.imgn.inject.PreDestroy;
 import be.imgn.inject.Provider;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.context.Context;
@@ -112,6 +116,8 @@ final class ModelFactory {
                 .map(constructor -> parameters(constructor, bean, types, elements, packageOf(bean)))
                 .orElse(List.of());
         MemberInjection members = members(bean);
+        LifecycleCallbacks callbacks =
+                lifecycleCallbacks(bean, Annotations.scope(bean).isPresent(), false);
         ContributionModel contribution = contribution(bean, bean.asType(), types);
         RenderedQualifier beanQualifier = contribution != null
                 ? null
@@ -134,7 +140,9 @@ final class ModelFactory {
                 Annotations.scope(bean).orElse(null),
                 beanQualifier,
                 exposedTypes,
-                contribution);
+                contribution,
+                callbacks.postConstruct(),
+                callbacks.preDestroy());
     }
 
     /**
@@ -191,6 +199,8 @@ final class ModelFactory {
         Elements elements = environment.getElementUtils();
         RenderedQualifier beanQualifier = Annotations.qualifier(type, elements, packageOf(type), annotationImplRequests)
                 .orElse(null);
+        LifecycleCallbacks callbacks =
+                lifecycleCallbacks(type, Annotations.scope(type).isPresent(), false);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
@@ -204,7 +214,9 @@ final class ModelFactory {
                 Annotations.scope(type).orElse(null),
                 beanQualifier,
                 exposedTypes(type, beanQualifier != null),
-                null);
+                null,
+                callbacks.postConstruct(),
+                callbacks.preDestroy());
     }
 
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
@@ -337,6 +349,79 @@ final class ModelFactory {
             diagnostics.error(
                     "An assisted recipe cannot be conditional; put the condition on the factory interface.", annotated);
         }
+    }
+
+    /**
+     * {@return the bean's validated lifecycle callbacks} Reports callback-shape, count, and scope/assisted misuse.
+     *
+     * @param bean the bean type
+     * @param scoped whether the bean has a scope
+     * @param assisted whether the bean is assisted (caller-owned)
+     */
+    LifecycleCallbacks lifecycleCallbacks(TypeElement bean, boolean scoped, boolean assisted) {
+        ExecutableElement postConstruct = singleCallback(bean, PostConstruct.class);
+        ExecutableElement preDestroy = singleCallback(bean, PreDestroy.class);
+        if (preDestroy != null) {
+            if (assisted) {
+                diagnostics.error(
+                        "@PreDestroy is not allowed on an assisted bean; assisted instances are caller-owned.",
+                        preDestroy);
+            } else if (!scoped) {
+                diagnostics.error(
+                        "@PreDestroy requires a scoped bean; an unscoped bean is never destroyed by the container.",
+                        preDestroy);
+            }
+        }
+        return new LifecycleCallbacks(name(postConstruct), name(preDestroy));
+    }
+
+    /** {@return the bean's @PostConstruct method name without reporting diagnostics (generation-time reader)} */
+    @Nullable
+    String postConstructName(TypeElement bean) {
+        return name(firstCallback(bean, PostConstruct.class));
+    }
+
+    private @Nullable ExecutableElement singleCallback(TypeElement bean, Class<? extends Annotation> annotation) {
+        ExecutableElement found = null;
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.METHOD || enclosed.getAnnotation(annotation) == null) {
+                continue;
+            }
+            ExecutableElement method = (ExecutableElement) enclosed;
+            if (found != null) {
+                diagnostics.error(
+                        "A class may declare at most one @" + annotation.getSimpleName() + " method.", method);
+                continue;
+            }
+            if (!isValidCallback(method)) {
+                diagnostics.error(
+                        "A @" + annotation.getSimpleName()
+                                + " callback must be a non-private, non-static, no-argument void method.",
+                        method);
+            }
+            found = method;
+        }
+        return found;
+    }
+
+    private static @Nullable ExecutableElement firstCallback(TypeElement bean, Class<? extends Annotation> annotation) {
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD && enclosed.getAnnotation(annotation) != null) {
+                return (ExecutableElement) enclosed;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isValidCallback(ExecutableElement method) {
+        return method.getReturnType().getKind() == TypeKind.VOID
+                && method.getParameters().isEmpty()
+                && !method.getModifiers().contains(Modifier.STATIC)
+                && !method.getModifiers().contains(Modifier.PRIVATE);
+    }
+
+    private static @Nullable String name(@Nullable ExecutableElement method) {
+        return method == null ? null : method.getSimpleName().toString();
     }
 
     /** {@return whether the element carries an annotation meta-annotated {@link ConditioningAnnotation}} */
