@@ -597,6 +597,9 @@ final class ModelFactory {
             List<AnnotationMirror> own = interceptingAnnotations(method);
             boolean eligible = isInterceptable(method);
             if (!own.isEmpty() && !eligible) {
+                if (method.getAnnotation(Provides.class) != null) {
+                    continue; // Skip @Provides methods silently; diagnostic reported in providesModel
+                }
                 diagnostics.error(ineligibleReason(method), method);
                 return null;
             }
@@ -688,13 +691,10 @@ final class ModelFactory {
                 && !isObjectMethod(method);
     }
 
-    /** {@return why {@code method} cannot be intercepted} */
+    /** {@return why a method with its own intercepting annotation cannot be intercepted} */
     private static String ineligibleReason(ExecutableElement method) {
         Set<Modifier> modifiers = method.getModifiers();
         String name = method.getSimpleName().toString();
-        if (method.getAnnotation(Provides.class) != null) {
-            return "@Provides " + name + "() cannot be intercepted: the container does not construct its result.";
-        }
         if (modifiers.contains(Modifier.PRIVATE)) {
             return name + "() cannot be intercepted: it is private.";
         }

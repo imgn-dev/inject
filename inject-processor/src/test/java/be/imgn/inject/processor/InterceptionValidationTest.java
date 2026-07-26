@@ -231,6 +231,13 @@ class InterceptionValidationTest {
 
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("@Provides");
+        // Verify the diagnostic is emitted exactly once
+        long countErrors = compilation.errors().stream()
+                .filter(diagnostic -> diagnostic.getMessage(null).contains("@Provides"))
+                .count();
+        if (countErrors != 1) {
+            throw new AssertionError("Expected exactly 1 error about @Provides, but got " + countErrors);
+        }
     }
 
     @Test
