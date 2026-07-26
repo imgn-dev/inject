@@ -70,9 +70,9 @@ resolution goes through the returned wrapper.
 
 ## Limitations
 
-- Scopes control instantiation only. There is no destruction side: no
-  callback when an instance is discarded, no injector shutdown that releases
-  scoped instances.
+- Scopes control instantiation. Releasing scoped instances is a separate
+  concern, handled by [lifecycle callbacks](lifecycle-callbacks.md): a
+  `@PreDestroy` method runs when the owning injector closes.
 - A bean carries at most one scoping annotation.
 - Scopes are declared on the bean, not chosen at the injection point; a
   consumer cannot request "a fresh instance" of a singleton (though injecting a

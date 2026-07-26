@@ -17,6 +17,8 @@ solves it, examples per use case, and its limitations.
   scope SPI.
 - [Conditional beans](conditional-beans.md) — beans present only when a
   condition matches; `@ConditionalOnProperty` and the condition SPI.
+- [Lifecycle callbacks](lifecycle-callbacks.md) — `@PostConstruct` after full
+  injection and `@PreDestroy` on injector close.
 
 ## Consuming beans
 
