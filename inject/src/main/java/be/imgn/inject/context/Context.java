@@ -2,8 +2,10 @@ package be.imgn.inject.context;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
+import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 
@@ -39,6 +41,20 @@ public interface Context {
      */
     default List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
         return List.of();
+    }
+
+    /**
+     * {@return the provider for the interceptor handling {@code annotationType}}
+     *
+     * <p>The default rejects every lookup, so minimal {@code Context} implementations need not supply an index.
+     *
+     * @param annotationType the intercepting annotation
+     * @throws InterceptorResolutionException if no bean is annotated {@code @Intercepts} for it
+     */
+    default Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        throw new InterceptorResolutionException("No interceptor bean for @" + annotationType.getSimpleName()
+                + "; annotate a bean with @Intercepts(" + annotationType.getSimpleName() + ".class).");
     }
 
     /**
