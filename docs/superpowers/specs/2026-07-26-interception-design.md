@@ -206,6 +206,7 @@ proxy instance unchanged.
 | Intercepting annotation on a `record` | records are implicitly final and their accessors are part of their identity |
 | Intercepting annotation on an `enum` | enum constants are created by the JVM, not by a factory |
 | Intercepting annotation on a `sealed` class | `sealed` permits only its listed subclasses |
+| Intercepting annotation on a generic class | a generic class is bound under its raw type |
 | Method-level annotation on a `final`, `static`, or `private` method | names the offending modifier |
 | Method-level annotation on an `@Inject`, `@PostConstruct`, or `@PreDestroy` method | framework plumbing cannot be intercepted |
 | Intercepting annotation on a `@Provides` method | the container does not construct the result |
