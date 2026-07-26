@@ -197,7 +197,8 @@ class MethodInterceptionTest {
     void bindFailsWhenNoInterceptorHandlesTheAnnotation() {
         assertThatExceptionOfType(InterceptorResolutionException.class)
                 .isThrownBy(() -> greet(List.of(OUTER)).bind(new StubContext(Map.of())))
-                .withMessageContaining("Outer");
+                .withMessageContaining("Outer")
+                .withMessageContaining(String.class.getName() + ".greet");
     }
 
     @Test

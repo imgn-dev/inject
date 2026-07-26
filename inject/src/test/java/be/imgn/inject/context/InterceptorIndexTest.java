@@ -36,17 +36,27 @@ class InterceptorIndexTest {
         }
     }
 
-    /** Factory for an interceptor bean; scoped when {@code singleton}, prototype otherwise. */
+    /**
+     * Factory for an interceptor bean; scoped when {@code singleton}, prototype otherwise. Exposes a qualified key
+     * (distinct across instances) unless {@code qualified} is {@code false}, in which case it exposes the bean's bare
+     * unqualified key so a test can override it the way {@code Injector.builder()} overrides an interceptor bean.
+     */
     static final class NoopFactory extends Factory<Noop> {
         private final Class<? extends Annotation> handled;
         private final String name;
         private final boolean singleton;
+        private final boolean qualified;
 
         NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton) {
+            this(handled, name, singleton, true);
+        }
+
+        NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton, boolean qualified) {
             super(Noop.class);
             this.handled = handled;
             this.name = name;
             this.singleton = singleton;
+            this.qualified = qualified;
         }
 
         @Override
@@ -66,7 +76,7 @@ class InterceptorIndexTest {
 
         @Override
         protected List<Key<?>> exposedKeys() {
-            return List.of(Key.of(Noop.class, Names.named(name)));
+            return qualified ? List.of(Key.of(Noop.class, Names.named(name))) : List.of(Key.of(Noop.class));
         }
     }
 
@@ -137,10 +147,30 @@ class InterceptorIndexTest {
     void anOverrideForAnInterceptorBeansOwnKeyReachesTheChainToo() {
         Noop stub = new Noop("stub");
         DefaultContext context = new DefaultContext(
-                List.of(new NoopFactory(Timed.class, "timing", true)),
+                List.of(new NoopFactory(Timed.class, "timing", true, false)),
                 List.of(new SingletonScope()),
                 Map.of(Key.of(Noop.class), (Provider<Noop>) () -> stub));
 
-        assertThat(context.interceptor(Timed.class).get()).isEqualTo(stub);
+        assertThat(context.getProvider(Key.of(Noop.class)).get())
+                .as("the override replaces the interceptor bean for direct resolution")
+                .isEqualTo(stub);
+        assertThat(context.interceptor(Timed.class).get())
+                .as("the override replaces the interceptor bean in the chain too")
+                .isEqualTo(stub);
+    }
+
+    @Test
+    void aChildOverrideForAnInterceptorBeansOwnKeyDoesNotReachTheChain() {
+        DefaultContext parent = new DefaultContext(
+                List.of(new NoopFactory(Timed.class, "timing", true, false)), List.of(new SingletonScope()));
+        Noop stub = new Noop("stub");
+        ChildContext child = new ChildContext(parent, Map.of(Key.of(Noop.class), (Provider<Noop>) () -> stub));
+
+        assertThat(child.getProvider(Key.of(Noop.class)).get())
+                .as("the child's binding shadows direct resolution through the child")
+                .isEqualTo(stub);
+        assertThat(child.interceptor(Timed.class).get())
+                .as("but ChildContext.interceptor delegates to the parent, so the chain still runs the original")
+                .isEqualTo(new Noop("timing"));
     }
 }

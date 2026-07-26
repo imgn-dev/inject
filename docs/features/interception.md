@@ -140,7 +140,11 @@ public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
   test overrides for free, replacing it in every chain it participates in, not
   just direct resolution — but only when the override targets the
   interceptor's own key (`Key.of(TheInterceptor.class)`); an override bound
-  under a qualifier or a supertype key is not picked up by the chain.
+  under a qualifier or a supertype key is not picked up by the chain. This
+  reach-the-chain behaviour is for `Injector.builder()` overrides only: a
+  [child injector](child-injectors.md)'s binding for the interceptor's own key
+  shadows direct resolution through the child but leaves every chain — the
+  parent's and the child's — running the original interceptor.
 - There is no ordering attribute: the bean's author fixes the order by writing
   the annotations in the order they should run.
 - An intercepting annotation with no `@Intercepts` bean fails when the bean is

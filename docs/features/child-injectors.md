@@ -64,3 +64,8 @@ nearest binding.
   resolves `Injector` to itself.
 - A child holds a reference to its parent; it is a view over the parent's
   graph, not a detachable copy.
+- A child binding for an [interceptor](interception.md) bean's own key shadows
+  direct resolution through the child, but not the interceptor chain:
+  `ChildContext.interceptor` always delegates to the parent, so intercepted
+  methods keep running the parent's interceptor instance regardless of a
+  child's override.

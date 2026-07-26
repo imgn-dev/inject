@@ -201,7 +201,9 @@ map and swaps in the override's provider when present, so the override reaches t
 resolution.
 
 **Child injectors** resolve intercepted beans through the parent's factories, so interception is intact;
-`ChildContext.interceptor` delegates to the parent.
+`ChildContext.interceptor` delegates to the parent unconditionally — it does not consult the child's own bindings. A
+child binding for an interceptor's own key therefore shadows direct resolution through the child but does not reach
+any chain; the override-reaches-the-chain behaviour above is a root-builder-only mechanic.
 
 ## Compile-time errors
 

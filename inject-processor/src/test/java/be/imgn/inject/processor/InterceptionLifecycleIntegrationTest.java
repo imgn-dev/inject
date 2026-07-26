@@ -25,9 +25,12 @@ import be.imgn.inject.Names;
 
 /**
  * Pushes one intercepted bean through every container mechanic at once — {@code @ExposeAs}, a qualifier,
- * {@code @Singleton}, {@code @PostConstruct}/{@code @PreDestroy}, and resolution through a child injector — asserting
- * interception holds in each case. {@link InterceptionEndToEndTest} covers the bare constructor-injection case; this
- * locks in that stacking the rest of the container's machinery on top does not silently drop the chain.
+ * {@code @Singleton}, {@code @PostConstruct}/{@code @PreDestroy} — asserting interception holds in each case, then
+ * checks the two ways a child injector can resolve an intercepted bean: a {@code @Singleton} anchors to the parent and
+ * comes back as the same intercepted instance, while an unscoped bean is rebuilt at the child (via
+ * {@code ChildContext}'s {@code factory.build(this)}) and is still intercepted. {@link InterceptionEndToEndTest} covers
+ * the bare constructor-injection case; this locks in that stacking the rest of the container's machinery on top does
+ * not silently drop the chain.
  */
 class InterceptionLifecycleIntegrationTest {
 
@@ -149,11 +152,32 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
+    private static final JavaFileObject WORKER = JavaFileObjects.forSourceString("example.Worker", """
+            package example;
+
+            import be.imgn.inject.Inject;
+
+            public class Worker {
+                private final CallLog log;
+
+                @Inject
+                public Worker(CallLog log) {
+                    this.log = log;
+                }
+
+                @Timed("work")
+                public String work() {
+                    log.add("worked");
+                    return "worked";
+                }
+            }
+            """);
+
     @Test
     void interceptionSurvivesExposureQualifierScopeLifecycleAndAChildInjector(@TempDir Path outputDir)
             throws Exception {
-        Compilation compilation =
-                javac().withProcessors(new InjectProcessor()).compile(TIMED, LOG, INTERCEPTOR, REPORTER, ORDERS_REPORT);
+        Compilation compilation = javac().withProcessors(new InjectProcessor())
+                .compile(TIMED, LOG, INTERCEPTOR, REPORTER, ORDERS_REPORT, WORKER);
         CompilationSubject.assertThat(compilation).succeeded();
         writeClassOutput(compilation, outputDir);
 
@@ -192,12 +216,45 @@ class InterceptionLifecycleIntegrationTest {
                         .as("a call on the instance resolved through the child injector is still intercepted")
                         .containsExactly("postConstruct", "enter:report", "exit:report");
 
+                // Unscoped bean through a child: ChildContext rebuilds it locally (factory.build(this)) instead of
+                // delegating to the parent, so its own dependencies resolve through the child, not the parent. A
+                // child-only CallLog override proves that: only a Worker built through the child can see it.
+                Class<?> workerType = loader.loadClass("example.Worker");
+                Method work = workerType.getMethod("work");
+                @SuppressWarnings("unchecked")
+                Class<Object> logClass = (Class<Object>) logType;
+                Object childLog = logType.getDeclaredConstructor().newInstance();
+                Injector workerChild =
+                        injector.childBuilder().bind(logClass, childLog).build();
+
+                Object rebuiltByChild = workerChild.getInstance(workerType);
+                Object workResult = work.invoke(rebuiltByChild);
+
+                assertThat(workResult).isEqualTo("worked");
+                assertThat(entries.invoke(childLog))
+                        .asInstanceOf(InstanceOfAssertFactories.LIST)
+                        .as("an unscoped bean resolved through a child is rebuilt there, seeing the child's own"
+                                + " CallLog binding rather than the parent's")
+                        .containsExactly("worked");
+                assertThat(entries.invoke(log))
+                        .asInstanceOf(InstanceOfAssertFactories.LIST)
+                        .as("interception still holds for the unscoped bean the child rebuilt: the shared"
+                                + " interceptor still logs to the parent's CallLog")
+                        .containsExactly("postConstruct", "enter:report", "exit:report", "enter:work", "exit:work");
+
+                workerChild.close();
                 child.close();
                 injector.close();
                 assertThat(entries.invoke(log))
                         .asInstanceOf(InstanceOfAssertFactories.LIST)
                         .as("closing the owning injector still runs @PreDestroy")
-                        .containsExactly("postConstruct", "enter:report", "exit:report", "preDestroy");
+                        .containsExactly(
+                                "postConstruct",
+                                "enter:report",
+                                "exit:report",
+                                "enter:work",
+                                "exit:work",
+                                "preDestroy");
             } finally {
                 Thread.currentThread().setContextClassLoader(previous);
             }
