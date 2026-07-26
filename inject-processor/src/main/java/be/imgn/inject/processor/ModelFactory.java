@@ -282,10 +282,7 @@ final class ModelFactory {
                     "@Inject constructor of " + bean.getQualifiedName() + " must not be private.", constructor.get());
             valid = false;
         }
-        // Enums are excluded: "no accessible no-argument constructor" is meaningless for a type that can never be
-        // instantiated with `new` regardless of constructor accessibility. An enum reaching this point only because
-        // of an intercepting annotation gets its own, more specific diagnostic from validateInterceptableShape.
-        if (constructor.isEmpty() && bean.getKind() != ElementKind.ENUM && !hasAccessibleNoArgConstructor(bean)) {
+        if (constructor.isEmpty() && !hasAccessibleNoArgConstructor(bean)) {
             diagnostics.error(
                     bean.getQualifiedName()
                             + " has @Inject members but no @Inject constructor and no accessible no-argument"
@@ -558,12 +555,47 @@ final class ModelFactory {
     }
 
     /**
+     * {@return whether {@code bean} has an interceptable shape, given that it (or one of its methods) carries an
+     * intercepting annotation; reports the shape violation, if any, via {@link #validateInterceptableShape}}
+     *
+     * <p>Returns {@code true} without reporting anything when {@code bean} carries no intercepting annotation at all:
+     * such a bean is not subject to the interception shape rules in the first place. Called ahead of
+     * {@link #validateBean} so a bean that both fails the interception shape check and would otherwise trip a
+     * plain-bean diagnostic (e.g. an intercepted enum, which has no accessible no-argument constructor by construction)
+     * gets exactly the interception-specific error.
+     *
+     * @param bean the candidate bean type
+     */
+    boolean validateInterceptionShape(TypeElement bean) {
+        if (!carriesInterceptingAnnotation(bean)) {
+            return true;
+        }
+        return validateInterceptableShape(bean);
+    }
+
+    /** {@return whether {@code bean} or one of its methods carries an intercepting annotation} */
+    private static boolean carriesInterceptingAnnotation(TypeElement bean) {
+        if (!interceptingAnnotations(bean).isEmpty()) {
+            return true;
+        }
+        for (Element enclosed : bean.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD
+                    && !interceptingAnnotations(enclosed).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * {@return {@code bean}'s interception model, or {@code null} when nothing is intercepted}
      *
      * <p>Reports every placement a generated subclass cannot honour. A class-level annotation sweeps declared methods
      * that are not {@code private}, {@code static}, or {@code final}, skipping {@code Object} methods and framework
      * callbacks; a method-level annotation applies to that method alone and replaces a class-level declaration of the
-     * same annotation type in place, so the class-level position (outermost) is preserved.
+     * same annotation type in place, so the class-level position (outermost) is preserved. When every intercepting
+     * annotation found on the bean was consumed by a silently-skipped {@code @Provides} method, this returns
+     * {@code null} without reporting: {@link #providesModel} is the single reporter for that case.
      *
      * @param bean the bean type
      */
@@ -589,6 +621,7 @@ final class ModelFactory {
             return null;
         }
         List<InterceptedMethodModel> methods = new ArrayList<>();
+        int providesSkipped = 0;
         for (Element enclosed : bean.getEnclosedElements()) {
             if (enclosed.getKind() != ElementKind.METHOD) {
                 continue;
@@ -598,6 +631,7 @@ final class ModelFactory {
             boolean eligible = isInterceptable(method);
             if (!own.isEmpty() && !eligible) {
                 if (method.getAnnotation(Provides.class) != null) {
+                    providesSkipped++;
                     continue; // Skip @Provides methods silently; diagnostic reported in providesModel
                 }
                 diagnostics.error(ineligibleReason(method), method);
@@ -616,6 +650,11 @@ final class ModelFactory {
             methods.add(interceptedMethod(method, methods.size(), List.copyOf(merged.values()), elements));
         }
         if (methods.isEmpty()) {
+            if (classLevel.isEmpty() && providesSkipped > 0 && providesSkipped == annotatedMethods.size()) {
+                // Every intercepting annotation on the bean was consumed by a silently-skipped @Provides method;
+                // providesModel is the single reporter for that case.
+                return null;
+            }
             diagnostics.error(
                     bean.getQualifiedName() + " carries an intercepting annotation but declares no interceptable"
                             + " method.",

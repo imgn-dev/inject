@@ -67,7 +67,8 @@ final class GatherStage {
             for (Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
                 if (element instanceof TypeElement bean) {
                     beanTypes.add(bean);
-                } else if (element.getEnclosingElement() instanceof TypeElement bean) {
+                } else if (element.getKind() == ElementKind.METHOD
+                        && element.getEnclosingElement() instanceof TypeElement bean) {
                     beanTypes.add(bean);
                 }
             }
@@ -103,6 +104,9 @@ final class GatherStage {
         Set<String> assistedBeanNames = new LinkedHashSet<>();
         List<AssistedReference> assistedReferences = new ArrayList<>();
         for (TypeElement bean : beanTypes) {
+            if (!models.validateInterceptionShape(bean)) {
+                continue;
+            }
             if (!models.validateBean(bean)) {
                 continue;
             }

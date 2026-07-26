@@ -8,6 +8,7 @@ import javax.tools.JavaFileObject;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class InterceptionValidationTest {
@@ -26,6 +27,22 @@ class InterceptionValidationTest {
             @Target({ElementType.TYPE, ElementType.METHOD})
             public @interface Timed {
                 String value() default "";
+            }
+            """);
+
+    private static final JavaFileObject FIELD_TIMED = JavaFileObjects.forSourceString("example.FieldTimed", """
+            package example;
+
+            import be.imgn.inject.InterceptingAnnotation;
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+
+            @InterceptingAnnotation
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.FIELD)
+            public @interface FieldTimed {
             }
             """);
 
@@ -86,7 +103,30 @@ class InterceptionValidationTest {
                 """);
 
         assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("enum");
+        assertThat(compilation).hadErrorContaining("cannot be intercepted");
+    }
+
+    @Test
+    void nonInterceptedEnumWithInjectMemberFailsAtSource() {
+        Compilation compilation = compile("example.Bean2", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public enum Bean2 {
+                    ONE;
+
+                    @Inject
+                    String value;
+                }
+                """);
+
+        assertThat(compilation).failed();
+        assertThat(compilation)
+                .hadErrorContaining("example.Bean2 has @Inject members but no @Inject constructor and no accessible"
+                        + " no-argument constructor.");
+        Assertions.assertThat(compilation.errors())
+                .noneMatch(diagnostic -> diagnostic.getMessage(null).contains("$$Factory"));
     }
 
     @Test
@@ -230,14 +270,9 @@ class InterceptionValidationTest {
                 """);
 
         assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("@Provides");
-        // Verify the diagnostic is emitted exactly once
-        long countErrors = compilation.errors().stream()
-                .filter(diagnostic -> diagnostic.getMessage(null).contains("@Provides"))
-                .count();
-        if (countErrors != 1) {
-            throw new AssertionError("Expected exactly 1 error about @Provides, but got " + countErrors);
-        }
+        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
+                        diagnostic.getMessage(null))
+                .contains("@Provides"));
     }
 
     @Test
@@ -327,5 +362,22 @@ class InterceptionValidationTest {
                 """);
 
         assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void interceptingAnnotationOnFieldOfUnrelatedClassGeneratesNoFactory() {
+        Compilation compilation = javac().withProcessors(new InjectProcessor())
+                .compile(FIELD_TIMED, JavaFileObjects.forSourceString("example.Plain", """
+                                package example;
+
+                                public class Plain {
+                                    @FieldTimed
+                                    String value;
+                                }
+                                """));
+
+        assertThat(compilation).succeeded();
+        Assertions.assertThat(compilation.generatedSourceFiles())
+                .noneMatch(file -> file.getName().contains("$Plain$$Factory"));
     }
 }
