@@ -106,15 +106,15 @@ final class InterceptedProxyGenerator {
     /** {@return the lambda calling the bean's own implementation with the arguments unpacked from the array} */
     private static CodeBlock joinpointLambda(InterceptedMethodModel method) {
         return method.returnType().equals(TypeName.VOID)
-                ? CodeBlock.of("arguments -> {\n$>super.$L($L);\nreturn null;\n$<}", method.name(), unpack(method))
-                : CodeBlock.of("arguments -> super.$L($L)", method.name(), unpack(method));
+                ? CodeBlock.of("$$arguments -> {\n$>super.$L($L);\nreturn null;\n$<}", method.name(), unpack(method))
+                : CodeBlock.of("$$arguments -> super.$L($L)", method.name(), unpack(method));
     }
 
     /** {@return the arguments of the joinpoint's {@code super} call, unpacked from the argument array} */
     private static CodeBlock unpack(InterceptedMethodModel method) {
         return IntStream.range(0, method.parameters().size())
                 .mapToObj(index -> CodeBlock.of(
-                        "($T) arguments[$L]", method.parameters().get(index).type(), index))
+                        "($T) $$arguments[$L]", method.parameters().get(index).type(), index))
                 .collect(CodeBlock.joining(", "));
     }
 

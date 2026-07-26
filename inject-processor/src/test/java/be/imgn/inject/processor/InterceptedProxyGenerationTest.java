@@ -86,7 +86,7 @@ class InterceptedProxyGenerationTest {
         proxy.contains("final class $Orders$$Intercepted extends Orders");
         proxy.contains("InterceptedMethod.of(Orders.class, \"place\"");
         proxy.contains("AnnotationValue.of(Timed.class");
-        proxy.contains("super.place((String) arguments[0])");
+        proxy.contains("super.place((String) $arguments[0])");
         proxy.contains("$Orders$$Intercepted(Context context, String region)");
         proxy.contains("super(region)");
         proxy.contains("bind(context)");
@@ -260,7 +260,7 @@ class InterceptedProxyGenerationTest {
                 .contentsAsUtf8String();
         proxy.contains("InterceptedMethod.of(Generic.class, \"identity\", Object.class, List.of(Object.class)");
         proxy.contains("InterceptedMethod.of(Generic.class, \"boxed\", List.class, List.of(List.class)");
-        proxy.contains("Joinpoint $joinpoint = arguments -> super.identity((T) arguments[0])");
+        proxy.contains("Joinpoint $joinpoint = $arguments -> super.identity((T) $arguments[0])");
         proxy.doesNotContain("private final Joinpoint identity");
     }
 
@@ -295,5 +295,52 @@ class InterceptedProxyGenerationTest {
         proxy.contains("protected String guarded()");
         proxy.contains("String local()");
         proxy.doesNotContain("public String local()");
+    }
+
+    @Test
+    void keepsTheLocalJoinpointsParameterFromShadowingAGenericMethodParameterNamedArguments() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Picker", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import java.util.List;
+
+                public class Picker {
+                    @Inject
+                    public Picker() {}
+
+                    @Timed
+                    public <T> T pick(List<T> arguments) {
+                        return arguments.get(0);
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void keepsTheHoistedJoinpointFieldsParameterFromShadowingAMethodParameterNamedArguments() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Feeder", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Feeder {
+                    @Inject
+                    public Feeder() {}
+
+                    @Timed
+                    public String feed(String arguments) {
+                        return arguments;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
     }
 }
