@@ -20,6 +20,7 @@ import be.imgn.inject.Default;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.Intercepts;
 import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provides;
@@ -40,6 +41,11 @@ final class GatherStage {
         for (Element element : roundEnv.getElementsAnnotatedWith(Inject.class)) {
             if (element.getEnclosingElement() instanceof TypeElement bean) {
                 beanTypes.add(bean);
+            }
+        }
+        for (Element element : roundEnv.getElementsAnnotatedWith(Intercepts.class)) {
+            if (element instanceof TypeElement interceptor) {
+                beanTypes.add(interceptor);
             }
         }
         for (TypeElement annotation : annotations) {

@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
  * @param postConstruct the bean's {@code @PostConstruct} method name, or {@code null}
  * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}
+ * @param interceptsAnnotation the annotation this bean intercepts (from {@code @Intercepts}), or {@code null}
  */
 record BeanModel(
         String packageName,
@@ -44,4 +45,5 @@ record BeanModel(
         List<TypeName> exposedTypes,
         @Nullable ContributionModel contribution,
         @Nullable String postConstruct,
-        @Nullable String preDestroy) {}
+        @Nullable String preDestroy,
+        @Nullable ClassName interceptsAnnotation) {}

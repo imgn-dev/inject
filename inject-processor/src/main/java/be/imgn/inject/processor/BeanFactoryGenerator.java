@@ -63,6 +63,9 @@ final class BeanFactoryGenerator {
         if (model.preDestroy() != null) {
             type.addMethod(preDestroy(model)).addMethod(hasPreDestroy());
         }
+        if (model.interceptsAnnotation() != null) {
+            type.addMethod(intercepts(model.interceptsAnnotation()));
+        }
         if (model.contribution() != null) {
             type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(model.contribution()));
         } else if (!model.exposedTypes().isEmpty()) {
@@ -188,6 +191,17 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
                 .addStatement("return $T.of($T.class)", OPTIONAL, scopeAnnotation)
+                .build();
+    }
+
+    private static MethodSpec intercepts(ClassName annotation) {
+        TypeName returnType = ParameterizedTypeName.get(
+                OPTIONAL, ParameterizedTypeName.get(CLASS, WildcardTypeName.subtypeOf(ANNOTATION)));
+        return MethodSpec.methodBuilder("intercepts")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(returnType)
+                .addStatement("return $T.of($T.class)", OPTIONAL, annotation)
                 .build();
     }
 

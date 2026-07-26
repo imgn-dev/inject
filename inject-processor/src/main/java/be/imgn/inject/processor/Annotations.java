@@ -23,6 +23,7 @@ import com.palantir.javapoet.TypeName;
 
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.InterceptingAnnotation;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.ScopingAnnotation;
 
@@ -37,6 +38,7 @@ final class Annotations {
     private static final ClassName SCOPING_ANNOTATION = ClassName.get("be.imgn.inject", "ScopingAnnotation");
     private static final ClassName INJECTING_ANNOTATION = ClassName.get("be.imgn.inject", "InjectingAnnotation");
     private static final ClassName CONDITIONING_ANNOTATION = ClassName.get("be.imgn.inject", "ConditioningAnnotation");
+    private static final ClassName INTERCEPTING_ANNOTATION = ClassName.get("be.imgn.inject", "InterceptingAnnotation");
     private static final ClassName MAP = ClassName.get("java.util", "Map");
     private static final ClassName SET = ClassName.get("java.util", "Set");
     private static final ClassName LIST = ClassName.get("java.util", "List");
@@ -93,11 +95,12 @@ final class Annotations {
         return annotationType.getAnnotation(QualifyingAnnotation.class) != null
                 || annotationType.getAnnotation(ScopingAnnotation.class) != null
                 || annotationType.getAnnotation(InjectingAnnotation.class) != null
-                || annotationType.getAnnotation(ConditioningAnnotation.class) != null;
+                || annotationType.getAnnotation(ConditioningAnnotation.class) != null
+                || annotationType.getAnnotation(InterceptingAnnotation.class) != null;
     }
 
     /** {@return an {@code AnnotationValue.of(...)} expression describing the annotation} */
-    private static CodeBlock annotationValue(TypeElement annotationType, AnnotationMirror mirror, Elements utils) {
+    static CodeBlock annotationValue(TypeElement annotationType, AnnotationMirror mirror, Elements utils) {
         Map<String, AnnotationValue> values = valuesByName(mirror, utils);
         CodeBlock members = values.entrySet().stream()
                 .map(entry -> CodeBlock.of("$T.entry($S, $L)", MAP, entry.getKey(), metadataValue(entry.getValue())))
@@ -125,6 +128,9 @@ final class Annotations {
         }
         if (annotationType.getAnnotation(ConditioningAnnotation.class) != null) {
             present.add(CodeBlock.of("$T.class", CONDITIONING_ANNOTATION));
+        }
+        if (annotationType.getAnnotation(InterceptingAnnotation.class) != null) {
+            present.add(CodeBlock.of("$T.class", INTERCEPTING_ANNOTATION));
         }
         return CodeBlock.of("$T.of($L)", SET, present.stream().collect(CodeBlock.joining(", ")));
     }

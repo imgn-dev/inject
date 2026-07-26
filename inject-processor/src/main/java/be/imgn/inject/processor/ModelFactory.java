@@ -43,6 +43,7 @@ import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Injector;
+import be.imgn.inject.Intercepts;
 import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.PostConstruct;
@@ -51,6 +52,7 @@ import be.imgn.inject.Provider;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
+import be.imgn.inject.context.MethodInterceptor;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
 
@@ -84,7 +86,8 @@ final class ModelFactory {
             EventListener.class.getName(),
             Injector.class.getName(),
             Context.class.getName(),
-            Factory.class.getName());
+            Factory.class.getName(),
+            MethodInterceptor.class.getName());
 
     private final ProcessingEnvironment environment;
     private final List<InjectPlugin> plugins;
@@ -142,7 +145,8 @@ final class ModelFactory {
                 exposedTypes,
                 contribution,
                 callbacks.postConstruct(),
-                callbacks.preDestroy());
+                callbacks.preDestroy(),
+                interceptsAnnotation(bean));
     }
 
     /**
@@ -216,7 +220,8 @@ final class ModelFactory {
                 exposedTypes(type, beanQualifier != null),
                 null,
                 callbacks.postConstruct(),
-                callbacks.preDestroy());
+                callbacks.preDestroy(),
+                interceptsAnnotation(type));
     }
 
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
@@ -480,6 +485,55 @@ final class ModelFactory {
         return constructors.stream()
                 .anyMatch(constructor -> constructor.getParameters().isEmpty()
                         && !constructor.getModifiers().contains(Modifier.PRIVATE));
+    }
+
+    /**
+     * {@return the annotation named by {@code @Intercepts} on {@code bean}, or {@code null} when it carries none}
+     *
+     * <p>Read through the mirror: {@code Intercepts.value()} is a {@code Class}, so reading it reflectively during
+     * annotation processing throws {@code MirroredTypeException}.
+     */
+    @Nullable
+    ClassName interceptsAnnotation(TypeElement bean) {
+        for (AnnotationMirror mirror : bean.getAnnotationMirrors()) {
+            TypeElement annotationType =
+                    (TypeElement) mirror.getAnnotationType().asElement();
+            if (!annotationType.getQualifiedName().contentEquals(Intercepts.class.getCanonicalName())) {
+                continue;
+            }
+            if (!implementsMethodInterceptor(bean)) {
+                diagnostics.error(
+                        bean.getQualifiedName() + " is annotated @Intercepts but does not implement MethodInterceptor.",
+                        bean);
+                return null;
+            }
+            return interceptsValue(mirror);
+        }
+        return null;
+    }
+
+    /** {@return whether {@code bean} implements {@code MethodInterceptor}} */
+    private boolean implementsMethodInterceptor(TypeElement bean) {
+        TypeElement declared = environment.getElementUtils().getTypeElement(MethodInterceptor.class.getCanonicalName());
+        return declared != null
+                && environment
+                        .getTypeUtils()
+                        .isAssignable(
+                                environment.getTypeUtils().erasure(bean.asType()),
+                                environment.getTypeUtils().erasure(declared.asType()));
+    }
+
+    private static @Nullable ClassName interceptsValue(AnnotationMirror mirror) {
+        for (ExecutableElement member : mirror.getElementValues().keySet()) {
+            if (!member.getSimpleName().contentEquals("value")) {
+                continue;
+            }
+            Object value = mirror.getElementValues().get(member).getValue();
+            if (value instanceof DeclaredType declared && declared.asElement() instanceof TypeElement handled) {
+                return ClassName.get(handled);
+            }
+        }
+        return null;
     }
 
     private List<TypeName> exposedTypes(TypeElement bean, boolean qualified) {
