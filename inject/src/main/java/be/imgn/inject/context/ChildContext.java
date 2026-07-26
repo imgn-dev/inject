@@ -97,6 +97,11 @@ public final class ChildContext implements Context {
         return parent.getBeanDefinitionsByStereotype(stereotype);
     }
 
+    @Override
+    public Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
+        return parent.interceptor(annotationType);
+    }
+
     private Injector requireInjector() {
         Injector attached = injector;
         if (attached == null) {

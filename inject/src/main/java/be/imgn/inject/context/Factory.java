@@ -158,6 +158,15 @@ public abstract class Factory<T> implements BeanDefinition {
     }
 
     /**
+     * {@return the intercepting annotation this bean handles, or empty when the bean is not an interceptor}
+     *
+     * <p>A generated factory overrides this for a bean annotated {@code @Intercepts}.
+     */
+    protected Optional<Class<? extends Annotation>> intercepts() {
+        return Optional.empty();
+    }
+
+    /**
      * {@return the provider for the {@code paramIndex}-th constructor parameter}
      *
      * @param paramIndex the zero-based parameter index

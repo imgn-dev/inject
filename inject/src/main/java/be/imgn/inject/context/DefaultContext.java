@@ -22,6 +22,7 @@ import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.Injector;
+import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 import be.imgn.inject.ScopeResolutionException;
@@ -42,6 +43,7 @@ public final class DefaultContext implements Context {
     private final Map<Key<?>, Provider<?>> registry;
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
+    private final Map<Class<? extends Annotation>, InterceptorEntry> interceptors;
     private final ResolutionStack stack = new ResolutionStack();
     private final Deque<TrackedInstance<?>> destroyables = new ArrayDeque<>();
     private @Nullable Injector injector;
@@ -97,11 +99,24 @@ public final class DefaultContext implements Context {
         List<BeanDefinition> definitionList = new ArrayList<>();
         Map<Key<?>, List<Contributor>> contributions = new LinkedHashMap<>();
         List<PendingDefault> defaults = new ArrayList<>();
+        Map<Class<? extends Annotation>, InterceptorEntry> interceptorIndex = new HashMap<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
                 continue; // an unmatched condition removes the bean from the graph entirely
             }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
+            Optional<Class<? extends Annotation>> intercepts = factory.intercepts();
+            if (intercepts.isPresent()) {
+                @SuppressWarnings("unchecked")
+                InterceptorEntry entry = new InterceptorEntry(factory, (Provider<MethodInterceptor>) provider);
+                InterceptorEntry existing = interceptorIndex.putIfAbsent(intercepts.get(), entry);
+                if (existing != null) {
+                    throw new DuplicateBindingException("Duplicate interceptor for @"
+                            + intercepts.get().getSimpleName() + ": "
+                            + existing.factory().type().getName() + " and "
+                            + factory.type().getName());
+                }
+            }
             Optional<Contribution> contribution = factory.contribution();
             if (contribution.isPresent()) {
                 contributions
@@ -153,6 +168,7 @@ public final class DefaultContext implements Context {
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
+        this.interceptors = Map.copyOf(interceptorIndex);
     }
 
     private static boolean conditionsPass(
@@ -262,6 +278,20 @@ public final class DefaultContext implements Context {
                 .toList();
     }
 
+    @Override
+    public Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        if (closed) {
+            throw new IllegalStateException("This Injector has been closed.");
+        }
+        InterceptorEntry entry = interceptors.get(annotationType);
+        if (entry == null) {
+            throw new InterceptorResolutionException("No interceptor bean for @" + annotationType.getSimpleName()
+                    + "; annotate a bean with @Intercepts(" + annotationType.getSimpleName() + ".class).");
+        }
+        return entry.provider();
+    }
+
     /**
      * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to. Called once by the
      * injector that owns this context, immediately after construction.
@@ -328,6 +358,9 @@ public final class DefaultContext implements Context {
             factory.preDestroy(instance);
         }
     }
+
+    /** One indexed interceptor: the factory that declared it and its fully wrapped provider. */
+    private record InterceptorEntry(Factory<?> factory, Provider<MethodInterceptor> provider) {}
 
     /** {@return the aggregate provider for one collection key: a set provider, or a map provider when keys exist} */
     private static Provider<?> aggregate(Key<?> collectionKey, List<Contributor> contributors) {
