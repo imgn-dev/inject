@@ -8,6 +8,9 @@ import be.imgn.inject.ConditionalOnProperty;
 /** Built-in {@link Condition} for {@link ConditionalOnProperty}. */
 public final class OnPropertyCondition implements Condition {
 
+    /** Creates the condition. Instantiated by {@link java.util.ServiceLoader}. */
+    public OnPropertyCondition() {}
+
     @Override
     public Class<? extends Annotation> annotationType() {
         return ConditionalOnProperty.class;

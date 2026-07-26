@@ -32,6 +32,8 @@ public record FieldInjectionPoint(
         implements InjectionPoint {
 
     /**
+     * Creates a field injection point.
+     *
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type
@@ -48,6 +50,8 @@ public record FieldInjectionPoint(
     }
 
     /**
+     * Creates a field injection point.
+     *
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type
@@ -59,6 +63,8 @@ public record FieldInjectionPoint(
     }
 
     /**
+     * Creates a field injection point.
+     *
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type
@@ -75,6 +81,8 @@ public record FieldInjectionPoint(
     }
 
     /**
+     * Creates a field injection point.
+     *
      * @param factory the factory owning this injection point
      * @param fieldName the field name
      * @param fieldType the field's declared type

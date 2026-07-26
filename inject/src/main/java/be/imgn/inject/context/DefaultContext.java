@@ -49,13 +49,13 @@ public final class DefaultContext implements Context {
     private @Nullable Injector injector;
     private volatile boolean closed;
 
-    /** {@return a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services} */
+    /** Creates a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services. */
     public DefaultContext() {
         this(loadFactories(), loadScopes(), loadConditions(), systemProperties(), Map.of());
     }
 
     /**
-     * {@return a context loaded from all registered services, with {@code overrides} shadowing discovered bindings}
+     * Creates a context loaded from all registered services, with {@code overrides} shadowing discovered bindings.
      *
      * @param overrides providers that replace any discovered binding for the same key; primarily a test seam
      */

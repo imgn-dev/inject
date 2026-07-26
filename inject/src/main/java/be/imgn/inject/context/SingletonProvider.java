@@ -16,7 +16,11 @@ public final class SingletonProvider<T> implements Provider<T> {
     private final Provider<T> delegate;
     private volatile @Nullable T instance;
 
-    /** @param delegate the provider to memoize */
+    /**
+     * Creates a memoizing provider.
+     *
+     * @param delegate the provider to memoize
+     */
     public SingletonProvider(Provider<T> delegate) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
     }

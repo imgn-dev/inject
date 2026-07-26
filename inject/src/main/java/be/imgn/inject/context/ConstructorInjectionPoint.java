@@ -18,6 +18,8 @@ public record ConstructorInjectionPoint(
         implements InjectionPoint {
 
     /**
+     * Creates a constructor injection point.
+     *
      * @param factory the factory owning this injection point
      * @param parameters the constructor parameters, in order
      * @param annotationMetadata annotations present on the constructor

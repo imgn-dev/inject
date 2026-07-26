@@ -12,6 +12,11 @@
 
     <artifactId>inject-examples-module</artifactId>
 
+    <properties>
+        <!-- Examples are read as source, not as API: they ship no javadoc and are not javadoc-checked. -->
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>be.imgn.inject</groupId>

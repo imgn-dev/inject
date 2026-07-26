@@ -29,6 +29,9 @@ import org.jspecify.annotations.Nullable;
 @Mojo(name = "register-factories", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
 public class RegisterFactoriesMojo extends AbstractMojo {
 
+    /** Creates the mojo. Instantiated by Maven. */
+    public RegisterFactoriesMojo() {}
+
     /** The compiled output directory to scan and patch. */
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
     private @Nullable File classesDirectory;

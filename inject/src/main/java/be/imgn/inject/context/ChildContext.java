@@ -30,6 +30,8 @@ public final class ChildContext implements Context {
     private boolean closed;
 
     /**
+     * Creates a child context over {@code parent}.
+     *
      * @param parent the parent context resolutions fall back to
      * @param bindings the child's own bindings, by key
      */

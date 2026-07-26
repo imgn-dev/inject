@@ -19,6 +19,8 @@ public record MethodInjectionPoint(
         implements InjectionPoint {
 
     /**
+     * Creates a method injection point.
+     *
      * @param factory the factory owning this injection point
      * @param methodName the method name
      * @param parameters the method parameters, in order

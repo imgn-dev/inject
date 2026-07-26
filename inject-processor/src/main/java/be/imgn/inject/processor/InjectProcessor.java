@@ -30,6 +30,9 @@ import be.imgn.inject.processor.spi.InjectPlugin;
 @SupportedAnnotationTypes("*")
 public final class InjectProcessor extends AbstractProcessor {
 
+    /** Creates the processor. Instantiated by {@link java.util.ServiceLoader}. */
+    public InjectProcessor() {}
+
     private final List<String> factoryNames = new ArrayList<>();
     private final Set<String> emittedAnnotationImpls = new HashSet<>();
 

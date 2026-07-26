@@ -15,6 +15,7 @@ public final class LogPlugin implements InjectPlugin {
 
     private static final ClassName LOGGER = ClassName.get("java.util.logging", "Logger");
 
+    /** Creates the plugin. Instantiated by {@link java.util.ServiceLoader}. */
     public LogPlugin() {}
 
     @Override

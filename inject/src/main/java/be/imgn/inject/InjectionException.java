@@ -2,12 +2,18 @@ package be.imgn.inject;
 
 /** Base type for all runtime injection failures. */
 public class InjectionException extends RuntimeException {
-    /** @param message the detail message */
+    /**
+     * Creates the exception.
+     *
+     * @param message the detail message
+     */
     public InjectionException(String message) {
         super(message);
     }
 
     /**
+     * Creates the exception.
+     *
      * @param message the detail message
      * @param cause the underlying cause
      */

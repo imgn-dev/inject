@@ -371,8 +371,10 @@ Configuration knowledge base, versions via `${…}` properties):
 
 Pipeline (single `./mvnw clean verify`): Spotless → Checkstyle (`validate`) →
 Error Prone + NullAway (`compile`) → Surefire + Mockito agent + JaCoCo (`test`) →
-Javadoc (`package`). Javadoc runs with `doclint` enforcing completeness on public
-API, consistent with the docs-always-current rule in `CLAUDE.md`.
+Javadoc (`package`, goal `javadoc-no-fork`). Javadoc runs with `doclint all` and
+`failOnWarnings`, so an undocumented or malformed public API member fails the
+build, consistent with the docs-always-current rule in `CLAUDE.md`. The two
+example modules set `maven.javadoc.skip`: they are read as source, not as API.
 
 ## 11. Bootstrap Summary
 

@@ -21,7 +21,11 @@ import be.imgn.inject.Provider;
 public abstract class Factory<T> implements BeanDefinition {
     private final Class<T> type;
 
-    /** @param type the built type */
+    /**
+     * Creates a factory for {@code type}.
+     *
+     * @param type the built type
+     */
     protected Factory(Class<T> type) {
         this.type = Objects.requireNonNull(type, "type");
     }

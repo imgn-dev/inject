@@ -14,6 +14,8 @@ public final class FactoryProvider<T> implements Provider<T> {
     private final Factory<T> factory;
 
     /**
+     * Creates a provider backed by {@code factory}.
+     *
      * @param context the resolution context
      * @param factory the backing factory
      */

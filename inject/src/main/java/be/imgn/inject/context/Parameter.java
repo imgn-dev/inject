@@ -29,6 +29,8 @@ public record Parameter(
         boolean isProvider) {
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param qualifierType the marker qualifier annotation type, or {@code null}
@@ -43,6 +45,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      */
@@ -51,6 +55,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param isProvider provider flag
@@ -60,6 +66,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param qualifierType the marker qualifier annotation type
@@ -69,6 +77,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param qualifierType the marker qualifier annotation type
@@ -79,6 +89,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param qualifier the qualifier annotation instance
@@ -88,6 +100,8 @@ public record Parameter(
     }
 
     /**
+     * Creates a parameter description.
+     *
      * @param name the parameter name
      * @param type the parameter type
      * @param qualifier the qualifier annotation instance

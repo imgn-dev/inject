@@ -248,8 +248,21 @@
                         <links>
                             <link>https://docs.oracle.com/en/java/javase/21/docs/api/</link>
                         </links>
-                        <doclint>all,-missing</doclint>
+                        <!-- all: syntax, references, HTML, and completeness. Missing documentation is a warning, so
+                             failOnWarnings is what turns it into a build failure. -->
+                        <doclint>all</doclint>
+                        <failOnWarnings>true</failOnWarnings>
+                        <quiet>true</quiet>
                     </configuration>
+                    <executions>
+                        <execution>
+                            <id>check-javadoc</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>javadoc-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -266,6 +279,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>

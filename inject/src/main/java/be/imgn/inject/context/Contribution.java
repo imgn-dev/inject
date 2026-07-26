@@ -15,6 +15,8 @@ import be.imgn.inject.Key;
  */
 public record Contribution(Key<?> collectionKey, @Nullable String mapKey) {
     /**
+     * Creates a collection contribution.
+     *
      * @param collectionKey the collection binding key
      * @param mapKey the map key, or {@code null} for a set contribution
      */
