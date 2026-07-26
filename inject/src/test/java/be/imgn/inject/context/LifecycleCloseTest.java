@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
 import be.imgn.inject.Singleton;
+import be.imgn.inject.Types;
 
 class LifecycleCloseTest {
 
@@ -115,5 +116,62 @@ class LifecycleCloseTest {
         context.close();
         assertThatExceptionOfType(IllegalStateException.class)
                 .isThrownBy(() -> context.getProvider(Key.of(String.class)));
+    }
+
+    /** A marker interface contributed into a {@code Set}. */
+    interface Element {}
+
+    /** The bean implementing {@link Element}. */
+    record ElementImpl() implements Element {}
+
+    /** Singleton {@code @IntoSet} contributor whose preDestroy logs into a shared list. */
+    static final class ElementContribFactory extends Factory<Element> {
+        private final List<String> destroyed;
+
+        ElementContribFactory(List<String> destroyed) {
+            super(Element.class);
+            this.destroyed = destroyed;
+        }
+
+        @Override
+        protected Element createInstance(Context context) {
+            return new ElementImpl();
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return List.of();
+        }
+
+        @Override
+        protected Optional<Contribution> contribution() {
+            return Optional.of(new Contribution(Key.of(Types.setOf(Element.class)), null));
+        }
+
+        @Override
+        protected Optional<Class<? extends Annotation>> scope() {
+            return Optional.of(Singleton.class);
+        }
+
+        @Override
+        protected boolean hasPreDestroy() {
+            return true;
+        }
+
+        @Override
+        protected void preDestroy(Element instance) {
+            destroyed.add("element");
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void singletonSetContributorIsDestroyedOnClose() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context =
+                new DefaultContext(List.of(new ElementContribFactory(destroyed)), List.of(new SingletonScope()));
+        context.getProvider(Key.of(Types.setOf(Element.class))).get(); // force creation of the singleton contributor
+        context.close();
+        assertThat(destroyed).containsExactly("element");
     }
 }
