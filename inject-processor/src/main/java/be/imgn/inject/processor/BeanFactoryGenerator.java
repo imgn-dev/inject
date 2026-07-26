@@ -109,12 +109,19 @@ final class BeanFactoryGenerator {
         CodeBlock arguments = IntStream.range(0, model.constructorParameters().size())
                 .mapToObj(index -> argument(model.constructorParameters().get(index), "Constructor", index))
                 .collect(CodeBlock.joining(", "));
+        InterceptionModel interception = model.interception();
+        CodeBlock construction = interception == null
+                ? CodeBlock.of("new $T($L)", model.beanType(), arguments)
+                : CodeBlock.of(
+                        "new $L(context$L)",
+                        interception.proxySimpleName(),
+                        arguments.isEmpty() ? CodeBlock.of("") : CodeBlock.of(", $L", arguments));
         return MethodSpec.methodBuilder("createInstance")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
                 .returns(model.beanType())
                 .addParameter(CONTEXT, "context")
-                .addStatement("return new $T($L)", model.beanType(), arguments)
+                .addStatement("return $L", construction)
                 .build();
     }
 

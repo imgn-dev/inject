@@ -1,16 +1,20 @@
 package be.imgn.inject.processor;
 
 import java.util.List;
+import javax.lang.model.element.Modifier;
 
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeVariableName;
+
+import org.jspecify.annotations.Nullable;
 
 /**
  * One intercepted method to override in the generated proxy.
  *
  * @param name the method name
  * @param fieldName the proxy's chain field name, unique across overloads ({@code name + "$" + index})
+ * @param visibility the source method's visibility, mirrored by the override; {@code null} for package-private
  * @param returnType the declared return type; {@code TypeName.VOID} for a void method
  * @param parameters the declared parameters, in order
  * @param thrownTypes the declared checked exception types eligible for their own catch clause, in declaration order,
@@ -24,6 +28,7 @@ import com.palantir.javapoet.TypeVariableName;
 record InterceptedMethodModel(
         String name,
         String fieldName,
+        @Nullable Modifier visibility,
         TypeName returnType,
         List<ProxyParameter> parameters,
         List<TypeName> thrownTypes,

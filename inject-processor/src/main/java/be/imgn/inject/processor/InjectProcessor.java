@@ -67,6 +67,9 @@ public final class InjectProcessor extends AbstractProcessor {
             return false;
         }
         for (BeanModel model : gathered.beans().values()) {
+            if (model.interception() != null) {
+                writeFactory(InterceptedProxyGenerator.generate(model));
+            }
             writeFactory(BeanFactoryGenerator.generate(model));
             factoryNames.add(model.packageName() + "." + model.factorySimpleName());
         }

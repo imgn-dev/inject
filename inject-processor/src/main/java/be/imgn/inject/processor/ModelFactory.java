@@ -778,6 +778,7 @@ final class ModelFactory {
         return new InterceptedMethodModel(
                 method.getSimpleName().toString(),
                 method.getSimpleName() + "$" + index,
+                visibility(method),
                 returnType,
                 proxyParameters(method),
                 thrownTypes(method),
@@ -786,6 +787,23 @@ final class ModelFactory {
                 returnType instanceof ParameterizedTypeName || returnType instanceof TypeVariableName,
                 typeVariables,
                 List.copyOf(rendered));
+    }
+
+    /**
+     * {@return {@code method}'s visibility modifier, or {@code null} when it is package-private}
+     *
+     * <p>The generated override mirrors it: widening a {@code protected} or package-private method to {@code public}
+     * would expose it on the proxy. {@code private} methods never reach here; they are rejected as uninterceptable.
+     */
+    private static @Nullable Modifier visibility(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        if (modifiers.contains(Modifier.PUBLIC)) {
+            return Modifier.PUBLIC;
+        }
+        if (modifiers.contains(Modifier.PROTECTED)) {
+            return Modifier.PROTECTED;
+        }
+        return null;
     }
 
     /** {@return whether {@code method} declares {@code Throwable} itself} */
