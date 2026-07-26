@@ -38,7 +38,7 @@ public final class TimingInterceptor implements MethodInterceptor {
     }
 
     @Override
-    public Object invoke(MethodInvocation invocation) throws Throwable {
+    public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
         long start = System.nanoTime();
         try {
             return invocation.proceed();
@@ -70,9 +70,9 @@ call from one bean method to another is intercepted too.
 ### Placement and order
 
 A class-level annotation sweeps every declared method that is not `private`,
-`static`, or `final`, skipping `Object` methods and `@Inject` /
-`@PostConstruct` / `@PreDestroy` methods. A method-level annotation applies to
-that method alone.
+`static`, or `final`, skipping `Object` methods, `@Provides` methods, and
+`@Inject` / `@PostConstruct` / `@PreDestroy` methods. A method-level
+annotation applies to that method alone.
 
 Interceptors run in source order, first listed outermost, and class-level
 annotations wrap method-level ones:
@@ -99,7 +99,7 @@ arguments for the rest of the chain, validating count and types:
 
 ```java
 @Override
-public Object invoke(MethodInvocation invocation) throws Throwable {
+public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
     String raw = (String) invocation.arguments().get(0);
     return invocation.proceed(raw.strip());
 }

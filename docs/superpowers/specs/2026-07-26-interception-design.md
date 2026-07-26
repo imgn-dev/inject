@@ -181,7 +181,8 @@ virtually into the override.
 returns, and Java 21 has no statements before `super`. The generated override null-checks its chain field and falls
 through to `super` when it is unset, making the rule deterministic instead of an NPE.
 
-**Interceptor instantiation is deferred to the first intercepted call.** `bind` resolves `Provider`s only, so an
+**Providers are resolved when the proxy is constructed; interceptor instantiation waits for the first intercepted
+call.** `bind` resolves `Provider`s only — a missing interceptor therefore fails at bean construction, while an
 interceptor may depend on beans that depend on intercepted beans without tripping the cycle guard. Each call does
 `provider.get()`, so the interceptor's own scope decides sharing: a `@Singleton` interceptor is shared, a prototype
 interceptor is fresh per call.
@@ -208,6 +209,7 @@ proxy instance unchanged.
 | Intercepting annotation on a `sealed` class | `sealed` permits only its listed subclasses |
 | Intercepting annotation on a generic class | a generic class is bound under its raw type |
 | Method-level annotation on a `final`, `static`, or `private` method | names the offending modifier |
+| Method-level annotation on a method whose `throws` clause holds a type variable | a type variable cannot be a `catch` parameter |
 | Method-level annotation on an `@Inject`, `@PostConstruct`, or `@PreDestroy` method | framework plumbing cannot be intercepted |
 | Intercepting annotation on a `@Provides` method | the container does not construct the result |
 | Intercepting annotation on an assisted recipe | assisted instances are built per call, outside the registry |
@@ -219,8 +221,8 @@ A class-level annotation over a bean that has *some* ineligible methods skips th
 `Object` methods must not make class-level interception unusable.
 
 An intercepting annotation with no `@Intercepts` bean is not a compile error — the interceptor may live in another
-artifact. It fails at the first intercepted call with `InterceptorResolutionException`, naming the annotation and the
-bean.
+artifact. It fails when the bean is constructed — the proxy binds its whole chain in its constructor — with
+`InterceptorResolutionException`, naming the annotation and the bean.
 
 ## Runtime model
 
