@@ -1,7 +1,9 @@
 package be.imgn.inject.context;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,6 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.jspecify.annotations.Nullable;
@@ -38,7 +41,9 @@ public final class DefaultContext implements Context {
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
     private final ResolutionStack stack = new ResolutionStack();
+    private final Deque<TrackedInstance<?>> destroyables = new ArrayDeque<>();
     private @Nullable Injector injector;
+    private volatile boolean closed;
 
     /** {@return a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services} */
     public DefaultContext() {
@@ -183,13 +188,34 @@ public final class DefaultContext implements Context {
             throw new ScopeResolutionException(
                     "No scope registered for @" + scopeAnnotation.get().getSimpleName());
         }
-        return scope.wrap(guarded);
+        Provider<T> scoped = scope.wrap(guarded);
+        if (!factory.hasPreDestroy()) {
+            return scoped;
+        }
+        return tracking(factory, scoped);
+    }
+
+    /** {@return a provider that records the created instance once, for destruction at {@link #close}} */
+    private <T> Provider<T> tracking(Factory<T> factory, Provider<T> scoped) {
+        AtomicBoolean recorded = new AtomicBoolean();
+        return () -> {
+            T instance = scoped.get();
+            if (recorded.compareAndSet(false, true)) {
+                synchronized (destroyables) {
+                    destroyables.push(new TrackedInstance<>(factory, instance));
+                }
+            }
+            return instance;
+        };
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> Provider<T> getProvider(Key<T> key) {
         Objects.requireNonNull(key, "key");
+        if (closed) {
+            throw new IllegalStateException("This Injector has been closed.");
+        }
         Provider<?> provider = registry.get(key);
         if (provider == null) {
             throw new UnsatisfiedDependencyException("No binding for " + key + stack.requiredBySuffix());
@@ -234,8 +260,46 @@ public final class DefaultContext implements Context {
         return attached;
     }
 
+    /**
+     * Destroys every tracked scoped instance (invoking each factory's {@code @PreDestroy}) in reverse creation order,
+     * then rejects further resolution. Failures are collected as suppressed exceptions on the first one thrown, so
+     * every instance is still given a chance to destroy. Idempotent.
+     */
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        RuntimeException failure = null;
+        synchronized (destroyables) {
+            while (!destroyables.isEmpty()) {
+                TrackedInstance<?> tracked = destroyables.pop(); // LIFO: last created destroyed first
+                try {
+                    tracked.destroy();
+                } catch (RuntimeException e) {
+                    if (failure == null) {
+                        failure = e;
+                    } else {
+                        failure.addSuppressed(e);
+                    }
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
     /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
     private record Contributor(Contribution contribution, Provider<?> provider) {}
+
+    /** A created scoped instance paired with the factory that can destroy it. */
+    private record TrackedInstance<T>(Factory<T> factory, T instance) {
+        void destroy() {
+            factory.preDestroy(instance);
+        }
+    }
 
     /** {@return the aggregate provider for one collection key: a set provider, or a map provider when keys exist} */
     private static Provider<?> aggregate(Key<?> collectionKey, List<Contributor> contributors) {

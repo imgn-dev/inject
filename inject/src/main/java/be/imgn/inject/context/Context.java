@@ -40,4 +40,10 @@ public interface Context {
     default List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype) {
         return List.of();
     }
+
+    /**
+     * Destroys this context's scoped instances (invoking their {@code @PreDestroy} callbacks) and marks it closed. The
+     * default is a no-op for minimal implementations. Idempotent.
+     */
+    default void close() {}
 }

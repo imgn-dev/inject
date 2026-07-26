@@ -167,4 +167,16 @@ class ChildContextTest {
         assertThat(context.getBeanDefinition(Key.of(String.class))).isPresent();
         assertThat(context.getBeanDefinition(Key.of(Integer.class))).isEmpty();
     }
+
+    @Test
+    void childCloseDoesNotCloseTheParent() {
+        DefaultContext parent = new DefaultContext(List.of(new ParentStringFactory()), List.of());
+        ChildContext context = child(parent, Map.of());
+        context.close();
+        // child closed: its own resolution fails
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> context.getProvider(Key.of(String.class)));
+        // parent still open
+        assertThat(parent.getProvider(Key.of(String.class)).get()).isEqualTo("parent");
+    }
 }

@@ -60,4 +60,9 @@ final class DefaultInjector implements Injector {
     public ChildBuilder childBuilder() {
         return new ChildBuilder(context);
     }
+
+    @Override
+    public void close() {
+        context.close();
+    }
 }

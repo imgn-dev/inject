@@ -31,7 +31,7 @@ import be.imgn.inject.context.Factory;
  * dependency and receives the injector that built it. {@code Injector}, {@code Context}, and {@code Factory} can never
  * be bound.
  */
-public interface Injector {
+public interface Injector extends AutoCloseable {
     /**
      * {@return an instance of {@code type}}
      *
@@ -101,6 +101,14 @@ public interface Injector {
 
     /** {@return a builder for a child of this injector: its bindings layer over this injector's graph} */
     ChildBuilder childBuilder();
+
+    /**
+     * Closes this injector: invokes {@code @PreDestroy} on every scoped instance it created, in reverse creation order,
+     * then rejects further resolution. Idempotent. Child injectors own no scoped instances, so closing a child destroys
+     * nothing and does not close its parent.
+     */
+    @Override
+    void close();
 
     /** {@return a new injector backed by all registered factories and scopes} */
     static Injector create() {
