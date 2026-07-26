@@ -103,8 +103,10 @@ final class GatherStage {
         Map<String, List<AssistedRecipe>> assistedRecipes = new LinkedHashMap<>();
         Set<String> assistedBeanNames = new LinkedHashSet<>();
         List<AssistedReference> assistedReferences = new ArrayList<>();
+        Set<TypeElement> interceptionRejected = new LinkedHashSet<>();
         for (TypeElement bean : beanTypes) {
             if (!models.validateInterceptionShape(bean)) {
+                interceptionRejected.add(bean);
                 continue;
             }
             if (!models.validateBean(bean)) {
@@ -145,7 +147,8 @@ final class GatherStage {
                 assistedRecipes,
                 assistedBeanNames,
                 assistedFactories,
-                assistedReferences);
+                assistedReferences,
+                interceptionRejected);
     }
 
     /**

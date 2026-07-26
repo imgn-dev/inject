@@ -126,7 +126,40 @@ class InterceptionValidationTest {
                 .hadErrorContaining("example.Bean2 has @Inject members but no @Inject constructor and no accessible"
                         + " no-argument constructor.");
         Assertions.assertThat(compilation.errors())
-                .noneMatch(diagnostic -> diagnostic.getMessage(null).contains("$$Factory"));
+                .noneMatch(diagnostic -> diagnostic.getSource() != null
+                        && diagnostic.getSource().getName().contains("$$Factory"));
+    }
+
+    @Test
+    void rejectedShapeInjectedElsewhereReportsExactlyOneError() {
+        Compilation compilation = javac().withProcessors(new InjectProcessor())
+                .compile(
+                        TIMED,
+                        JavaFileObjects.forSourceString("example.Foo", """
+                                package example;
+
+                                public final class Foo {
+                                    public Foo() {}
+
+                                    @Timed
+                                    public void run() {}
+                                }
+                                """),
+                        JavaFileObjects.forSourceString("example.Bar", """
+                                package example;
+
+                                import be.imgn.inject.Inject;
+
+                                public class Bar {
+                                    @Inject
+                                    public Bar(Foo foo) {}
+                                }
+                                """));
+
+        assertThat(compilation).failed();
+        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
+                        diagnostic.getMessage(null))
+                .contains("Remove final"));
     }
 
     @Test

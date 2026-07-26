@@ -129,7 +129,9 @@ final class PlanStage {
         Set<TypeElement> seen = new HashSet<>();
         while (!queue.isEmpty()) {
             TypeElement dependency = queue.poll();
-            if (!seen.add(dependency) || beans.containsKey(dependency)) {
+            if (!seen.add(dependency)
+                    || beans.containsKey(dependency)
+                    || gathered.interceptionRejected().contains(dependency)) {
                 continue;
             }
             if (!roundEnv.getRootElements().contains(dependency)) {
