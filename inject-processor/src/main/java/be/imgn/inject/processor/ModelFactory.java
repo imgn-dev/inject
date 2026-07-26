@@ -30,6 +30,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 
+import com.palantir.javapoet.ArrayTypeName;
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.ParameterizedTypeName;
@@ -134,7 +135,8 @@ final class ModelFactory {
         constructorSites.add(bean);
         injectConstructor(bean).ifPresent(constructorSites::add);
         List<TypeName> exposedTypes = contribution != null ? List.of() : exposedTypes(bean, beanQualifier != null);
-        InterceptionModel interception = interception(bean);
+        ClassName interceptsAnnotation = interceptsAnnotation(bean);
+        InterceptionModel interception = interception(bean, interceptsAnnotation);
         return new BeanModel(
                 packageOf(bean),
                 GeneratedNames.factoryName(enclosingChain(bean)),
@@ -151,7 +153,7 @@ final class ModelFactory {
                 contribution,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
-                interceptsAnnotation(bean),
+                interceptsAnnotation,
                 interception);
     }
 
@@ -211,6 +213,7 @@ final class ModelFactory {
                 .orElse(null);
         LifecycleCallbacks callbacks =
                 lifecycleCallbacks(type, Annotations.scope(type).isPresent(), false);
+        ClassName interceptsAnnotation = interceptsAnnotation(type);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
@@ -227,8 +230,8 @@ final class ModelFactory {
                 null,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
-                interceptsAnnotation(type),
-                interception(type));
+                interceptsAnnotation,
+                interception(type, interceptsAnnotation));
     }
 
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
@@ -598,9 +601,12 @@ final class ModelFactory {
      * {@code null} without reporting: {@link #providesModel} is the single reporter for that case.
      *
      * @param bean the bean type
+     * @param interceptsAnnotation the result of {@link #interceptsAnnotation(TypeElement)} for {@code bean}, passed in
+     *     rather than recomputed so a bean that is both {@code @Intercepts}-annotated and shape-invalid is reported
+     *     only once
      */
     @Nullable
-    InterceptionModel interception(TypeElement bean) {
+    InterceptionModel interception(TypeElement bean, @Nullable ClassName interceptsAnnotation) {
         Elements elements = environment.getElementUtils();
         List<AnnotationMirror> classLevel = interceptingAnnotations(bean);
         List<ExecutableElement> annotatedMethods = new ArrayList<>();
@@ -613,7 +619,7 @@ final class ModelFactory {
         if (classLevel.isEmpty() && annotatedMethods.isEmpty()) {
             return null;
         }
-        if (interceptsAnnotation(bean) != null) {
+        if (interceptsAnnotation != null) {
             diagnostics.error(bean.getQualifiedName() + " is an interceptor and cannot itself be intercepted.", bean);
             return null;
         }
@@ -766,10 +772,20 @@ final class ModelFactory {
     /** {@return whether {@code method} overrides one of {@code Object}'s methods} */
     private static boolean isObjectMethod(ExecutableElement method) {
         String name = method.getSimpleName().toString();
-        int arity = method.getParameters().size();
-        return (name.equals("toString") && arity == 0)
-                || (name.equals("hashCode") && arity == 0)
-                || (name.equals("equals") && arity == 1);
+        List<? extends VariableElement> parameters = method.getParameters();
+        if (parameters.isEmpty()) {
+            return name.equals("toString") || name.equals("hashCode");
+        }
+        return name.equals("equals")
+                && parameters.size() == 1
+                && isObjectType(parameters.get(0).asType());
+    }
+
+    /** {@return whether {@code type} is exactly {@link Object}} */
+    private static boolean isObjectType(TypeMirror type) {
+        return type instanceof DeclaredType declared
+                && declared.asElement() instanceof TypeElement element
+                && element.getQualifiedName().contentEquals(Object.class.getName());
     }
 
     /** {@return {@code executable}'s parameters as proxy signature parameters} */
@@ -811,9 +827,13 @@ final class ModelFactory {
     }
 
     /**
-     * {@return whether casting a value to {@code type} is an unchecked cast: a parameterized type or a type variable}
+     * {@return whether casting a value to {@code type} is an unchecked cast: a parameterized type or a type variable,
+     * including one nested inside an array type such as {@code T[]}}
      */
     private static boolean isUncheckedCastType(TypeName type) {
+        if (type instanceof ArrayTypeName array) {
+            return isUncheckedCastType(array.componentType());
+        }
         return type instanceof ParameterizedTypeName || type instanceof TypeVariableName;
     }
 
@@ -835,9 +855,13 @@ final class ModelFactory {
     }
 
     /** {@return whether {@code method} declares {@code Throwable} itself} */
-    private static boolean declaresThrowable(ExecutableElement method) {
+    private boolean declaresThrowable(ExecutableElement method) {
+        Types types = environment.getTypeUtils();
+        Elements elements = environment.getElementUtils();
+        TypeMirror throwable =
+                elements.getTypeElement(Throwable.class.getCanonicalName()).asType();
         for (TypeMirror thrown : method.getThrownTypes()) {
-            if (thrown.toString().equals(Throwable.class.getName())) {
+            if (types.isSameType(thrown, throwable)) {
                 return true;
             }
         }

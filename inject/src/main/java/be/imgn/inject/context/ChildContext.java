@@ -99,6 +99,10 @@ public final class ChildContext implements Context {
 
     @Override
     public Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        if (closed) {
+            throw new IllegalStateException("This Injector has been closed.");
+        }
         return parent.interceptor(annotationType);
     }
 

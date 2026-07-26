@@ -401,6 +401,30 @@ class InterceptionValidationTest {
     }
 
     @Test
+    void interceptorNotImplementingMethodInterceptorReportsExactlyOneError() {
+        Compilation compilation = compile("example.NotAnInterceptor", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Intercepts;
+
+                @Timed
+                @Intercepts(Timed.class)
+                public class NotAnInterceptor {
+                    @Inject
+                    public NotAnInterceptor() {}
+
+                    public void run() {}
+                }
+                """);
+
+        assertThat(compilation).failed();
+        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
+                        diagnostic.getMessage(null))
+                .contains("does not implement MethodInterceptor"));
+    }
+
+    @Test
     void classLevelAnnotationWithNoEligibleMethodIsRejected() {
         Compilation compilation = compile("example.Bean", """
                 package example;

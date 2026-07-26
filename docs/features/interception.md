@@ -121,19 +121,31 @@ public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
   an interceptor cannot add methods a bean does not declare.
 - Calls made from the bean's own constructor are not intercepted — the chain
   is assigned after `super(...)` returns, so a constructor-time call falls
-  through to the bean's own implementation.
+  through to the bean's own implementation. The chain is live by the time the
+  container runs `@Inject` methods, field injection, and `@PostConstruct`, so a
+  call made from any of those **is** intercepted. `@Inject` methods run before
+  field injection, so an interceptor invoked from one may observe a bean whose
+  `@Inject` fields are still null.
+- A `synchronized` intercepted method still holds its monitor for the call
+  into `super`, but the interceptors themselves run outside that lock.
 - Inherited methods are not swept; a class-level annotation covers declared
   methods only, consistent with
   [member injection](injection.md) and [lifecycle callbacks](lifecycle-callbacks.md).
 - [`@Provides`](provides-methods.md) products and
   [assisted](assisted-injection.md) beans cannot be intercepted: the container
   does not construct them.
-- [Builder overrides](builder-overrides.md) bypass interception entirely — an
-  override binds a raw instance, and nothing proxies it.
+- [Builder overrides](builder-overrides.md) of an intercepted bean bypass
+  interception entirely — an override binds a raw instance, and nothing
+  proxies it. Overriding the *interceptor* bean itself is different: it gets
+  test overrides for free, replacing it in every chain it participates in, not
+  just direct resolution — but only when the override targets the
+  interceptor's own key (`Key.of(TheInterceptor.class)`); an override bound
+  under a qualifier or a supertype key is not picked up by the chain.
 - There is no ordering attribute: the bean's author fixes the order by writing
   the annotations in the order they should run.
 - An intercepting annotation with no `@Intercepts` bean fails when the bean is
-  constructed, with `InterceptorResolutionException`, not at compile time and
-  not deferred until an intercepted method is actually called — the chain is
-  bound in the generated proxy's constructor. The interceptor may legitimately
-  live in another artifact.
+  constructed, with `InterceptorResolutionException` naming the annotation and
+  the intercepted method, not at compile time and not deferred until an
+  intercepted method is actually called — the chain is bound in the generated
+  proxy's constructor. The interceptor may legitimately live in another
+  artifact.

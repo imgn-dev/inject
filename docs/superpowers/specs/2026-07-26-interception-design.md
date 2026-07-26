@@ -194,7 +194,11 @@ proxy instance unchanged.
 **`MethodInterceptor` joins `EXCLUDED_DEFAULT_EXPOSURES`.** Without it, two interceptor beans would collide on the
 `MethodInterceptor` key through default supertype exposure.
 
-**Builder overrides bypass interception.** An override binds a raw instance or provider; nothing proxies it.
+**Builder overrides bypass interception** for the intercepted bean itself: an override binds a raw instance or
+provider, and nothing proxies it. Overriding an *interceptor* bean is different: after overrides merge into the
+registry, `DefaultContext` checks each interceptor entry's bean key (`Key.of(factory.type())`) against the overrides
+map and swaps in the override's provider when present, so the override reaches the chain too, not just direct
+resolution.
 
 **Child injectors** resolve intercepted beans through the parent's factories, so interception is intact;
 `ChildContext.interceptor` delegates to the parent.
@@ -222,7 +226,8 @@ A class-level annotation over a bean that has *some* ineligible methods skips th
 
 An intercepting annotation with no `@Intercepts` bean is not a compile error — the interceptor may live in another
 artifact. It fails when the bean is constructed — the proxy binds its whole chain in its constructor — with
-`InterceptorResolutionException`, naming the annotation and the bean.
+`InterceptorResolutionException`, naming the annotation and the intercepted method (its declaring type and name), with
+the actionable `@Intercepts(TheAnnotation.class)` hint kept alongside.
 
 ## Runtime model
 
@@ -246,9 +251,10 @@ declaring `@Intercepts` for the same annotation are a `DuplicateBindingException
 annotation and both beans — the same rule as two bindings for one key.
 
 `InterceptedMethod.bind(context)` resolves one `Provider` per binding, in order, at proxy construction.
-`MethodInterception.invoke` allocates one per-call `Invocation` carrying the chain index and the arguments; chain
-state is therefore per call, so recursion and concurrent calls on one proxy are safe. Generated joinpoint lambdas are
-hoisted to instance fields, so an intercepted call costs two allocations: the `Object[]` and the `Invocation`.
+`MethodInterception.invoke` allocates one short-lived `Invocation` per chain position, carrying that position and the
+arguments; chain state is therefore per call, so recursion and concurrent calls on one proxy are safe. Generated
+joinpoint lambdas are hoisted to instance fields, so an intercepted call costs one `Object[]` plus one `Invocation`
+per chain position.
 
 ## Generated code
 
@@ -266,9 +272,9 @@ public final class $OrderService$$Intercepted extends OrderService {
     private final @Nullable MethodInterception place$0;
     private final Joinpoint place$0$joinpoint = args -> super.place((Cart) args[0]);
 
-    $OrderService$$Intercepted(Context context, Repo repo) {
+    $OrderService$$Intercepted(Context $context, Repo repo) {
         super(repo);
-        this.place$0 = PLACE.bind(context);
+        this.place$0 = PLACE.bind($context);
     }
 
     @Override
@@ -289,8 +295,10 @@ public final class $OrderService$$Intercepted extends OrderService {
 }
 ```
 
-The proxy constructor mirrors the bean's `@Inject` constructor signature, prefixed with `Context`; a bean without one
-gets a `Context`-only constructor calling `super()`. The generated factory changes in one place:
+The proxy constructor mirrors the bean's `@Inject` constructor signature, prefixed with a `Context` parameter named
+`$context` — `$`-prefixed like the generator's other locals (`$interception`, `$e`, `$t`, `$arguments`, `$joinpoint`)
+so it cannot collide with a bean constructor parameter of the same name; a bean without one gets a `Context`-only
+constructor calling `super()`. The generated factory changes in one place:
 
 ```java
 @Override

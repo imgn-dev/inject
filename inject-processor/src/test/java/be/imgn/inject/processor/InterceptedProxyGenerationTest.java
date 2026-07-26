@@ -87,9 +87,9 @@ class InterceptedProxyGenerationTest {
         proxy.contains("InterceptedMethod.of(Orders.class, \"place\"");
         proxy.contains("AnnotationValue.of(Timed.class");
         proxy.contains("super.place((String) $arguments[0])");
-        proxy.contains("$Orders$$Intercepted(Context context, String region)");
+        proxy.contains("$Orders$$Intercepted(Context $context, String region)");
         proxy.contains("super(region)");
-        proxy.contains("bind(context)");
+        proxy.contains("bind($context)");
         proxy.contains("catch (RuntimeException | Error");
         proxy.contains("InterceptionException");
 
@@ -97,6 +97,43 @@ class InterceptedProxyGenerationTest {
                 .generatedSourceFile("example.$Orders$$Factory")
                 .contentsAsUtf8String()
                 .contains("new $Orders$$Intercepted(context, getInstanceForConstructor(0, context))");
+    }
+
+    @Test
+    void aConstructorParameterNamedContextDoesNotCollideWithTheProxysOwnParameter() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orders", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Orders {
+                    @Inject
+                    public Orders(String context) {}
+
+                    @Timed
+                    public void place() {}
+                }
+                """);
+        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+                package example;
+
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static String context() {
+                        return "eu";
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean, config);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Orders$$Intercepted")
+                .contentsAsUtf8String()
+                .contains("$Orders$$Intercepted(Context $context, String context)");
     }
 
     @Test
@@ -346,5 +383,128 @@ class InterceptedProxyGenerationTest {
                 .generatedSourceFile("example.$Feeder$$Intercepted")
                 .contentsAsUtf8String()
                 .contains("$arguments -> super.feed((String) $arguments[0])");
+    }
+
+    @Test
+    void suppressesUncheckedForAGenericArrayParameter() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Shapes", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                @Timed
+                public class Shapes {
+                    @Inject
+                    public Shapes() {}
+
+                    public <T> void genericVarargs(T[] values) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Shapes$$Intercepted")
+                .contentsAsUtf8String()
+                .contains("@SuppressWarnings(\"unchecked\")");
+    }
+
+    @Test
+    void classLevelSweepInterceptsAnOverloadedEqualsButSkipsTheRealOne() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Money", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                @Timed
+                public class Money {
+                    @Inject
+                    public Money() {}
+
+                    @Override
+                    public boolean equals(Object other) {
+                        return other instanceof Money;
+                    }
+
+                    @Override
+                    public int hashCode() {
+                        return 0;
+                    }
+
+                    public boolean equals(String currency) {
+                        return true;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
+        StringSubject proxy = assertThat(compilation)
+                .generatedSourceFile("example.$Money$$Intercepted")
+                .contentsAsUtf8String();
+        proxy.contains("equals(String currency)");
+        proxy.doesNotContain("equals(Object other)");
+    }
+
+    @Test
+    void methodLevelAnnotationOnAnOverloadedEqualsIsAccepted() {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Money", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Money {
+                    @Inject
+                    public Money() {}
+
+                    @Timed
+                    public boolean equals(String currency) {
+                        return true;
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void declaresThrowableWithATypeAnnotationStillSuppressesWrapping() {
+        JavaFileObject marker = JavaFileObjects.forSourceString("example.Marked", """
+                package example;
+
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Target;
+
+                @Target(ElementType.TYPE_USE)
+                public @interface Marked {}
+                """);
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Risky", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Risky {
+                    @Inject
+                    public Risky() {}
+
+                    @Timed
+                    public String risky() throws @Marked Throwable {
+                        return "risky";
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, marker, bean);
+
+        assertThat(compilation).succeeded();
+        StringSubject proxy = assertThat(compilation)
+                .generatedSourceFile("example.$Risky$$Intercepted")
+                .contentsAsUtf8String();
+        proxy.contains("public String risky() throws Throwable");
+        proxy.doesNotContain("An interceptor threw an undeclared exception");
     }
 }

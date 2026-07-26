@@ -162,6 +162,17 @@ public final class DefaultContext implements Context {
         }
         // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
         built.putAll(overrides);
+        // An override for an interceptor bean's own key also replaces its provider in the interceptor chain, so a
+        // builder override reaches an interceptor invoked as part of a call, not just direct resolution.
+        for (Map.Entry<Class<? extends Annotation>, InterceptorEntry> entry : interceptorIndex.entrySet()) {
+            Provider<?> override =
+                    overrides.get(Key.of(entry.getValue().factory().type()));
+            if (override != null) {
+                @SuppressWarnings("unchecked")
+                Provider<MethodInterceptor> replaced = (Provider<MethodInterceptor>) override;
+                entry.setValue(new InterceptorEntry(entry.getValue().factory(), replaced));
+            }
+        }
         // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);

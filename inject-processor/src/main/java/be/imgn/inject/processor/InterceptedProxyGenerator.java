@@ -128,7 +128,7 @@ final class InterceptedProxyGenerator {
     /** {@return the proxy constructor: {@code Context} first, then the bean's own constructor parameters} */
     private static MethodSpec constructor(InterceptionModel interception) {
         MethodSpec.Builder builder =
-                MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC).addParameter(CONTEXT, "context");
+                MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC).addParameter(CONTEXT, "$context");
         for (ProxyParameter parameter : interception.constructorParameters()) {
             builder.addParameter(parameter.type(), parameter.name());
         }
@@ -137,7 +137,7 @@ final class InterceptedProxyGenerator {
                 .collect(CodeBlock.joining(", "));
         builder.addStatement("super($L)", superArguments);
         for (InterceptedMethodModel method : interception.methods()) {
-            builder.addStatement("this.$L = $L.bind(context)", method.fieldName(), descriptorName(method));
+            builder.addStatement("this.$L = $L.bind($$context)", method.fieldName(), descriptorName(method));
         }
         return builder.build();
     }

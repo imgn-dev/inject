@@ -6,4 +6,12 @@ public class InterceptorResolutionException extends InjectionException {
     public InterceptorResolutionException(String message) {
         super(message);
     }
+
+    /**
+     * @param message the detail message
+     * @param cause the underlying cause
+     */
+    public InterceptorResolutionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Provider;
 
 /**
@@ -87,13 +88,22 @@ public final class InterceptedMethod {
      * {@return this call site bound to {@code context}: one interceptor provider per binding, in order}
      *
      * @param context the resolution context
-     * @throws be.imgn.inject.InterceptorResolutionException if a binding has no interceptor bean
+     * @throws InterceptorResolutionException if a binding has no interceptor bean
      */
     public MethodInterception bind(Context context) {
         Objects.requireNonNull(context, "context");
         List<Provider<MethodInterceptor>> providers = new ArrayList<>(bindings.size());
         for (AnnotationValue binding : bindings) {
-            providers.add(context.interceptor(binding.annotationType()));
+            try {
+                providers.add(context.interceptor(binding.annotationType()));
+            } catch (InterceptorResolutionException e) {
+                throw new InterceptorResolutionException(
+                        "No interceptor bean for @" + binding.annotationType().getSimpleName() + " on " + this
+                                + "; annotate a bean with @Intercepts("
+                                + binding.annotationType().getSimpleName()
+                                + ".class).",
+                        e);
+            }
         }
         return new MethodInterception(this, List.copyOf(providers));
     }

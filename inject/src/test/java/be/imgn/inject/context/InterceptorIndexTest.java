@@ -17,6 +17,7 @@ import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
+import be.imgn.inject.Provider;
 import be.imgn.inject.Singleton;
 
 class InterceptorIndexTest {
@@ -120,5 +121,26 @@ class InterceptorIndexTest {
         ChildContext child = new ChildContext(parent, Map.of());
 
         assertThat(child.interceptor(Timed.class).get()).isEqualTo(new Noop("timing"));
+    }
+
+    @Test
+    void aClosedChildRejectsInterceptorLookup() {
+        DefaultContext parent = new DefaultContext(
+                List.of(new NoopFactory(Timed.class, "timing", true)), List.of(new SingletonScope()));
+        ChildContext child = new ChildContext(parent, Map.of());
+        child.close();
+
+        assertThatExceptionOfType(IllegalStateException.class).isThrownBy(() -> child.interceptor(Timed.class));
+    }
+
+    @Test
+    void anOverrideForAnInterceptorBeansOwnKeyReachesTheChainToo() {
+        Noop stub = new Noop("stub");
+        DefaultContext context = new DefaultContext(
+                List.of(new NoopFactory(Timed.class, "timing", true)),
+                List.of(new SingletonScope()),
+                Map.of(Key.of(Noop.class), (Provider<Noop>) () -> stub));
+
+        assertThat(context.interceptor(Timed.class).get()).isEqualTo(stub);
     }
 }
