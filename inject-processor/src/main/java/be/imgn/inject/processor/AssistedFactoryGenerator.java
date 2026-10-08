@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -100,13 +102,33 @@ final class AssistedFactoryGenerator {
         MethodSpec.Builder method = MethodSpec.overriding(factoryMethod.method());
         AssistedRecipe recipe = factoryMethod.recipe();
         CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe));
+        // The body's locals must not collide with the factory-method parameters it copies; the context is always
+        // reached through this.context, so a parameter named "context" cannot stand in for it.
+        Set<String> parameterNames = factoryMethod.method().getParameters().stream()
+                .map(parameter -> parameter.getSimpleName().toString())
+                .collect(Collectors.toSet());
         ExecutableElement providesMethod = recipe.providesMethod();
         if (providesMethod == null) {
-            constructorBody(method, recipe, arguments, models.members(recipe.owner()), models);
+            constructorBody(
+                    method,
+                    recipe,
+                    arguments,
+                    models.members(recipe.owner()),
+                    models,
+                    unusedName("instance", parameterNames));
         } else {
-            providesBody(method, recipe, providesMethod, arguments);
+            providesBody(method, recipe, providesMethod, arguments, unusedName("host", parameterNames));
         }
         return method.build();
+    }
+
+    /** {@return {@code base}, suffixed with underscores until it differs from every name in {@code taken}} */
+    private static String unusedName(String base, Set<String> taken) {
+        String name = base;
+        while (taken.contains(name)) {
+            name += "_";
+        }
+        return name;
     }
 
     private static void constructorBody(
@@ -114,42 +136,49 @@ final class AssistedFactoryGenerator {
             AssistedRecipe recipe,
             CodeBlock arguments,
             MemberInjection members,
-            ModelFactory models) {
+            ModelFactory models,
+            String instance) {
         ClassName beanType = ClassName.get(recipe.owner());
-        method.addStatement("$T instance = new $T($L)", beanType, beanType, arguments);
+        method.addStatement("$T $N = new $T($L)", beanType, instance, beanType, arguments);
         // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
         // injectFields emits them).
         for (MethodModel injected : members.methods()) {
             CodeBlock args = injected.parameters().stream()
                     .map(AssistedFactoryGenerator::resolve)
                     .collect(CodeBlock.joining(", "));
-            method.addStatement("instance.$L($L)", injected.name(), args);
+            method.addStatement("$N.$L($L)", instance, injected.name(), args);
         }
         for (FieldModel field : members.fields()) {
             method.addStatement(
-                    "instance.$L = $L",
+                    "$N.$L = $L",
+                    instance,
                     field.name(),
                     resolve(field.type(), field.qualifier(), field.isProvider(), null));
         }
         for (PluginField pluginField : members.pluginFields()) {
-            method.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
+            method.addStatement("$N.$L = $L", instance, pluginField.name(), pluginField.initializer());
         }
         String postConstruct = models.postConstructName(recipe.owner());
         if (postConstruct != null) {
-            method.addStatement("instance.$L()", postConstruct);
+            method.addStatement("$N.$L()", instance, postConstruct);
         }
-        method.addStatement("return instance");
+        method.addStatement("return $N", instance);
     }
 
     private static void providesBody(
-            MethodSpec.Builder method, AssistedRecipe recipe, ExecutableElement providesMethod, CodeBlock arguments) {
+            MethodSpec.Builder method,
+            AssistedRecipe recipe,
+            ExecutableElement providesMethod,
+            CodeBlock arguments,
+            String host) {
         String methodName = providesMethod.getSimpleName().toString();
         ClassName hostType = ClassName.get(recipe.owner());
         if (providesMethod.getModifiers().contains(Modifier.STATIC)) {
             method.addStatement("return $T.$L($L)", hostType, methodName, arguments);
         } else {
-            method.addStatement("$T host = context.getProvider($T.of($T.class)).get()", hostType, KEY, hostType);
-            method.addStatement("return host.$L($L)", methodName, arguments);
+            method.addStatement(
+                    "$T $N = this.context.getProvider($T.of($T.class)).get()", hostType, host, KEY, hostType);
+            method.addStatement("return $N.$L($L)", host, methodName, arguments);
         }
     }
 
@@ -194,7 +223,7 @@ final class AssistedFactoryGenerator {
         CodeBlock key = qualifier == null
                 ? CodeBlock.of("$T.of($L)", KEY, type)
                 : CodeBlock.of("$T.of($L, $L)", KEY, type, qualifier.expression());
-        CodeBlock provider = CodeBlock.of("context.getProvider($L)", key);
+        CodeBlock provider = CodeBlock.of("this.context.getProvider($L)", key);
         return isProvider ? provider : CodeBlock.of("$L.get()", provider);
     }
 

@@ -246,6 +246,49 @@ class AssistedGenerationTest {
                 .contains("example.$ReportFactory$$Factory");
     }
 
+    @Test
+    void factoryParametersCannotShadowTheContextOrTheGeneratedLocals() throws Exception {
+        JavaFileObject dep = JavaFileObjects.forSourceString("example.Dep", """
+                package example;
+
+                public class Dep {}
+                """);
+        JavaFileObject widget = JavaFileObjects.forSourceString("example.Widget", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Injector;
+
+                public class Widget {
+                    @Inject
+                    public Widget(Dep dep, @Assisted Injector context, @Assisted("label") String instance) {}
+                }
+                """);
+        JavaFileObject factory = JavaFileObjects.forSourceString("example.WidgetFactory", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.AssistedFactory;
+                import be.imgn.inject.Injector;
+
+                public interface WidgetFactory {
+                    @AssistedFactory
+                    Widget create(Injector context, @Assisted("label") String instance);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(dep, widget, factory);
+
+        CompilationSubject.assertThat(compilation).succeeded();
+        assertThat(contents(compilation, "example.$WidgetFactory$$Impl"))
+                .as("container dependencies resolve through the impl's own context, never a caller-supplied one")
+                .contains("this.context.getProvider(Key.of(Dep.class)).get()")
+                .doesNotContainPattern("[^.]context\\.getProvider")
+                .contains("Widget instance_ = new Widget(")
+                .contains("return instance_;");
+    }
+
     private static String contents(Compilation compilation, String qualifiedName) throws IOException {
         return compilation
                 .generatedSourceFile(qualifiedName)
