@@ -70,6 +70,9 @@ errors, with no cost deferred to runtime.
   runtime. A dependency missing from that set is reported on first resolution
   of the bean that needs it (`UnsatisfiedDependencyException`), not at injector
   creation.
-- Classes without an `@Inject` constructor are invisible to the processor; types
-  you do not control are supplied through
+- A class without an `@Inject` constructor gets a generated default factory
+  only when something in the same compilation depends on it, nothing in that
+  compilation binds it already (a `@Provides` method or a bean's exposed
+  type), and it is a concrete class with an accessible no-argument
+  constructor. Types you do not control are supplied through
   [`@Provides` methods](provides-methods.md).

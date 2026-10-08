@@ -1,5 +1,8 @@
 package be.imgn.inject.processor;
 
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeName;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -9,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.processing.RoundEnvironment;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import org.jspecify.annotations.Nullable;
 
@@ -124,6 +129,7 @@ final class PlanStage {
     private void planDefaultFactories(Gathered gathered, RoundEnvironment roundEnv) {
         Map<TypeElement, BeanModel> beans = gathered.beans();
         Map<TypeElement, List<TypeElement>> edges = gathered.edges();
+        Set<TypeName> supplied = suppliedTypes(gathered);
         Deque<TypeElement> queue = new ArrayDeque<>(gathered.seeds());
         Set<TypeElement> seen = new HashSet<>();
         while (!queue.isEmpty()) {
@@ -135,6 +141,14 @@ final class PlanStage {
             }
             if (!roundEnv.getRootElements().contains(dependency)) {
                 // Library / cross-module type: satisfied elsewhere, checked at runtime
+                continue;
+            }
+            if (supplied.contains(ClassName.get(dependency))) {
+                // Bound by a @Provides method or exposed by a bean: a default factory would shadow or duplicate it
+                continue;
+            }
+            if (isAbstract(dependency)) {
+                // Not instantiable: an implementation must be bound elsewhere, checked at runtime
                 continue;
             }
             if (models.injectConstructor(dependency).isPresent()) {
@@ -152,6 +166,33 @@ final class PlanStage {
                         dependency);
             }
         }
+    }
+
+    /** {@return the raw types bound in this round by {@code @Provides} methods and by beans' exposed types} */
+    private static Set<TypeName> suppliedTypes(Gathered gathered) {
+        Set<TypeName> supplied = new HashSet<>();
+        for (ProvidesModel provides : gathered.provides()) {
+            if (provides.contribution() == null) {
+                supplied.add(raw(provides.producedType()));
+                provides.exposedTypes().forEach(type -> supplied.add(raw(type)));
+            }
+        }
+        for (BeanModel bean : gathered.beans().values()) {
+            if (bean.contribution() == null) {
+                bean.exposedTypes().forEach(type -> supplied.add(raw(type)));
+            }
+        }
+        return supplied;
+    }
+
+    private static TypeName raw(TypeName type) {
+        return type instanceof ParameterizedTypeName parameterized ? parameterized.rawType() : type;
+    }
+
+    private static boolean isAbstract(TypeElement type) {
+        return type.getKind() == ElementKind.INTERFACE
+                || type.getKind() == ElementKind.ANNOTATION_TYPE
+                || type.getModifiers().contains(Modifier.ABSTRACT);
     }
 
     private static @Nullable List<TypeElement> findCycle(

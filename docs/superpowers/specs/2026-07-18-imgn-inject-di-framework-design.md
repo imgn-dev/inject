@@ -203,7 +203,10 @@ Plugins discovered via `ServiceLoader<InjectPlugin>`.
 **1. Gather.** Collect every `@Inject` site, every `@Provides` method, and every
 meta-annotated annotation. For each *dependency type* encountered, ensure a factory
 will exist:
-- has `@Inject` or is produced by `@Provides` → generated factory;
+- has `@Inject`, is produced by `@Provides`, or is exposed by a bean → that
+  binding's factory serves it, and no other factory is generated for it;
+- an interface or abstract class → no factory; an implementation must be bound
+  elsewhere, checked at runtime;
 - otherwise **must have an accessible no-arg constructor** → a default factory is
   generated for it (a dependency does **not** need `@Inject`, but it always needs a
   Factory);
