@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class ConstructorInjectionTest {
 
     @Test
     void generatesFactoryForSingleParameterConstructor() {
-        JavaFileObject greeter = JavaFileObjects.forSourceString("example.Greeter", """
+        JavaFileObject greeter = TestCompiler.source("example.Greeter", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -31,9 +29,7 @@ class ConstructorInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(greeter);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Greeter$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Greeter$$Factory");
         source.contains("class $Greeter$$Factory extends Factory<Greeter>");
         source.contains("super(Greeter.class)");
         source.contains("new Parameter(\"name\", String.class,");
@@ -43,7 +39,7 @@ class ConstructorInjectionTest {
 
     @Test
     void generatesFactoryForTwoParameterConstructorInOrder() {
-        JavaFileObject pair = JavaFileObjects.forSourceString("example.Pair", """
+        JavaFileObject pair = TestCompiler.source("example.Pair", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -57,9 +53,7 @@ class ConstructorInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(pair);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Pair$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Pair$$Factory");
         source.contains("new Parameter(\"first\", String.class,");
         source.contains("new Parameter(\"second\", Integer.class,");
         source.contains("getInstanceForConstructor(0, context)");

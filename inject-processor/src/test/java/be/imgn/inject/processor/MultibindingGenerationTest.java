@@ -1,17 +1,15 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class MultibindingGenerationTest {
 
-    private static final JavaFileObject HANDLER = JavaFileObjects.forSourceString("example.Handler", """
+    private static final JavaFileObject HANDLER = TestCompiler.source("example.Handler", """
             package example;
 
             public interface Handler {}
@@ -19,7 +17,7 @@ class MultibindingGenerationTest {
 
     @Test
     void intoSetGeneratesContributionAndNoExposedKeys() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.AuthHandler", """
+        JavaFileObject bean = TestCompiler.source("example.AuthHandler", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -35,16 +33,14 @@ class MultibindingGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(HANDLER, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$AuthHandler$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$AuthHandler$$Factory");
         source.contains("new Contribution(Key.of(Types.setOf(Handler.class)), null)");
         source.contains("return List.of();");
     }
 
     @Test
     void intoMapGeneratesContributionWithKey() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.AuthHandler", """
+        JavaFileObject bean = TestCompiler.source("example.AuthHandler", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -62,13 +58,12 @@ class MultibindingGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$AuthHandler$$Factory")
-                .contentsAsUtf8String()
                 .contains("new Contribution(Key.of(Types.mapOf(String.class, Handler.class)), \"auth\")");
     }
 
     @Test
     void markerOnProvidesMethodWorks() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.IntoSet;
@@ -88,13 +83,12 @@ class MultibindingGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Config$fallback$$Factory")
-                .contentsAsUtf8String()
                 .contains("new Contribution(Key.of(Types.setOf(Handler.class)), null)");
     }
 
     @Test
     void bothMarkersIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Both", """
+        JavaFileObject bean = TestCompiler.source("example.Both", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -117,7 +111,7 @@ class MultibindingGenerationTest {
 
     @Test
     void markerWithExposeAsIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -140,7 +134,7 @@ class MultibindingGenerationTest {
 
     @Test
     void markerWithQualifierIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -163,7 +157,7 @@ class MultibindingGenerationTest {
 
     @Test
     void nonAssignableElementTypeIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -184,7 +178,7 @@ class MultibindingGenerationTest {
 
     @Test
     void blankMapKeyIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -205,7 +199,7 @@ class MultibindingGenerationTest {
 
     @Test
     void markerOnNonProvidesMethodIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject config = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.IntoSet;
@@ -226,7 +220,7 @@ class MultibindingGenerationTest {
 
     @Test
     void duplicateInCompilationMapKeysIsAnError() {
-        JavaFileObject a = JavaFileObjects.forSourceString("example.A", """
+        JavaFileObject a = TestCompiler.source("example.A", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -238,7 +232,7 @@ class MultibindingGenerationTest {
                     public A() {}
                 }
                 """);
-        JavaFileObject b = JavaFileObjects.forSourceString("example.B", """
+        JavaFileObject b = TestCompiler.source("example.B", """
                 package example;
 
                 import be.imgn.inject.Inject;

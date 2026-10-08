@@ -1,11 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.IOException;
 import java.util.Optional;
 import javax.tools.JavaFileObject;
@@ -14,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class AssistedGenerationTest {
 
-    private static final JavaFileObject REPORT = JavaFileObjects.forSourceString("example.Report", """
+    private static final JavaFileObject REPORT = TestCompiler.source("example.Report", """
             package example;
 
             import be.imgn.inject.Assisted;
@@ -28,7 +25,7 @@ class AssistedGenerationTest {
 
     @Test
     void generatesImplAndFactory() throws Exception {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -42,7 +39,7 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         assertThat(compilation.generatedSourceFile("example.$ReportFactory$$Impl"))
                 .isPresent();
         assertThat(compilation.generatedSourceFile("example.$ReportFactory$$Factory"))
@@ -56,7 +53,7 @@ class AssistedGenerationTest {
 
     @Test
     void implPassesAssistedArgumentsInRecipeOrder() throws Exception {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -70,7 +67,7 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         assertThat(contents(compilation, "example.$ReportFactory$$Impl"))
                 .contains("new Report(")
                 .contains(", id, footer)");
@@ -78,7 +75,7 @@ class AssistedGenerationTest {
 
     @Test
     void memberInjectionRunsInsideCreate() throws IOException {
-        JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
+        JavaFileObject report = TestCompiler.source("example.Report", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -95,7 +92,7 @@ class AssistedGenerationTest {
                     void configure(String note) {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -108,7 +105,7 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(report, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         assertThat(contents(compilation, "example.$ReportFactory$$Impl"))
                 .contains("Report instance = new Report(")
                 .contains("instance.tag = ")
@@ -125,7 +122,7 @@ class AssistedGenerationTest {
 
     @Test
     void assistedParameterTypesAreNotContainerResolved() throws Exception {
-        JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
+        JavaFileObject report = TestCompiler.source("example.Report", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -137,7 +134,7 @@ class AssistedGenerationTest {
                     public Report(String db, @Assisted Context ctx) {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -151,12 +148,12 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(report, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
     }
 
     @Test
     void providesRecipeInvokesHost() throws Exception {
-        JavaFileObject staticConfig = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject staticConfig = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -169,7 +166,7 @@ class AssistedGenerationTest {
                     }
                 }
                 """);
-        JavaFileObject staticFactory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+        JavaFileObject staticFactory = TestCompiler.source("example.ConfigFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -183,10 +180,10 @@ class AssistedGenerationTest {
         Compilation staticCompilation =
                 javac().withProcessors(new InjectProcessor()).compile(staticConfig, staticFactory);
 
-        CompilationSubject.assertThat(staticCompilation).succeeded();
+        CompilationAssert.assertThat(staticCompilation).succeeded();
         assertThat(contents(staticCompilation, "example.$ConfigFactory$$Impl")).contains("Config.legacy(");
 
-        JavaFileObject instanceConfig = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject instanceConfig = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -203,7 +200,7 @@ class AssistedGenerationTest {
                     }
                 }
                 """);
-        JavaFileObject instanceFactory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+        JavaFileObject instanceFactory = TestCompiler.source("example.ConfigFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -217,14 +214,14 @@ class AssistedGenerationTest {
         Compilation instanceCompilation =
                 javac().withProcessors(new InjectProcessor()).compile(instanceConfig, instanceFactory);
 
-        CompilationSubject.assertThat(instanceCompilation).succeeded();
+        CompilationAssert.assertThat(instanceCompilation).succeeded();
         assertThat(contents(instanceCompilation, "example.$ConfigFactory$$Impl"))
                 .contains("context.getProvider(Key.of(Config.class)");
     }
 
     @Test
     void serviceFileListsTheGeneratedFactory() throws Exception {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -238,7 +235,7 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(REPORT, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         Optional<JavaFileObject> serviceFile = compilation.generatedFile(
                 StandardLocation.CLASS_OUTPUT, "META-INF/services/be.imgn.inject.context.Factory");
         assertThat(serviceFile).isPresent();
@@ -248,12 +245,12 @@ class AssistedGenerationTest {
 
     @Test
     void factoryParametersCannotShadowTheContextOrTheGeneratedLocals() throws Exception {
-        JavaFileObject dep = JavaFileObjects.forSourceString("example.Dep", """
+        JavaFileObject dep = TestCompiler.source("example.Dep", """
                 package example;
 
                 public class Dep {}
                 """);
-        JavaFileObject widget = JavaFileObjects.forSourceString("example.Widget", """
+        JavaFileObject widget = TestCompiler.source("example.Widget", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -265,7 +262,7 @@ class AssistedGenerationTest {
                     public Widget(Dep dep, @Assisted Injector context, @Assisted("label") String instance) {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.WidgetFactory", """
+        JavaFileObject factory = TestCompiler.source("example.WidgetFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -280,7 +277,7 @@ class AssistedGenerationTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(dep, widget, factory);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         assertThat(contents(compilation, "example.$WidgetFactory$$Impl"))
                 .as("container dependencies resolve through the impl's own context, never a caller-supplied one")
                 .contains("this.context.getProvider(Key.of(Dep.class)).get()")

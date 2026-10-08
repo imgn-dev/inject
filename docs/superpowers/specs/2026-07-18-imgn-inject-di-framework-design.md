@@ -297,7 +297,8 @@ cares about.
 - **Runtime unit tests:** `Key` equality (type + nullable qualifier); `SingletonProvider`
   once-only under concurrency; scope wrapping; runtime cycle guard;
   `Provider<T>` injection.
-- **Processor tests:** `google-compile-testing` — assert generated sources and
+- **Processor tests:** an in-process `javax.tools` compiler harness
+  (`TestCompiler`, with AssertJ `CompilationAssert`) — assert generated sources and
   compile errors (missing factory, cycle, no default constructor, `@Provides` on a
   non-method, pre-existing service file conflict).
 - **`inject-examples`:** end-to-end on both classpath and module path; a `@Log`
@@ -341,7 +342,7 @@ public class ScopeResolutionException     extends InjectionException   // no Sco
 ### Testing
 Validation is covered by the JUnit 6 + AssertJ suite: `assertThatThrownBy(...)`
 / `assertThatNullPointerException()` for each boundary, and
-`google-compile-testing` for the processor-side errors.
+the `javax.tools` compiler harness for the processor-side errors.
 
 **AssertJ style:** use AssertJ's fluent chaining — one `assertThat(instance)`
 followed by chained assertions (`.isNotNull().returns(…, from(…)).satisfies(…)`),

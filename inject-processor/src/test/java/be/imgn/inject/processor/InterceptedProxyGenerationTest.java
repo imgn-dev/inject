@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.IOException;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class InterceptedProxyGenerationTest {
 
-    private static final JavaFileObject TIMED = JavaFileObjects.forSourceString("example.Timed", """
+    private static final JavaFileObject TIMED = TestCompiler.source("example.Timed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -30,7 +28,7 @@ class InterceptedProxyGenerationTest {
             }
             """);
 
-    private static final JavaFileObject AUDITED = JavaFileObjects.forSourceString("example.Audited", """
+    private static final JavaFileObject AUDITED = TestCompiler.source("example.Audited", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -47,7 +45,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void generatesAProxyThatChainsToSuper() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orders", """
+        JavaFileObject bean = TestCompiler.source("example.Orders", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -62,7 +60,7 @@ class InterceptedProxyGenerationTest {
                     }
                 }
                 """);
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -78,9 +76,7 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean, config);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Orders$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Orders$$Intercepted");
         proxy.contains("final class $Orders$$Intercepted extends Orders");
         proxy.contains("InterceptedMethod.of(Orders.class, \"place\"");
         proxy.contains("AnnotationValue.of(Timed.class");
@@ -93,13 +89,12 @@ class InterceptedProxyGenerationTest {
 
         assertThat(compilation)
                 .generatedSourceFile("example.$Orders$$Factory")
-                .contentsAsUtf8String()
                 .contains("new $Orders$$Intercepted(context, getInstanceForConstructor(0, context))");
     }
 
     @Test
     void aConstructorParameterNamedContextDoesNotCollideWithTheProxysOwnParameter() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orders", """
+        JavaFileObject bean = TestCompiler.source("example.Orders", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -112,7 +107,7 @@ class InterceptedProxyGenerationTest {
                     public void place() {}
                 }
                 """);
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -130,13 +125,12 @@ class InterceptedProxyGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Orders$$Intercepted")
-                .contentsAsUtf8String()
                 .contains("$Orders$$Intercepted(Context $context, String context)");
     }
 
     @Test
     void classLevelAnnotationWrapsMethodLevelOnesInSourceOrder() throws IOException {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orders", """
+        JavaFileObject bean = TestCompiler.source("example.Orders", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -166,7 +160,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void handlesVoidPrimitiveVarargsAndCheckedExceptions() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Mixed", """
+        JavaFileObject bean = TestCompiler.source("example.Mixed", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -196,9 +190,7 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Mixed$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Mixed$$Intercepted");
         proxy.contains("super.nothing()");
         proxy.contains("return (Integer)");
         proxy.contains("the primitive return type int");
@@ -208,7 +200,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void catchesOnlyTheMostGeneralOfTwoRelatedCheckedExceptions() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Reader", """
+        JavaFileObject bean = TestCompiler.source("example.Reader", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -229,16 +221,14 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Reader$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Reader$$Intercepted");
         proxy.contains("catch (IOException");
         proxy.doesNotContain("catch (FileNotFoundException");
     }
 
     @Test
     void rethrowsInsteadOfWrappingWhenTheMethodDeclaresThrowable() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Risky", """
+        JavaFileObject bean = TestCompiler.source("example.Risky", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -257,16 +247,14 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Risky$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Risky$$Intercepted");
         proxy.contains("public String risky() throws Throwable");
         proxy.doesNotContain("An interceptor threw an undeclared exception");
     }
 
     @Test
     void erasesTypeVariablesAndDeclaresAGenericMethodsJoinpointLocally() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Generic", """
+        JavaFileObject bean = TestCompiler.source("example.Generic", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -290,9 +278,7 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Generic$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Generic$$Intercepted");
         proxy.contains("InterceptedMethod.of(Generic.class, \"identity\", Object.class, List.of(Object.class)");
         proxy.contains("InterceptedMethod.of(Generic.class, \"boxed\", List.class, List.of(List.class)");
         proxy.contains("Joinpoint $joinpoint = $arguments -> super.identity((T) $arguments[0])");
@@ -301,7 +287,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void mirrorsTheInterceptedMethodVisibility() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Visible", """
+        JavaFileObject bean = TestCompiler.source("example.Visible", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -324,9 +310,7 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Visible$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Visible$$Intercepted");
         proxy.contains("protected String guarded()");
         proxy.contains("String local()");
         proxy.doesNotContain("public String local()");
@@ -334,7 +318,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void keepsTheLocalJoinpointsParameterFromShadowingAGenericMethodParameterNamedArguments() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Picker", """
+        JavaFileObject bean = TestCompiler.source("example.Picker", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -358,7 +342,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void keepsTheHoistedJoinpointFieldsParameterFromShadowingAMethodParameterNamedArguments() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Feeder", """
+        JavaFileObject bean = TestCompiler.source("example.Feeder", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -379,13 +363,12 @@ class InterceptedProxyGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Feeder$$Intercepted")
-                .contentsAsUtf8String()
                 .contains("$arguments -> super.feed((String) $arguments[0])");
     }
 
     @Test
     void suppressesUncheckedForAGenericArrayParameter() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Shapes", """
+        JavaFileObject bean = TestCompiler.source("example.Shapes", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -404,13 +387,12 @@ class InterceptedProxyGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Shapes$$Intercepted")
-                .contentsAsUtf8String()
                 .contains("@SuppressWarnings(\"unchecked\")");
     }
 
     @Test
     void classLevelSweepInterceptsAnOverloadedEqualsButSkipsTheRealOne() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Money", """
+        JavaFileObject bean = TestCompiler.source("example.Money", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -439,16 +421,14 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Money$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Money$$Intercepted");
         proxy.contains("equals(String currency)");
         proxy.doesNotContain("equals(Object other)");
     }
 
     @Test
     void methodLevelAnnotationOnAnOverloadedEqualsIsAccepted() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Money", """
+        JavaFileObject bean = TestCompiler.source("example.Money", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -471,7 +451,7 @@ class InterceptedProxyGenerationTest {
 
     @Test
     void declaresThrowableWithATypeAnnotationStillSuppressesWrapping() {
-        JavaFileObject marker = JavaFileObjects.forSourceString("example.Marked", """
+        JavaFileObject marker = TestCompiler.source("example.Marked", """
                 package example;
 
                 import java.lang.annotation.ElementType;
@@ -480,7 +460,7 @@ class InterceptedProxyGenerationTest {
                 @Target(ElementType.TYPE_USE)
                 public @interface Marked {}
                 """);
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Risky", """
+        JavaFileObject bean = TestCompiler.source("example.Risky", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -499,9 +479,7 @@ class InterceptedProxyGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, marker, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject proxy = assertThat(compilation)
-                .generatedSourceFile("example.$Risky$$Intercepted")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> proxy = assertThat(compilation).generatedSourceFile("example.$Risky$$Intercepted");
         proxy.contains("public String risky() throws Throwable");
         proxy.doesNotContain("An interceptor threw an undeclared exception");
     }

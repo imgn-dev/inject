@@ -1,10 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.junit.jupiter.api.Test;
 
@@ -12,14 +10,14 @@ class ValidationTest {
 
     @Test
     void failsWhenDependencyHasNoFactoryAndNoNoArgConstructor() {
-        JavaFileObject noDefault = JavaFileObjects.forSourceString("example.NoDefault", """
+        JavaFileObject noDefault = TestCompiler.source("example.NoDefault", """
                 package example;
 
                 public class NoDefault {
                     public NoDefault(int value) {}
                 }
                 """);
-        JavaFileObject client = JavaFileObjects.forSourceString("example.Client", """
+        JavaFileObject client = TestCompiler.source("example.Client", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -38,7 +36,7 @@ class ValidationTest {
 
     @Test
     void failsOnDependencyCycle() {
-        JavaFileObject a = JavaFileObjects.forSourceString("example.A", """
+        JavaFileObject a = TestCompiler.source("example.A", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -48,7 +46,7 @@ class ValidationTest {
                     public A(B b) {}
                 }
                 """);
-        JavaFileObject b = JavaFileObjects.forSourceString("example.B", """
+        JavaFileObject b = TestCompiler.source("example.B", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -67,7 +65,7 @@ class ValidationTest {
 
     @Test
     void providerDependencyBreaksCycle() {
-        JavaFileObject a = JavaFileObjects.forSourceString("example.A", """
+        JavaFileObject a = TestCompiler.source("example.A", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -78,7 +76,7 @@ class ValidationTest {
                     public A(Provider<B> b) {}
                 }
                 """);
-        JavaFileObject b = JavaFileObjects.forSourceString("example.B", """
+        JavaFileObject b = TestCompiler.source("example.B", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -98,7 +96,7 @@ class ValidationTest {
 
     @Test
     void rejectsPrivateInjectField() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;

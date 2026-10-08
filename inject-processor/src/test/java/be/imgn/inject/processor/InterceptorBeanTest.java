@@ -1,17 +1,15 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class InterceptorBeanTest {
 
-    private static final JavaFileObject TIMED = JavaFileObjects.forSourceString("example.Timed", """
+    private static final JavaFileObject TIMED = TestCompiler.source("example.Timed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -30,7 +28,7 @@ class InterceptorBeanTest {
 
     @Test
     void interceptorBeanFactoryReportsTheHandledAnnotation() {
-        JavaFileObject interceptor = JavaFileObjects.forSourceString("example.TimingInterceptor", """
+        JavaFileObject interceptor = TestCompiler.source("example.TimingInterceptor", """
                 package example;
 
                 import be.imgn.inject.Intercepts;
@@ -51,16 +49,15 @@ class InterceptorBeanTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, interceptor);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$TimingInterceptor$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$TimingInterceptor$$Factory");
         source.contains("protected Optional<Class<? extends Annotation>> intercepts()");
         source.contains("return Optional.of(Timed.class)");
     }
 
     @Test
     void interceptorBeanDoesNotClaimTheMethodInterceptorKey() {
-        JavaFileObject interceptor = JavaFileObjects.forSourceString("example.TimingInterceptor", """
+        JavaFileObject interceptor = TestCompiler.source("example.TimingInterceptor", """
                 package example;
 
                 import be.imgn.inject.Intercepts;
@@ -81,13 +78,12 @@ class InterceptorBeanTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$TimingInterceptor$$Factory")
-                .contentsAsUtf8String()
                 .doesNotContain("MethodInterceptor.class");
     }
 
     @Test
     void interceptsOnANonInterceptorIsRejected() {
-        JavaFileObject notAnInterceptor = JavaFileObjects.forSourceString("example.Bogus", """
+        JavaFileObject notAnInterceptor = TestCompiler.source("example.Bogus", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -108,7 +104,7 @@ class InterceptorBeanTest {
 
     @Test
     void anInterceptingAnnotationIsCapturedAsAStereotype() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject bean = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -125,9 +121,7 @@ class InterceptorBeanTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Service$$Factory");
         source.contains("AnnotationValue.of(Timed.class");
         source.contains("InterceptingAnnotation.class");
     }

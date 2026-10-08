@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class ProvidesTest {
 
     @Test
     void generatesFactoryForStaticProvidesMethod() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -29,9 +27,8 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$provideName$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$Config$provideName$$Factory");
         source.contains("extends Factory<String>");
         source.contains("super(String.class)");
         source.contains("return Config.provideName()");
@@ -39,7 +36,7 @@ class ProvidesTest {
 
     @Test
     void generatesFactoryForInstanceProvidesMethodResolvingHostFirst() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -55,9 +52,8 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$provideName$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$Config$provideName$$Factory");
         source.contains("new Parameter(\"host\", Config.class)");
         source.contains("Config host = getInstanceForConstructor(0, context)");
         source.contains("return host.provideName()");
@@ -67,7 +63,7 @@ class ProvidesTest {
 
     @Test
     void resolvesProvidesMethodParameters() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -83,16 +79,15 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$greeting$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$Config$greeting$$Factory");
         source.contains("new Parameter(\"count\", Integer.class,");
         source.contains("return Config.greeting(getInstanceForConstructor(0, context))");
     }
 
     @Test
     void appliesQualifierAndScopeFromProvidesMethod() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Named;
@@ -112,9 +107,7 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$url$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$url$$Factory");
         source.contains("Key.of(String.class,");
         source.contains("Names.named(\"db\")");
         source.contains("return Optional.of(Singleton.class)");
@@ -123,10 +116,10 @@ class ProvidesTest {
     @Test
     void exposeAsNarrowsTheProvidesResult() {
         JavaFileObject engine =
-                JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
-        JavaFileObject v8 = JavaFileObjects.forSourceString(
+                TestCompiler.source("example.Engine", "package example;\n\npublic interface Engine {}\n");
+        JavaFileObject v8 = TestCompiler.source(
                 "example.V8Engine", "package example;\n\npublic class V8Engine implements Engine {}\n");
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -144,9 +137,7 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$engine$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$engine$$Factory");
         source.contains("Key.of(Engine.class)");
         source.doesNotContain("Key.of(V8Engine.class)");
     }
@@ -154,10 +145,10 @@ class ProvidesTest {
     @Test
     void exposeAsOnProvidesAppliesTheMethodQualifier() {
         JavaFileObject engine =
-                JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
-        JavaFileObject v8 = JavaFileObjects.forSourceString(
+                TestCompiler.source("example.Engine", "package example;\n\npublic interface Engine {}\n");
+        JavaFileObject v8 = TestCompiler.source(
                 "example.V8Engine", "package example;\n\npublic class V8Engine implements Engine {}\n");
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -177,16 +168,14 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$engine$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$engine$$Factory");
         source.contains("Key.of(Engine.class,");
         source.contains("Names.named(\"fast\")");
     }
 
     @Test
     void disambiguatesOverloadedProvidesMethods() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;

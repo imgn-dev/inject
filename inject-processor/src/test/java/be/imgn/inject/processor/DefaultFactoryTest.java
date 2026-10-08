@@ -1,17 +1,15 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class DefaultFactoryTest {
 
-    private static final JavaFileObject CONFIG = JavaFileObjects.forSourceString("example.Config", """
+    private static final JavaFileObject CONFIG = TestCompiler.source("example.Config", """
             package example;
 
             public class Config {
@@ -33,12 +31,12 @@ class DefaultFactoryTest {
 
     @Test
     void generatesDefaultFactoryForUndeclaredDependencyWithNoArgConstructor() {
-        JavaFileObject repo = JavaFileObjects.forSourceString("example.Repo", """
+        JavaFileObject repo = TestCompiler.source("example.Repo", """
                 package example;
 
                 public class Repo {}
                 """);
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -54,12 +52,8 @@ class DefaultFactoryTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String()
                 .contains("new Parameter(\"repo\", Repo.class,");
-        assertThat(compilation)
-                .generatedSourceFile("example.$Repo$$Factory")
-                .contentsAsUtf8String()
-                .contains("return new Repo()");
+        assertThat(compilation).generatedSourceFile("example.$Repo$$Factory").contains("return new Repo()");
     }
 
     @Test
@@ -85,17 +79,17 @@ class DefaultFactoryTest {
 
     @Test
     void noDefaultFactoryForAnInterfaceOrAbstractClass() {
-        JavaFileObject store = JavaFileObjects.forSourceString("example.Store", """
+        JavaFileObject store = TestCompiler.source("example.Store", """
                 package example;
 
                 public interface Store {}
                 """);
-        JavaFileObject base = JavaFileObjects.forSourceString("example.Base", """
+        JavaFileObject base = TestCompiler.source("example.Base", """
                 package example;
 
                 public abstract class Base {}
                 """);
-        JavaFileObject consumer = JavaFileObjects.forSourceString("example.Consumer", """
+        JavaFileObject consumer = TestCompiler.source("example.Consumer", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -115,7 +109,7 @@ class DefaultFactoryTest {
     }
 
     private static JavaFileObject consumerOf(String type) {
-        return JavaFileObjects.forSourceString("example.Consumer", """
+        return TestCompiler.source("example.Consumer", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -128,7 +122,7 @@ class DefaultFactoryTest {
     }
 
     private static JavaFileObject configModule(String annotations) {
-        return JavaFileObjects.forSourceString("example.ConfigModule", """
+        return TestCompiler.source("example.ConfigModule", """
                 package example;
 
                 import be.imgn.inject.Default;

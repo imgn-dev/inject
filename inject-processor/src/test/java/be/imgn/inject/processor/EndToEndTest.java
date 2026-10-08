@@ -1,12 +1,9 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import be.imgn.inject.Injector;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -20,7 +17,7 @@ class EndToEndTest {
 
     @Test
     void injectorResolvesGeneratedFactoriesViaServiceLoader(@TempDir Path outputDir) throws Exception {
-        JavaFileObject widget = JavaFileObjects.forSourceString("example.Widget", """
+        JavaFileObject widget = TestCompiler.source("example.Widget", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -30,7 +27,7 @@ class EndToEndTest {
                     public Widget() {}
                 }
                 """);
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -50,7 +47,7 @@ class EndToEndTest {
                 """);
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(widget, service);
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         writeClassOutput(compilation, outputDir);
 
         try (URLClassLoader loader = new URLClassLoader(

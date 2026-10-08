@@ -1,16 +1,14 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.junit.jupiter.api.Test;
 
 class AssistedFactoryValidationTest {
 
-    private static final JavaFileObject REPORT = JavaFileObjects.forSourceString("example.Report", """
+    private static final JavaFileObject REPORT = TestCompiler.source("example.Report", """
             package example;
 
             import be.imgn.inject.Assisted;
@@ -24,7 +22,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void exactReturnFactoryCompiles() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -43,12 +41,12 @@ class AssistedFactoryValidationTest {
 
     @Test
     void supertypeReturnViaValueCompiles() {
-        JavaFileObject doc = JavaFileObjects.forSourceString("example.Doc", """
+        JavaFileObject doc = TestCompiler.source("example.Doc", """
                 package example;
 
                 public interface Doc {}
                 """);
-        JavaFileObject report = JavaFileObjects.forSourceString("example.Report", """
+        JavaFileObject report = TestCompiler.source("example.Report", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -59,7 +57,7 @@ class AssistedFactoryValidationTest {
                     public Report(String db, @Assisted String id, @Assisted("footer") String footer) {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -78,7 +76,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void parameterMismatchIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -97,7 +95,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void tagMismatchIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -117,7 +115,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void returnNotAssignableIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -137,7 +135,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void methodWithoutValueIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -157,7 +155,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void valueWithoutAssistedConstructorIsAnError() {
-        JavaFileObject dep = JavaFileObjects.forSourceString("example.Dep", """
+        JavaFileObject dep = TestCompiler.source("example.Dep", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -167,7 +165,7 @@ class AssistedFactoryValidationTest {
                     public Dep() {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.DepFactory", """
+        JavaFileObject factory = TestCompiler.source("example.DepFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -186,7 +184,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void providesLinkCompiles() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -199,7 +197,7 @@ class AssistedFactoryValidationTest {
                     }
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ConfigFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -217,7 +215,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void providesLinkUnknownMethodIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -230,7 +228,7 @@ class AssistedFactoryValidationTest {
                     }
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ConfigFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ConfigFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -249,7 +247,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void abstractNonFactoryMethodIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -271,7 +269,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void assistedFactoryOnClassMethodIsAnError() {
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -293,7 +291,7 @@ class AssistedFactoryValidationTest {
 
     @Test
     void overloadedAssistedProvidesLinkIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Overloaded", """
+        JavaFileObject config = TestCompiler.source("example.Overloaded", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -311,7 +309,7 @@ class AssistedFactoryValidationTest {
                     }
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.LegacyFactory", """
+        JavaFileObject factory = TestCompiler.source("example.LegacyFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;

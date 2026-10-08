@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class InjectorInjectionGenerationTest {
 
     @Test
     void injectorSiteCompilesAndRendersPlainKey() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Locator", """
+        JavaFileObject bean = TestCompiler.source("example.Locator", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -29,15 +27,13 @@ class InjectorInjectionGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Locator$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Locator$$Factory");
         source.contains("new Parameter(\"injector\", Injector.class,");
     }
 
     @Test
     void injectingContextIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -57,7 +53,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void injectingProviderOfContextIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -78,7 +74,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void injectingFactoryIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -98,7 +94,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void providingInjectorIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject config = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Injector;
@@ -120,7 +116,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void exposeAsFrameworkTypeIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -147,7 +143,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void intoSetOfFrameworkTypeIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -169,7 +165,7 @@ class InjectorInjectionGenerationTest {
 
     @Test
     void beanImplementingContextIsSilentlyNotExposedAsContext() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Custom", """
+        JavaFileObject bean = TestCompiler.source("example.Custom", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -191,9 +187,7 @@ class InjectorInjectionGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Custom$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Custom$$Factory");
         source.doesNotContain("Key.of(Context.class)");
     }
 }

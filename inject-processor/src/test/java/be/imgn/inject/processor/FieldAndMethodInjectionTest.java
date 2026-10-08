@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class FieldAndMethodInjectionTest {
 
     @Test
     void generatesFieldInjection() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -26,16 +24,14 @@ class FieldAndMethodInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Config$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$$Factory");
         source.contains("new FieldInjectionPoint(this, \"greeting\"");
         source.contains("instance.greeting = getInstanceForField(0, context)");
     }
 
     @Test
     void generatesMethodInjection() {
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -48,9 +44,7 @@ class FieldAndMethodInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Service$$Factory");
         source.contains("new MethodInjectionPoint(this, \"setClock\"");
         source.contains("new Parameter(\"clock\", String.class,");
         source.contains("instance.setClock(getInstanceForMethod(0, 0, context))");
@@ -58,7 +52,7 @@ class FieldAndMethodInjectionTest {
 
     @Test
     void generatesConstructorFieldAndMethodTogether() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bean", """
+        JavaFileObject bean = TestCompiler.source("example.Bean", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -76,9 +70,7 @@ class FieldAndMethodInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Bean$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Bean$$Factory");
         source.contains("super(Bean.class)");
         source.contains("return new Bean(getInstanceForConstructor(0, context))");
         source.contains("instance.counter = getInstanceForField(0, context)");

@@ -1,11 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.tools.JavaFileObject;
@@ -16,7 +13,7 @@ class GeneratedSourceEncodingTest {
 
     @Test
     void nonAsciiQualifiersAreWrittenAsUnicodeEscapes() throws IOException {
-        JavaFileObject consumer = JavaFileObjects.forSourceString("example.Consumer", """
+        JavaFileObject consumer = TestCompiler.source("example.Consumer", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -30,7 +27,7 @@ class GeneratedSourceEncodingTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(consumer);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         String source = compilation
                 .generatedSourceFile("example.$Consumer$$Factory")
                 .orElseThrow()
@@ -45,7 +42,7 @@ class GeneratedSourceEncodingTest {
 
     @Test
     void serviceFileIsUtf8() throws IOException {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Café", """
+        JavaFileObject bean = TestCompiler.source("example.Café", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -58,7 +55,7 @@ class GeneratedSourceEncodingTest {
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         byte[] serviceFile = compilation
                 .generatedFile(StandardLocation.CLASS_OUTPUT, "META-INF/services/be.imgn.inject.context.Factory")
                 .orElseThrow()

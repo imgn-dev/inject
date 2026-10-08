@@ -1,14 +1,11 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -31,7 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class InterceptionLifecycleIntegrationTest {
 
-    private static final JavaFileObject TIMED = JavaFileObjects.forSourceString("example.Timed", """
+    private static final JavaFileObject TIMED = TestCompiler.source("example.Timed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -48,7 +45,7 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
-    private static final JavaFileObject LOG = JavaFileObjects.forSourceString("example.CallLog", """
+    private static final JavaFileObject LOG = TestCompiler.source("example.CallLog", """
             package example;
 
             import be.imgn.inject.Inject;
@@ -73,7 +70,7 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
-    private static final JavaFileObject INTERCEPTOR = JavaFileObjects.forSourceString("example.TimingInterceptor", """
+    private static final JavaFileObject INTERCEPTOR = TestCompiler.source("example.TimingInterceptor", """
             package example;
 
             import be.imgn.inject.Inject;
@@ -102,7 +99,7 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
-    private static final JavaFileObject REPORTER = JavaFileObjects.forSourceString("example.Reporter", """
+    private static final JavaFileObject REPORTER = TestCompiler.source("example.Reporter", """
             package example;
 
             public interface Reporter {
@@ -110,7 +107,7 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
-    private static final JavaFileObject ORDERS_REPORT = JavaFileObjects.forSourceString("example.OrdersReport", """
+    private static final JavaFileObject ORDERS_REPORT = TestCompiler.source("example.OrdersReport", """
             package example;
 
             import be.imgn.inject.ExposeAs;
@@ -149,7 +146,7 @@ class InterceptionLifecycleIntegrationTest {
             }
             """);
 
-    private static final JavaFileObject WORKER = JavaFileObjects.forSourceString("example.Worker", """
+    private static final JavaFileObject WORKER = TestCompiler.source("example.Worker", """
             package example;
 
             import be.imgn.inject.Inject;
@@ -177,7 +174,7 @@ class InterceptionLifecycleIntegrationTest {
             throws Exception {
         Compilation compilation = javac().withProcessors(new InjectProcessor())
                 .compile(TIMED, LOG, INTERCEPTOR, REPORTER, ORDERS_REPORT, WORKER);
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         writeClassOutput(compilation, outputDir);
 
         try (URLClassLoader loader = new URLClassLoader(

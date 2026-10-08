@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class QualifierScopeProviderTest {
 
     @Test
     void generatesQualifierForNamedParameter() {
-        JavaFileObject consumer = JavaFileObjects.forSourceString("example.Consumer", """
+        JavaFileObject consumer = TestCompiler.source("example.Consumer", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -28,15 +26,13 @@ class QualifierScopeProviderTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(consumer);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Consumer$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Consumer$$Factory");
         source.contains("Names.named(\"main\")");
     }
 
     @Test
     void generatesScopeOverrideForSingletonBean() {
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -54,13 +50,12 @@ class QualifierScopeProviderTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String()
                 .contains("return Optional.of(Singleton.class)");
     }
 
     @Test
     void generatesProviderInjectionForProviderParameter() {
-        JavaFileObject lazy = JavaFileObjects.forSourceString("example.Lazy", """
+        JavaFileObject lazy = TestCompiler.source("example.Lazy", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -75,16 +70,14 @@ class QualifierScopeProviderTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(lazy);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Lazy$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Lazy$$Factory");
         source.contains("new Parameter(\"provider\", String.class,");
         source.contains("return new Lazy(getProviderForConstructor(0, context))");
     }
 
     @Test
     void generatesExposedKeysForQualifiedBean() {
-        JavaFileObject tag = JavaFileObjects.forSourceString("example.Tag", """
+        JavaFileObject tag = TestCompiler.source("example.Tag", """
                 package example;
 
                 import be.imgn.inject.QualifyingAnnotation;
@@ -97,7 +90,7 @@ class QualifierScopeProviderTest {
                     String value();
                 }
                 """);
-        JavaFileObject widget = JavaFileObjects.forSourceString("example.Widget", """
+        JavaFileObject widget = TestCompiler.source("example.Widget", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -112,16 +105,14 @@ class QualifierScopeProviderTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(tag, widget);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Widget$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Widget$$Factory");
         source.contains("Key.of(Widget.class,");
         source.contains("$example$Tag$$Impl(\"primary\")");
     }
 
     @Test
     void rendersIntValuedCustomQualifier() {
-        JavaFileObject priority = JavaFileObjects.forSourceString("example.Priority", """
+        JavaFileObject priority = TestCompiler.source("example.Priority", """
                 package example;
 
                 import be.imgn.inject.QualifyingAnnotation;
@@ -131,7 +122,7 @@ class QualifierScopeProviderTest {
                     int value();
                 }
                 """);
-        JavaFileObject task = JavaFileObjects.forSourceString("example.Task", """
+        JavaFileObject task = TestCompiler.source("example.Task", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -145,9 +136,7 @@ class QualifierScopeProviderTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(priority, task);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Task$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Task$$Factory");
         source.contains("$example$Priority$$Impl(5)");
         assertThat(compilation).generatedSourceFile("example.$example$Priority$$Impl");
     }

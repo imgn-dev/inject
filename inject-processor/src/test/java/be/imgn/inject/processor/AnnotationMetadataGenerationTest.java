@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class AnnotationMetadataGenerationTest {
 
     @Test
     void generatesBeanDefinitionMetadataOverride() {
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -29,9 +27,7 @@ class AnnotationMetadataGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Service$$Factory");
         // the bean's own @Singleton is exposed through BeanDefinition.annotationMetadata(), even with a no-arg
         // constructor (which emits no constructor injection point)
         source.contains("public AnnotationMetadata annotationMetadata()");
@@ -40,7 +36,7 @@ class AnnotationMetadataGenerationTest {
 
     @Test
     void capturesConditioningAnnotationWithItsStereotype() {
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Feature", """
+        JavaFileObject service = TestCompiler.source("example.Feature", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -56,9 +52,7 @@ class AnnotationMetadataGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Feature$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Feature$$Factory");
         source.contains("public AnnotationMetadata annotationMetadata()");
         source.contains("AnnotationValue.of(ConditionalOnProperty.class");
         source.contains("Map.entry(\"value\", \"feature.on\")");
@@ -67,7 +61,7 @@ class AnnotationMetadataGenerationTest {
 
     @Test
     void capturesQualifierAndScopeAnnotationsAtTheirSites() {
-        JavaFileObject service = JavaFileObjects.forSourceString("example.Service", """
+        JavaFileObject service = TestCompiler.source("example.Service", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -84,9 +78,7 @@ class AnnotationMetadataGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(service);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Service$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Service$$Factory");
         // the bean's @Singleton lands on the constructor injection point, with its scoping stereotype
         source.contains("AnnotationValue.of(Singleton.class, Map.of(), Set.of(ScopingAnnotation.class))");
         // the parameter's @Named lands on the parameter, with its qualifying stereotype
@@ -96,7 +88,7 @@ class AnnotationMetadataGenerationTest {
 
     @Test
     void emitsEmptyMetadataWhenNoFrameworkAnnotationIsPresent() {
-        JavaFileObject plain = JavaFileObjects.forSourceString("example.Plain", """
+        JavaFileObject plain = TestCompiler.source("example.Plain", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -110,15 +102,12 @@ class AnnotationMetadataGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(plain);
 
         assertThat(compilation).succeeded();
-        assertThat(compilation)
-                .generatedSourceFile("example.$Plain$$Factory")
-                .contentsAsUtf8String()
-                .contains("AnnotationMetadata.empty()");
+        assertThat(compilation).generatedSourceFile("example.$Plain$$Factory").contains("AnnotationMetadata.empty()");
     }
 
     @Test
     void metadataNeedsNoGeneratedImplementationClass() {
-        JavaFileObject scope = JavaFileObjects.forSourceString("example.Job", """
+        JavaFileObject scope = TestCompiler.source("example.Job", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -142,15 +131,12 @@ class AnnotationMetadataGenerationTest {
 
         assertThat(compilation).succeeded();
         // scoping/injecting annotations are recorded as data, so no implementation class is emitted for them
-        assertThat(compilation)
-                .generatedSourceFile("example.$Job$$Factory")
-                .contentsAsUtf8String()
-                .doesNotContain("$$Impl");
+        assertThat(compilation).generatedSourceFile("example.$Job$$Factory").doesNotContain("$$Impl");
     }
 
     @Test
     void generatesImplIntoTheUsingPackageNotTheAnnotationPackage() {
-        JavaFileObject tag = JavaFileObjects.forSourceString("tags.Tag", """
+        JavaFileObject tag = TestCompiler.source("tags.Tag", """
                 package tags;
 
                 import be.imgn.inject.QualifyingAnnotation;
@@ -160,7 +146,7 @@ class AnnotationMetadataGenerationTest {
                     String value();
                 }
                 """);
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bean", """
+        JavaFileObject bean = TestCompiler.source("example.Bean", """
                 package example;
 
                 import be.imgn.inject.Inject;

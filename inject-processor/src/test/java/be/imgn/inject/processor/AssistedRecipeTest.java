@@ -1,17 +1,15 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class AssistedRecipeTest {
 
-    private static final JavaFileObject ASSISTED_BEAN = JavaFileObjects.forSourceString("example.Report", """
+    private static final JavaFileObject ASSISTED_BEAN = TestCompiler.source("example.Report", """
             package example;
 
             import be.imgn.inject.Assisted;
@@ -25,7 +23,7 @@ class AssistedRecipeTest {
 
     @Test
     void assistedBeanGeneratesNoOwnFactory() {
-        JavaFileObject dep = JavaFileObjects.forSourceString("example.Dep", """
+        JavaFileObject dep = TestCompiler.source("example.Dep", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -47,7 +45,7 @@ class AssistedRecipeTest {
 
     @Test
     void injectingAnAssistedBeanDirectlyIsAnError() {
-        JavaFileObject consumer = JavaFileObjects.forSourceString("example.Consumer", """
+        JavaFileObject consumer = TestCompiler.source("example.Consumer", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -66,7 +64,7 @@ class AssistedRecipeTest {
 
     @Test
     void providesParameterReferencingAssistedBeanIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -87,7 +85,7 @@ class AssistedRecipeTest {
 
     @Test
     void assistedRecipeContainerParamReferencingAssistedBeanIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -107,7 +105,7 @@ class AssistedRecipeTest {
 
     @Test
     void conditionalAssistedBeanIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -129,7 +127,7 @@ class AssistedRecipeTest {
 
     @Test
     void scopedAssistedBeanIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -151,7 +149,7 @@ class AssistedRecipeTest {
 
     @Test
     void qualifiedOrExposedOrContributedAssistedBeanIsAnError() {
-        JavaFileObject exposed = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject exposed = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -177,7 +175,7 @@ class AssistedRecipeTest {
 
     @Test
     void assistedProvidesMethodBindsNothing() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -200,7 +198,7 @@ class AssistedRecipeTest {
 
     @Test
     void scopedAssistedProvidesIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -224,7 +222,7 @@ class AssistedRecipeTest {
 
     @Test
     void misplacedAssistedIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -247,7 +245,7 @@ class AssistedRecipeTest {
 
     @Test
     void misplacedAssistedOnAssistedBeanMethodIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -270,14 +268,14 @@ class AssistedRecipeTest {
 
     @Test
     void containerDependencyOfAssistedRecipeGetsADefaultFactory() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.SomeConfig", """
+        JavaFileObject config = TestCompiler.source("example.SomeConfig", """
                 package example;
 
                 public class SomeConfig {
                     public SomeConfig() {}
                 }
                 """);
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Report", """
+        JavaFileObject bean = TestCompiler.source("example.Report", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -297,7 +295,7 @@ class AssistedRecipeTest {
 
     @Test
     void hostOfInstanceAssistedProvidesGetsADefaultFactory() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.HostConfig", """
+        JavaFileObject config = TestCompiler.source("example.HostConfig", """
                 package example;
 
                 import be.imgn.inject.Assisted;

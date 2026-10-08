@@ -1,19 +1,17 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class LifecycleGenerationTest {
 
     @Test
     void generatesPostConstructAndPreDestroyOverrides() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Db", """
+        JavaFileObject bean = TestCompiler.source("example.Db", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -37,9 +35,7 @@ class LifecycleGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Db$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Db$$Factory");
         source.contains("protected void postConstruct(Db instance)");
         source.contains("instance.connect()");
         source.contains("protected void preDestroy(Db instance)");
@@ -50,7 +46,7 @@ class LifecycleGenerationTest {
 
     @Test
     void prototypeWithPostConstructOnlyGeneratesNoPreDestroy() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Task", """
+        JavaFileObject bean = TestCompiler.source("example.Task", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -68,16 +64,14 @@ class LifecycleGenerationTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Task$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Task$$Factory");
         source.contains("instance.start()");
         source.doesNotContain("hasPreDestroy");
     }
 
     @Test
     void assistedBeanCallsPostConstructInCreate() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Report", """
+        JavaFileObject bean = TestCompiler.source("example.Report", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -92,7 +86,7 @@ class LifecycleGenerationTest {
                     void render() {}
                 }
                 """);
-        JavaFileObject factory = JavaFileObjects.forSourceString("example.ReportFactory", """
+        JavaFileObject factory = TestCompiler.source("example.ReportFactory", """
                 package example;
 
                 import be.imgn.inject.AssistedFactory;
@@ -108,13 +102,12 @@ class LifecycleGenerationTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$ReportFactory$$Impl")
-                .contentsAsUtf8String()
                 .contains("instance.render()");
     }
 
     @Test
     void preDestroyOnUnscopedBeanIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -137,7 +130,7 @@ class LifecycleGenerationTest {
 
     @Test
     void preDestroyOnAssistedBeanIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -161,7 +154,7 @@ class LifecycleGenerationTest {
 
     @Test
     void twoPostConstructMethodsIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -187,7 +180,7 @@ class LifecycleGenerationTest {
 
     @Test
     void callbackWithParametersIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -210,7 +203,7 @@ class LifecycleGenerationTest {
 
     @Test
     void privateCallbackIsAnError() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.Inject;

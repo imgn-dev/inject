@@ -1,10 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +10,7 @@ class CollectionInjectionTest {
 
     @Test
     void rendersSetDependencyWithTypesSetOf() {
-        JavaFileObject router = JavaFileObjects.forSourceString("example.Router", """
+        JavaFileObject router = TestCompiler.source("example.Router", """
                 package example;
 
                 import java.util.Set;
@@ -27,15 +25,12 @@ class CollectionInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(router);
 
         assertThat(compilation).succeeded();
-        assertThat(compilation)
-                .generatedSourceFile("example.$Router$$Factory")
-                .contentsAsUtf8String()
-                .contains("Types.setOf(String.class)");
+        assertThat(compilation).generatedSourceFile("example.$Router$$Factory").contains("Types.setOf(String.class)");
     }
 
     @Test
     void rendersMapDependencyWithTypesMapOf() {
-        JavaFileObject router = JavaFileObjects.forSourceString("example.Router", """
+        JavaFileObject router = TestCompiler.source("example.Router", """
                 package example;
 
                 import java.util.Map;
@@ -52,13 +47,12 @@ class CollectionInjectionTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Router$$Factory")
-                .contentsAsUtf8String()
                 .contains("Types.mapOf(String.class, Integer.class)");
     }
 
     @Test
     void providerOfSetComposes() {
-        JavaFileObject lazy = JavaFileObjects.forSourceString("example.Lazy", """
+        JavaFileObject lazy = TestCompiler.source("example.Lazy", """
                 package example;
 
                 import java.util.Set;
@@ -74,19 +68,15 @@ class CollectionInjectionTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(lazy);
 
         assertThat(compilation).succeeded();
+        assertThat(compilation).generatedSourceFile("example.$Lazy$$Factory").contains("Types.setOf(String.class)");
         assertThat(compilation)
                 .generatedSourceFile("example.$Lazy$$Factory")
-                .contentsAsUtf8String()
-                .contains("Types.setOf(String.class)");
-        assertThat(compilation)
-                .generatedSourceFile("example.$Lazy$$Factory")
-                .contentsAsUtf8String()
                 .contains("getProviderForConstructor(0, context)");
     }
 
     @Test
     void rawSetIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import java.util.Set;
@@ -107,7 +97,7 @@ class CollectionInjectionTest {
 
     @Test
     void nonStringMapKeyIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import java.util.Map;
@@ -127,12 +117,12 @@ class CollectionInjectionTest {
 
     @Test
     void providesReturningParameterizedSetExposesTheCollectionKey() {
-        JavaFileObject handler = JavaFileObjects.forSourceString("example.Handler", """
+        JavaFileObject handler = TestCompiler.source("example.Handler", """
                 package example;
 
                 public interface Handler {}
                 """);
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import java.util.Set;
@@ -151,13 +141,12 @@ class CollectionInjectionTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Config$handlers$$Factory")
-                .contentsAsUtf8String()
                 .contains("Key.of(Types.setOf(Handler.class))");
     }
 
     @Test
     void providesReturningRawSetCompilesWithoutTheCollectionKeyOverride() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import java.util.Set;
@@ -177,13 +166,12 @@ class CollectionInjectionTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Config$handlers$$Factory")
-                .contentsAsUtf8String()
                 .doesNotContain("exposedKeys");
     }
 
     @Test
     void setOfProviderIsAnError() {
-        JavaFileObject bad = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bad = TestCompiler.source("example.Bad", """
                 package example;
 
                 import java.util.Set;

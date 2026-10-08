@@ -1,10 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +10,7 @@ class DefaultBindingProcessorTest {
 
     @Test
     void generatesIsDefaultOverrideForDefaultProvidesMethod() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Default;
@@ -32,13 +30,12 @@ class DefaultBindingProcessorTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Config$provideName$$Factory")
-                .contentsAsUtf8String()
                 .contains("protected boolean isDefault()");
     }
 
     @Test
     void ordinaryProvidesMethodGetsNoIsDefaultOverride() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Provides;
@@ -56,13 +53,12 @@ class DefaultBindingProcessorTest {
         assertThat(compilation).succeeded();
         assertThat(compilation)
                 .generatedSourceFile("example.$Config$provideName$$Factory")
-                .contentsAsUtf8String()
                 .doesNotContain("isDefault");
     }
 
     @Test
     void defaultWithoutProvidesIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Default;
@@ -83,7 +79,7 @@ class DefaultBindingProcessorTest {
 
     @Test
     void defaultWithIntoSetIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Default;
@@ -108,7 +104,7 @@ class DefaultBindingProcessorTest {
 
     @Test
     void defaultWithIntoMapIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Default;
@@ -133,7 +129,7 @@ class DefaultBindingProcessorTest {
 
     @Test
     void defaultOnAnAssistedRecipeIsAnError() {
-        JavaFileObject config = JavaFileObjects.forSourceString("example.Config", """
+        JavaFileObject config = TestCompiler.source("example.Config", """
                 package example;
 
                 import be.imgn.inject.Assisted;

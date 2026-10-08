@@ -112,7 +112,7 @@ processor-side validation.
   default wins when the condition fails; duplicate live defaults throw
   `DuplicateBindingException`; a scoped default is wrapped once; default-only key
   with failing condition throws `UnsatisfiedDependencyException`.
-- **Processor (`google-compile-testing`):** the prohibition matrix of §4; the
+- **Processor (`javax.tools` harness):** the prohibition matrix of §4; the
   generated factory overrides `isDefault()`.
 - **Examples:** `inject-examples` adds a conditional bean plus its noop default;
   `inject-examples-module` mirrors it on the module path.

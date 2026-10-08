@@ -1,23 +1,21 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.common.truth.StringSubject;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import javax.tools.JavaFileObject;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 
 class ExposeAsTest {
 
     @Test
     void defaultExposesBeanPlusAllSupertypes() {
-        JavaFileObject base = JavaFileObjects.forSourceString(
-                "example.BaseRepository", "package example;\n\npublic class BaseRepository {}\n");
-        JavaFileObject audit = JavaFileObjects.forSourceString(
+        JavaFileObject base =
+                TestCompiler.source("example.BaseRepository", "package example;\n\npublic class BaseRepository {}\n");
+        JavaFileObject audit = TestCompiler.source(
                 "example.RepositoryAuditable", "package example;\n\npublic interface RepositoryAuditable {}\n");
-        JavaFileObject repo = JavaFileObjects.forSourceString("example.UserRepository", """
+        JavaFileObject repo = TestCompiler.source("example.UserRepository", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -31,9 +29,8 @@ class ExposeAsTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(base, audit, repo);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$UserRepository$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$UserRepository$$Factory");
         source.contains("Key.of(UserRepository.class)");
         source.contains("Key.of(RepositoryAuditable.class)");
         source.contains("Key.of(BaseRepository.class)");
@@ -41,10 +38,9 @@ class ExposeAsTest {
 
     @Test
     void defaultExposureExcludesSerializable() {
-        JavaFileObject base = JavaFileObjects.forSourceString("example.Y", "package example;\n\npublic class Y {}\n");
-        JavaFileObject iface =
-                JavaFileObjects.forSourceString("example.Z", "package example;\n\npublic interface Z {}\n");
-        JavaFileObject x = JavaFileObjects.forSourceString("example.X", """
+        JavaFileObject base = TestCompiler.source("example.Y", "package example;\n\npublic class Y {}\n");
+        JavaFileObject iface = TestCompiler.source("example.Z", "package example;\n\npublic interface Z {}\n");
+        JavaFileObject x = TestCompiler.source("example.X", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -59,9 +55,7 @@ class ExposeAsTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(base, iface, x);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$X$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$X$$Factory");
         source.contains("Key.of(X.class)");
         source.contains("Key.of(Y.class)");
         source.contains("Key.of(Z.class)");
@@ -71,8 +65,8 @@ class ExposeAsTest {
     @Test
     void exposeAsNarrowsToExactlyTheListedType() {
         JavaFileObject engine =
-                JavaFileObjects.forSourceString("example.Engine", "package example;\n\npublic interface Engine {}\n");
-        JavaFileObject v8 = JavaFileObjects.forSourceString("example.V8Engine", """
+                TestCompiler.source("example.Engine", "package example;\n\npublic interface Engine {}\n");
+        JavaFileObject v8 = TestCompiler.source("example.V8Engine", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -91,9 +85,7 @@ class ExposeAsTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$V8Engine$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$V8Engine$$Factory");
         source.contains("Key.of(Engine.class)");
         source.doesNotContain("Key.of(V8Engine.class)");
         source.doesNotContain("Serializable");
@@ -102,12 +94,12 @@ class ExposeAsTest {
     @Test
     void exposeAsAcceptsMultipleTypes() {
         JavaFileObject printer =
-                JavaFileObjects.forSourceString("example.Printer", "package example;\n\npublic interface Printer {}\n");
+                TestCompiler.source("example.Printer", "package example;\n\npublic interface Printer {}\n");
         JavaFileObject scanner =
-                JavaFileObjects.forSourceString("example.Scanner", "package example;\n\npublic interface Scanner {}\n");
+                TestCompiler.source("example.Scanner", "package example;\n\npublic interface Scanner {}\n");
         JavaFileObject copier =
-                JavaFileObjects.forSourceString("example.Copier", "package example;\n\npublic interface Copier {}\n");
-        JavaFileObject device = JavaFileObjects.forSourceString("example.Device", """
+                TestCompiler.source("example.Copier", "package example;\n\npublic interface Copier {}\n");
+        JavaFileObject device = TestCompiler.source("example.Device", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -124,9 +116,7 @@ class ExposeAsTest {
                 javac().withProcessors(new InjectProcessor()).compile(printer, scanner, copier, device);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$Device$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Device$$Factory");
         source.contains("Key.of(Printer.class)");
         source.contains("Key.of(Scanner.class)");
         source.doesNotContain("Key.of(Copier.class)");
@@ -136,10 +126,10 @@ class ExposeAsTest {
     @Test
     void exposeAsAcceptsIndirectSupertype() {
         JavaFileObject vehicle =
-                JavaFileObjects.forSourceString("example.Vehicle", "package example;\n\npublic interface Vehicle {}\n");
-        JavaFileObject car = JavaFileObjects.forSourceString(
-                "example.Car", "package example;\n\npublic interface Car extends Vehicle {}\n");
-        JavaFileObject sportsCar = JavaFileObjects.forSourceString("example.SportsCar", """
+                TestCompiler.source("example.Vehicle", "package example;\n\npublic interface Vehicle {}\n");
+        JavaFileObject car =
+                TestCompiler.source("example.Car", "package example;\n\npublic interface Car extends Vehicle {}\n");
+        JavaFileObject sportsCar = TestCompiler.source("example.SportsCar", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -155,9 +145,7 @@ class ExposeAsTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(vehicle, car, sportsCar);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$SportsCar$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$SportsCar$$Factory");
         source.contains("Key.of(Vehicle.class)");
         source.doesNotContain("Key.of(Car.class)");
         source.doesNotContain("Key.of(SportsCar.class)");
@@ -165,7 +153,7 @@ class ExposeAsTest {
 
     @Test
     void emptyExposeAsFails() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Empty", """
+        JavaFileObject bean = TestCompiler.source("example.Empty", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -186,7 +174,7 @@ class ExposeAsTest {
 
     @Test
     void unrelatedExposeAsFails() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Widget", """
+        JavaFileObject bean = TestCompiler.source("example.Widget", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -207,7 +195,7 @@ class ExposeAsTest {
 
     @Test
     void exposeAsOnMethodWithoutProvidesFails() {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bad", """
+        JavaFileObject bean = TestCompiler.source("example.Bad", """
                 package example;
 
                 import be.imgn.inject.ExposeAs;
@@ -226,9 +214,9 @@ class ExposeAsTest {
 
     @Test
     void qualifierAppliesToEveryExposedKey() {
-        JavaFileObject audit = JavaFileObjects.forSourceString(
+        JavaFileObject audit = TestCompiler.source(
                 "example.RepositoryAuditable", "package example;\n\npublic interface RepositoryAuditable {}\n");
-        JavaFileObject repo = JavaFileObjects.forSourceString("example.UserRepository", """
+        JavaFileObject repo = TestCompiler.source("example.UserRepository", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -244,9 +232,8 @@ class ExposeAsTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(audit, repo);
 
         assertThat(compilation).succeeded();
-        StringSubject source = assertThat(compilation)
-                .generatedSourceFile("example.$UserRepository$$Factory")
-                .contentsAsUtf8String();
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$UserRepository$$Factory");
         source.contains("Key.of(UserRepository.class,");
         source.contains("Key.of(RepositoryAuditable.class,");
         source.contains("Names.named(\"primary-db\")");

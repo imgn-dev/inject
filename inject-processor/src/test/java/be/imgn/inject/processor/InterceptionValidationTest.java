@@ -1,10 +1,8 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.CompilationAssert.assertThat;
+import static be.imgn.inject.processor.TestCompiler.javac;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.IOException;
 import javax.tools.JavaFileObject;
 import org.assertj.core.api.Assertions;
@@ -12,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class InterceptionValidationTest {
 
-    private static final JavaFileObject TIMED = JavaFileObjects.forSourceString("example.Timed", """
+    private static final JavaFileObject TIMED = TestCompiler.source("example.Timed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -29,7 +27,7 @@ class InterceptionValidationTest {
             }
             """);
 
-    private static final JavaFileObject FIELD_TIMED = JavaFileObjects.forSourceString("example.FieldTimed", """
+    private static final JavaFileObject FIELD_TIMED = TestCompiler.source("example.FieldTimed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -46,8 +44,7 @@ class InterceptionValidationTest {
             """);
 
     private static Compilation compile(String name, String source) {
-        return javac().withProcessors(new InjectProcessor())
-                .compile(TIMED, JavaFileObjects.forSourceString(name, source));
+        return javac().withProcessors(new InjectProcessor()).compile(TIMED, TestCompiler.source(name, source));
     }
 
     @Test
@@ -132,9 +129,7 @@ class InterceptionValidationTest {
     @Test
     void rejectedShapeInjectedElsewhereReportsExactlyOneError() {
         Compilation compilation = javac().withProcessors(new InjectProcessor())
-                .compile(
-                        TIMED,
-                        JavaFileObjects.forSourceString("example.Foo", """
+                .compile(TIMED, TestCompiler.source("example.Foo", """
                                 package example;
 
                                 public final class Foo {
@@ -143,8 +138,7 @@ class InterceptionValidationTest {
                                     @Timed
                                     public void run() {}
                                 }
-                                """),
-                        JavaFileObjects.forSourceString("example.Bar", """
+                                """), TestCompiler.source("example.Bar", """
                                 package example;
 
                                 import be.imgn.inject.Inject;
@@ -473,7 +467,7 @@ class InterceptionValidationTest {
     @Test
     void interceptingAnnotationOnFieldOfUnrelatedClassGeneratesNoFactory() {
         Compilation compilation = javac().withProcessors(new InjectProcessor())
-                .compile(FIELD_TIMED, JavaFileObjects.forSourceString("example.Plain", """
+                .compile(FIELD_TIMED, TestCompiler.source("example.Plain", """
                                 package example;
 
                                 public class Plain {

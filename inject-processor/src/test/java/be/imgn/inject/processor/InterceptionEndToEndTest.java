@@ -1,12 +1,9 @@
 package be.imgn.inject.processor;
 
-import static com.google.testing.compile.Compiler.javac;
+import static be.imgn.inject.processor.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import be.imgn.inject.Injector;
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -20,7 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class InterceptionEndToEndTest {
 
-    private static final JavaFileObject TIMED = JavaFileObjects.forSourceString("example.Timed", """
+    private static final JavaFileObject TIMED = TestCompiler.source("example.Timed", """
             package example;
 
             import be.imgn.inject.InterceptingAnnotation;
@@ -37,7 +34,7 @@ class InterceptionEndToEndTest {
             }
             """);
 
-    private static final JavaFileObject LOG = JavaFileObjects.forSourceString("example.CallLog", """
+    private static final JavaFileObject LOG = TestCompiler.source("example.CallLog", """
             package example;
 
             import be.imgn.inject.Inject;
@@ -62,7 +59,7 @@ class InterceptionEndToEndTest {
             }
             """);
 
-    private static final JavaFileObject INTERCEPTOR = JavaFileObjects.forSourceString("example.TimingInterceptor", """
+    private static final JavaFileObject INTERCEPTOR = TestCompiler.source("example.TimingInterceptor", """
             package example;
 
             import be.imgn.inject.Inject;
@@ -94,7 +91,7 @@ class InterceptionEndToEndTest {
 
     @Test
     void interceptsThroughARealInjector(@TempDir Path outputDir) throws Exception {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Orders", """
+        JavaFileObject bean = TestCompiler.source("example.Orders", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -118,7 +115,7 @@ class InterceptionEndToEndTest {
                 """);
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, LOG, INTERCEPTOR, bean);
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         writeClassOutput(compilation, outputDir);
 
         try (URLClassLoader loader = new URLClassLoader(
@@ -147,7 +144,7 @@ class InterceptionEndToEndTest {
 
     @Test
     void constructorCallToAnInterceptedMethodRunsUnintercepted(@TempDir Path outputDir) throws Exception {
-        JavaFileObject bean = JavaFileObjects.forSourceString("example.Bootstrapping", """
+        JavaFileObject bean = TestCompiler.source("example.Bootstrapping", """
                 package example;
 
                 import be.imgn.inject.Inject;
@@ -174,7 +171,7 @@ class InterceptionEndToEndTest {
                 """);
 
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, LOG, INTERCEPTOR, bean);
-        CompilationSubject.assertThat(compilation).succeeded();
+        CompilationAssert.assertThat(compilation).succeeded();
         writeClassOutput(compilation, outputDir);
 
         try (URLClassLoader loader = new URLClassLoader(
