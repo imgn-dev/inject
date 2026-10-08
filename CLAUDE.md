@@ -14,6 +14,7 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
   Checkstyle (shared ruleset + `checkstyle-suppressions.xml`) → compile with
   `-Xlint:all -Werror`, Error Prone + NullAway → tests (Surefire) → JaCoCo →
   Javadoc → dependency analysis.
+- CI, the release workflow and Maven Central publishing: `docs/releasing.md`.
 
 ## Documentation
 

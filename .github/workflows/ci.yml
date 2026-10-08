@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The code targets Java 21, but the build itself needs JDK 24+: the test
+        # JVMs run with --sun-misc-unsafe-memory-access=allow. 25 is the LTS the
+        # release is built with; the newest JDK is built too, because Error Prone
+        # reflects into javac internals and breaks on new releases.
+        java: ['25', '26']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      # verify runs the whole quality pipeline, including the inject-maven-plugin
+      # invoker integration tests. Those child builds resolve only from ~/.m2
+      # (src/it/settings.xml), which this build fills first.
+      - name: Build and verify
+        run: ./mvnw -B --no-transfer-progress clean verify
+
+      - name: Upload test reports and integration test logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-jdk${{ matrix.java }}
+          path: |
+            */target/surefire-reports/
+            inject-maven-plugin/target/it/*/build.log
+          if-no-files-found: ignore

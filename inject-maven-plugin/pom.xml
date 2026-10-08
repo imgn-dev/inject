@@ -13,7 +13,7 @@
     <artifactId>inject-maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
 
-    <name>inject-maven-plugin</name>
+    <name>imgn inject maven plugin</name>
     <description>Registers generated factories as module-info services.</description>
 
     <dependencies>

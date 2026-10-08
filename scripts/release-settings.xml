@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings for a local release, used by scripts/release.sh. The Central Portal user token is read from the
+  environment, never from this file: release.sh prompts for it and exports it to the Maven process only. The server id
+  matches <publishingServerId>central</publishingServerId> in be.imgn.parent:parent.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <servers>
+        <server>
+            <id>central</id>
+            <username>${env.CENTRAL_TOKEN_USERNAME}</username>
+            <password>${env.CENTRAL_TOKEN_PASSWORD}</password>
+        </server>
+    </servers>
+</settings>

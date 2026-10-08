@@ -12,6 +12,9 @@
 
     <artifactId>inject-log</artifactId>
 
+    <name>imgn inject log</name>
+    <description>The @Log injecting annotation: a java.util.logging.Logger named after the declaring class.</description>
+
     <dependencies>
         <dependency>
             <groupId>be.imgn.inject</groupId>

@@ -12,6 +12,9 @@
 
     <artifactId>inject-examples</artifactId>
 
+    <name>imgn inject examples</name>
+    <description>Classpath usage examples and integration tests. Not published.</description>
+
     <properties>
         <!-- Examples are read as source, not as API: they ship no javadoc and are not javadoc-checked. -->
         <maven.javadoc.skip>true</maven.javadoc.skip>

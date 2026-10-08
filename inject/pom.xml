@@ -12,6 +12,9 @@
 
     <artifactId>inject</artifactId>
 
+    <name>imgn inject</name>
+    <description>Runtime and public API of imgn inject, a zero-reflection dependency injection framework for Java.</description>
+
     <dependencies>
         <dependency>
             <groupId>org.jspecify</groupId>

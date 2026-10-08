@@ -16,6 +16,8 @@
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
+    <name>imgn inject parent</name>
+    <description>Build configuration shared by the imgn inject modules.</description>
     <url>https://github.com/ogregoire/imgn-inject</url>
 
     <scm>
@@ -72,6 +74,18 @@
                     <configuration>
                         <!-- Replaces the parent's suppressions file; see the file for what it restates. -->
                         <suppressionsLocation>${maven.multiModuleProjectDirectory}/checkstyle-suppressions.xml</suppressionsLocation>
+                    </configuration>
+                </plugin>
+                <!-- The release profile hands every reactor module to Central; the examples are read as source, not
+                     consumed as artifacts. -->
+                <plugin>
+                    <groupId>org.sonatype.central</groupId>
+                    <artifactId>central-publishing-maven-plugin</artifactId>
+                    <configuration>
+                        <excludeArtifacts>
+                            <excludeArtifact>inject-examples</excludeArtifact>
+                            <excludeArtifact>inject-examples-module</excludeArtifact>
+                        </excludeArtifacts>
                     </configuration>
                 </plugin>
                 <plugin>

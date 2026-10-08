@@ -1,0 +1,17 @@
+version: 2
+
+updates:
+  # "Upgrade deliberately and continuously, rather than in bulk at the last
+  # moment." Every bump lands as a PR that CI must pass.
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies]
