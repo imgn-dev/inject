@@ -59,6 +59,39 @@ public final class Registry {
 Because the plugin runs inside the processor, its output is ordinary generated
 source: visible in the build output, debuggable, and free at runtime.
 
+## Packaging
+
+A plugin ships as two artifacts, mirroring `inject` / `inject-processor`:
+
+- `inject-log` holds the `@Log` annotation and depends only on `inject`. It is
+  a regular dependency of the code that writes `@Log`.
+- `inject-log-processor` holds `LogPlugin` and its `ServiceLoader`
+  registration, and depends on `inject-processor` and JavaPoet. It belongs on
+  the annotation processor path only, so neither it nor its code-generation
+  dependencies reach the application classpath.
+
+```xml
+<dependency>
+    <groupId>be.imgn.inject</groupId>
+    <artifactId>inject-log</artifactId>
+    <version>${inject.version}</version>
+</dependency>
+
+<!-- maven-compiler-plugin -->
+<annotationProcessorPaths>
+    <path>
+        <groupId>be.imgn.inject</groupId>
+        <artifactId>inject-processor</artifactId>
+        <version>${inject.version}</version>
+    </path>
+    <path>
+        <groupId>be.imgn.inject</groupId>
+        <artifactId>inject-log-processor</artifactId>
+        <version>${inject.version}</version>
+    </path>
+</annotationProcessorPaths>
+```
+
 ## Limitations
 
 - A plugin emits an initializer expression for a site; it cannot register

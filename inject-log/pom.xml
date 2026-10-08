@@ -19,15 +19,6 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>be.imgn.inject</groupId>
-            <artifactId>inject-processor</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.palantir.javapoet</groupId>
-            <artifactId>javapoet</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
         </dependency>

@@ -13,6 +13,7 @@
         <module>inject</module>
         <module>inject-processor</module>
         <module>inject-log</module>
+        <module>inject-log-processor</module>
         <module>inject-examples</module>
         <module>inject-maven-plugin</module>
         <module>inject-examples-module</module>

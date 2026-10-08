@@ -1,10 +1,11 @@
-package be.imgn.inject.log;
+package be.imgn.inject.log.processor;
 
 import java.util.Optional;
 
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 
+import be.imgn.inject.log.Log;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
 

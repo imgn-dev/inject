@@ -57,7 +57,7 @@
                         </path>
                         <path>
                             <groupId>be.imgn.inject</groupId>
-                            <artifactId>inject-log</artifactId>
+                            <artifactId>inject-log-processor</artifactId>
                             <version>${project.version}</version>
                         </path>
                     </annotationProcessorPaths>
