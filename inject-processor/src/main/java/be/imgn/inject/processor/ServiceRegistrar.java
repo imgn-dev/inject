@@ -2,7 +2,9 @@ package be.imgn.inject.processor;
 
 import be.imgn.inject.context.Factory;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.tools.FileObject;
@@ -32,7 +34,8 @@ final class ServiceRegistrar {
         }
         try {
             FileObject file = environment.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", FACTORY_SERVICE);
-            try (Writer writer = file.openWriter()) {
+            // ServiceLoader reads provider-configuration files as UTF-8, whatever javac's -encoding.
+            try (Writer writer = new OutputStreamWriter(file.openOutputStream(), StandardCharsets.UTF_8)) {
                 for (String name : factoryNames) {
                     writer.write(name);
                     writer.write('\n');

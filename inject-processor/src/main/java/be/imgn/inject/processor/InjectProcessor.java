@@ -3,9 +3,11 @@ package be.imgn.inject.processor;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import com.palantir.javapoet.JavaFile;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -14,8 +16,10 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,6 +30,8 @@ import org.jspecify.annotations.Nullable;
  */
 @SupportedAnnotationTypes("*")
 public final class InjectProcessor extends AbstractProcessor {
+
+    private static final char LAST_ASCII = 0x7f;
 
     private final List<String> factoryNames = new ArrayList<>();
     private final Set<String> emittedAnnotationImpls = new HashSet<>();
@@ -100,12 +106,40 @@ public final class InjectProcessor extends AbstractProcessor {
     }
 
     private void writeFactory(JavaFile file) {
+        String simpleName = Objects.requireNonNull(file.typeSpec().name(), "generated type name");
+        String qualifiedName = file.packageName().isEmpty() ? simpleName : file.packageName() + "." + simpleName;
         try {
-            file.writeTo(processingEnv.getFiler());
+            JavaFileObject source = processingEnv
+                    .getFiler()
+                    .createSourceFile(
+                            qualifiedName, file.typeSpec().originatingElements().toArray(Element[]::new));
+            try (Writer writer = source.openWriter()) {
+                writer.write(asciiOnly(file.toString()));
+            }
         } catch (IOException e) {
             processingEnv
                     .getMessager()
                     .printMessage(Diagnostic.Kind.ERROR, "Failed to write factory: " + e.getMessage());
         }
+    }
+
+    /**
+     * {@return {@code source} with every non-ASCII character written as a Unicode escape}
+     *
+     * <p>The Filer encodes generated sources with javac's {@code -encoding}, which replaces any character it cannot
+     * represent: two distinct string literals, such as qualifier names or map keys, could then compile to the same
+     * value. A Unicode escape is plain ASCII and denotes the same character under every encoding.
+     */
+    static String asciiOnly(String source) {
+        StringBuilder escaped = new StringBuilder(source.length());
+        for (int index = 0; index < source.length(); index++) {
+            char character = source.charAt(index);
+            if (character <= LAST_ASCII) {
+                escaped.append(character);
+            } else {
+                escaped.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
+            }
+        }
+        return escaped.toString();
     }
 }

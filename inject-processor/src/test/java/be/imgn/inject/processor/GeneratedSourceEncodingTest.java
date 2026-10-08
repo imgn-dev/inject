@@ -1,0 +1,74 @@
+package be.imgn.inject.processor;
+
+import static com.google.testing.compile.Compiler.javac;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.CompilationSubject;
+import com.google.testing.compile.JavaFileObjects;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
+import org.junit.jupiter.api.Test;
+
+class GeneratedSourceEncodingTest {
+
+    @Test
+    void nonAsciiQualifiersAreWrittenAsUnicodeEscapes() throws IOException {
+        JavaFileObject consumer = JavaFileObjects.forSourceString("example.Consumer", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Named;
+
+                public class Consumer {
+                    @Inject
+                    public Consumer(@Named("日") String sun, @Named("月") String moon) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(consumer);
+
+        CompilationSubject.assertThat(compilation).succeeded();
+        String source = compilation
+                .generatedSourceFile("example.$Consumer$$Factory")
+                .orElseThrow()
+                .getCharContent(true)
+                .toString();
+        assertThat(source)
+                .as("an encoding that cannot represent 日 or 月 would otherwise turn both qualifiers into the same value")
+                .matches("\\p{ASCII}*")
+                .contains("Names.named(\"\\u65e5\")")
+                .contains("Names.named(\"\\u6708\")");
+    }
+
+    @Test
+    void serviceFileIsUtf8() throws IOException {
+        JavaFileObject bean = JavaFileObjects.forSourceString("example.Café", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Café {
+                    @Inject
+                    public Café() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bean);
+
+        CompilationSubject.assertThat(compilation).succeeded();
+        byte[] serviceFile = compilation
+                .generatedFile(StandardLocation.CLASS_OUTPUT, "META-INF/services/be.imgn.inject.context.Factory")
+                .orElseThrow()
+                .openInputStream()
+                .readAllBytes();
+        assertThat(new String(serviceFile, StandardCharsets.UTF_8)).isEqualTo("example.$Café$$Factory\n");
+    }
+
+    @Test
+    void asciiOnlyEscapesEveryNonAsciiCharacter() {
+        assertThat(InjectProcessor.asciiOnly("a \"é\" \\ 😀")).isEqualTo("a \"\\u00e9\" \\ \\ud83d\\ude00");
+    }
+}
