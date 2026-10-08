@@ -1,13 +1,5 @@
 package be.imgn.inject.processor;
 
-import java.lang.annotation.Annotation;
-import java.util.List;
-import java.util.Objects;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.util.ElementFilter;
-
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.FieldSpec;
@@ -17,6 +9,13 @@ import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
 import com.palantir.javapoet.WildcardTypeName;
+import java.lang.annotation.Annotation;
+import java.util.List;
+import java.util.Objects;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.ElementFilter;
 
 /**
  * Emits a concrete implementation of an attributed qualifier annotation so it can be used as a value-based binding key

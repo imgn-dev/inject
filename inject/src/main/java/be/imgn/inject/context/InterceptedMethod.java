@@ -1,11 +1,10 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.InterceptorResolutionException;
+import be.imgn.inject.Provider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import be.imgn.inject.InterceptorResolutionException;
-import be.imgn.inject.Provider;
 
 /**
  * An intercepted method's immutable call-site description: what the method is, and which annotations bind interceptors
@@ -34,13 +33,15 @@ public final class InterceptedMethod {
     }
 
     /**
-     * {@return a call-site description}
+     * Returns a call-site description.
      *
      * @param declaringType the type declaring the intercepted method
      * @param methodName the method name
      * @param returnType the return type; {@code void.class} for a void method
      * @param parameterTypes the parameter types, in order
      * @param bindings the intercepting annotations, outermost first; must not be empty
+     * @return a call-site description
+     * @throws IllegalArgumentException if {@code bindings} is empty
      */
     public static InterceptedMethod of(
             Class<?> declaringType,
@@ -59,35 +60,56 @@ public final class InterceptedMethod {
         return new InterceptedMethod(declaringType, methodName, returnType, parameters, copied);
     }
 
-    /** {@return the type declaring the intercepted method} */
+    /**
+     * Returns the type declaring the intercepted method.
+     *
+     * @return the type declaring the intercepted method
+     */
     public Class<?> declaringType() {
         return declaringType;
     }
 
-    /** {@return the method name} */
+    /**
+     * Returns the method name.
+     *
+     * @return the method name
+     */
     public String methodName() {
         return methodName;
     }
 
-    /** {@return the return type} */
+    /**
+     * Returns the return type.
+     *
+     * @return the return type
+     */
     public Class<?> returnType() {
         return returnType;
     }
 
-    /** {@return the parameter types, in order} */
+    /**
+     * Returns the parameter types, in order.
+     *
+     * @return the parameter types, in order
+     */
     public List<Class<?>> parameterTypes() {
         return parameterTypes;
     }
 
-    /** {@return the intercepting annotations, outermost first} */
+    /**
+     * Returns the intercepting annotations, outermost first.
+     *
+     * @return the intercepting annotations, outermost first
+     */
     public List<AnnotationValue> bindings() {
         return bindings;
     }
 
     /**
-     * {@return this call site bound to {@code context}: one interceptor provider per binding, in order}
+     * Returns this call site bound to {@code context}: one interceptor provider per binding, in order.
      *
      * @param context the resolution context
+     * @return this call site bound to {@code context}: one interceptor provider per binding, in order
      * @throws InterceptorResolutionException if a binding has no interceptor bean
      */
     public MethodInterception bind(Context context) {

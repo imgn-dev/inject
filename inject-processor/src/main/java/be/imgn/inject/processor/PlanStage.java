@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.TypeElement;
-
 import org.jspecify.annotations.Nullable;
 
 /** Stage 2: adds default factories for undeclared in-compilation dependencies and rejects dependency cycles. */
@@ -135,10 +134,12 @@ final class PlanStage {
                 continue;
             }
             if (!roundEnv.getRootElements().contains(dependency)) {
-                continue; // library / cross-module type: satisfied elsewhere, checked at runtime
+                // Library / cross-module type: satisfied elsewhere, checked at runtime
+                continue;
             }
             if (models.injectConstructor(dependency).isPresent()) {
-                continue; // already an @Inject bean handled above
+                // Already an @Inject bean handled above
+                continue;
             }
             if (models.hasAccessibleNoArgConstructor(dependency)) {
                 beans.put(dependency, models.defaultModel(dependency));

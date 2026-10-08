@@ -3,6 +3,12 @@ package be.imgn.inject.processor;
 import static com.google.testing.compile.Compiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import be.imgn.inject.Injector;
+import be.imgn.inject.Key;
+import be.imgn.inject.Names;
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.CompilationSubject;
+import com.google.testing.compile.JavaFileObjects;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -10,18 +16,9 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.tools.JavaFileObject;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
-
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import be.imgn.inject.Injector;
-import be.imgn.inject.Key;
-import be.imgn.inject.Names;
 
 /**
  * Pushes one intercepted bean through every container mechanic at once — {@code @ExposeAs}, a qualifier,
@@ -174,6 +171,8 @@ class InterceptionLifecycleIntegrationTest {
             """);
 
     @Test
+    // Closes the injector inside its try block to assert @PreDestroy ran.
+    @SuppressWarnings("try")
     void interceptionSurvivesExposureQualifierScopeLifecycleAndAChildInjector(@TempDir Path outputDir)
             throws Exception {
         Compilation compilation = javac().withProcessors(new InjectProcessor())

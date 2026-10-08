@@ -1,13 +1,12 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-
-import be.imgn.inject.Key;
-import be.imgn.inject.Provider;
 
 /**
  * Base class for per-bean factories. Generated subclasses live in the bean's own package so they can access
@@ -30,7 +29,11 @@ public abstract class Factory<T> implements BeanDefinition {
         this.type = Objects.requireNonNull(type, "type");
     }
 
-    /** {@return the built type} */
+    /**
+     * Returns the built type.
+     *
+     * @return the built type
+     */
     public final Class<T> type() {
         return type;
     }
@@ -182,7 +185,7 @@ public abstract class Factory<T> implements BeanDefinition {
         ConstructorInjectionPoint point = constructorInjectionPoint()
                 .orElseThrow(() -> new IllegalStateException("No constructor injection point for " + type().getName()));
         checkIndex(paramIndex, point.parameters().size(), "constructor");
-        return providerFor(point.<D>keyForParameter(paramIndex), context);
+        return context.getProvider(point.<D>keyForParameter(paramIndex));
     }
 
     /**
@@ -192,6 +195,9 @@ public abstract class Factory<T> implements BeanDefinition {
      * @param context the resolution context
      * @param <D> the dependency type
      */
+    // D is chosen by the generated caller and matches the key at that index; the accessor exists so the
+    // generated code needs no casts.
+    @SuppressWarnings("TypeParameterUnusedInFormals")
     protected final <D> D getInstanceForConstructor(int paramIndex, Context context) {
         return this.<D>getProviderForConstructor(paramIndex, context).get();
     }
@@ -208,7 +214,7 @@ public abstract class Factory<T> implements BeanDefinition {
         Objects.requireNonNull(context, "context");
         MethodInjectionPoint point = methodInjectionPoints().get(methodIndex);
         checkIndex(paramIndex, point.parameters().size(), "method");
-        return providerFor(point.<D>keyForParameter(paramIndex), context);
+        return context.getProvider(point.<D>keyForParameter(paramIndex));
     }
 
     /**
@@ -219,6 +225,7 @@ public abstract class Factory<T> implements BeanDefinition {
      * @param context the resolution context
      * @param <D> the dependency type
      */
+    @SuppressWarnings("TypeParameterUnusedInFormals")
     protected final <D> D getInstanceForMethod(int methodIndex, int paramIndex, Context context) {
         return this.<D>getProviderForMethod(methodIndex, paramIndex, context).get();
     }
@@ -233,7 +240,7 @@ public abstract class Factory<T> implements BeanDefinition {
     protected final <D> Provider<D> getProviderForField(int fieldIndex, Context context) {
         Objects.requireNonNull(context, "context");
         FieldInjectionPoint point = fieldInjectionPoints().get(fieldIndex);
-        return providerFor(point.<D>key(), context);
+        return context.getProvider(point.<D>key());
     }
 
     /**
@@ -243,13 +250,9 @@ public abstract class Factory<T> implements BeanDefinition {
      * @param context the resolution context
      * @param <D> the dependency type
      */
+    @SuppressWarnings("TypeParameterUnusedInFormals")
     protected final <D> D getInstanceForField(int fieldIndex, Context context) {
         return this.<D>getProviderForField(fieldIndex, context).get();
-    }
-
-    @SuppressWarnings("unchecked")
-    private <D> Provider<D> providerFor(Key<D> key, Context context) {
-        return (Provider<D>) context.getProvider(key);
     }
 
     private void checkIndex(int index, int size, String kind) {

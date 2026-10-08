@@ -1,5 +1,32 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.Assisted;
+import be.imgn.inject.ConditioningAnnotation;
+import be.imgn.inject.Default;
+import be.imgn.inject.ExposeAs;
+import be.imgn.inject.Inject;
+import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.Injector;
+import be.imgn.inject.InterceptingAnnotation;
+import be.imgn.inject.Intercepts;
+import be.imgn.inject.IntoMap;
+import be.imgn.inject.IntoSet;
+import be.imgn.inject.PostConstruct;
+import be.imgn.inject.PreDestroy;
+import be.imgn.inject.Provider;
+import be.imgn.inject.Provides;
+import be.imgn.inject.QualifyingAnnotation;
+import be.imgn.inject.context.Context;
+import be.imgn.inject.context.Factory;
+import be.imgn.inject.context.MethodInterceptor;
+import be.imgn.inject.processor.spi.InjectPlugin;
+import be.imgn.inject.processor.spi.InjectionSite;
+import com.palantir.javapoet.ArrayTypeName;
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.TypeVariableName;
 import java.io.Closeable;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
@@ -29,37 +56,7 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-
-import com.palantir.javapoet.ArrayTypeName;
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeName;
-import com.palantir.javapoet.TypeVariableName;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.Assisted;
-import be.imgn.inject.ConditioningAnnotation;
-import be.imgn.inject.Default;
-import be.imgn.inject.ExposeAs;
-import be.imgn.inject.Inject;
-import be.imgn.inject.InjectingAnnotation;
-import be.imgn.inject.Injector;
-import be.imgn.inject.InterceptingAnnotation;
-import be.imgn.inject.Intercepts;
-import be.imgn.inject.IntoMap;
-import be.imgn.inject.IntoSet;
-import be.imgn.inject.PostConstruct;
-import be.imgn.inject.PreDestroy;
-import be.imgn.inject.Provider;
-import be.imgn.inject.Provides;
-import be.imgn.inject.QualifyingAnnotation;
-import be.imgn.inject.context.Context;
-import be.imgn.inject.context.Factory;
-import be.imgn.inject.context.MethodInterceptor;
-import be.imgn.inject.processor.spi.InjectPlugin;
-import be.imgn.inject.processor.spi.InjectionSite;
 
 /**
  * Translates {@code javax.lang.model} elements into the generator's models ({@link BeanModel}, {@link ProvidesModel})
@@ -334,6 +331,17 @@ final class ModelFactory {
         addParameterDependencies(executable, environment.getTypeUtils(), result, true);
     }
 
+    private static void addParameterDependencies(
+            ExecutableElement executable, Types types, List<TypeElement> result, boolean includeProviderTargets) {
+        for (VariableElement parameter : executable.getParameters()) {
+            if (hasInjectingAnnotation(parameter)) {
+                // Plugin-supplied argument, not a context dependency
+                continue;
+            }
+            dependencyElement(parameter.asType(), types, includeProviderTargets).ifPresent(result::add);
+        }
+    }
+
     Optional<ExecutableElement> injectConstructor(TypeElement bean) {
         for (Element enclosed : bean.getEnclosedElements()) {
             if (enclosed.getKind() == ElementKind.CONSTRUCTOR && enclosed.getAnnotation(Inject.class) != null) {
@@ -501,7 +509,8 @@ final class ModelFactory {
                 .map(ExecutableElement.class::cast)
                 .toList();
         if (constructors.isEmpty()) {
-            return true; // implicit default constructor
+            // Implicit default constructor
+            return true;
         }
         return constructors.stream()
                 .anyMatch(constructor -> constructor.getParameters().isEmpty()
@@ -605,6 +614,7 @@ final class ModelFactory {
      *     rather than recomputed so a bean that is both {@code @Intercepts}-annotated and shape-invalid is reported
      *     only once
      */
+    @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength", "checkstyle:ReturnCount"})
     @Nullable
     InterceptionModel interception(TypeElement bean, @Nullable ClassName interceptsAnnotation) {
         Elements elements = environment.getElementUtils();
@@ -638,7 +648,8 @@ final class ModelFactory {
             if (!own.isEmpty() && !eligible) {
                 if (method.getAnnotation(Provides.class) != null) {
                     providesSkipped++;
-                    continue; // Skip @Provides methods silently; diagnostic reported in providesModel
+                    // Skip @Provides methods silently; diagnostic reported in providesModel
+                    continue;
                 }
                 diagnostics.error(ineligibleReason(method), method);
                 return null;
@@ -687,6 +698,7 @@ final class ModelFactory {
     }
 
     /** {@return {@code true} if {@code bean} can be subclassed by a generated proxy; reports why not otherwise} */
+    @SuppressWarnings("checkstyle:ReturnCount")
     private boolean validateInterceptableShape(TypeElement bean) {
         if (bean.getKind() == ElementKind.RECORD) {
             diagnostics.error(
@@ -738,6 +750,7 @@ final class ModelFactory {
     }
 
     /** {@return why a method with its own intercepting annotation cannot be intercepted} */
+    @SuppressWarnings("checkstyle:ReturnCount")
     private static String ineligibleReason(ExecutableElement method) {
         Set<Modifier> modifiers = method.getModifiers();
         String name = method.getSimpleName().toString();
@@ -774,9 +787,9 @@ final class ModelFactory {
         String name = method.getSimpleName().toString();
         List<? extends VariableElement> parameters = method.getParameters();
         if (parameters.isEmpty()) {
-            return name.equals("toString") || name.equals("hashCode");
+            return "toString".equals(name) || "hashCode".equals(name);
         }
-        return name.equals("equals")
+        return "equals".equals(name)
                 && parameters.size() == 1
                 && isObjectType(parameters.get(0).asType());
     }
@@ -933,7 +946,8 @@ final class ModelFactory {
         }
         List<TypeElement> hierarchy = supertypeClosure(bean, types);
         if (hierarchy.size() == 1 && !qualified) {
-            return List.of(); // just the bean type, unqualified: the factory's default key already covers it
+            // Just the bean type, unqualified: the factory's default key already covers it
+            return List.of();
         }
         return hierarchy.stream().map(type -> (TypeName) ClassName.get(type)).toList();
     }
@@ -973,6 +987,7 @@ final class ModelFactory {
     }
 
     /** {@return the element's collection contribution, or {@code null}; reports marker misuse} */
+    @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:ReturnCount"})
     private @Nullable ContributionModel contribution(Element element, TypeMirror contributedType, Types types) {
         IntoSet intoSet = element.getAnnotation(IntoSet.class);
         IntoMap intoMap = element.getAnnotation(IntoMap.class);
@@ -1173,16 +1188,6 @@ final class ModelFactory {
         return false;
     }
 
-    private static void addParameterDependencies(
-            ExecutableElement executable, Types types, List<TypeElement> result, boolean includeProviderTargets) {
-        for (VariableElement parameter : executable.getParameters()) {
-            if (hasInjectingAnnotation(parameter)) {
-                continue; // plugin-supplied argument, not a context dependency
-            }
-            dependencyElement(parameter.asType(), types, includeProviderTargets).ifPresent(result::add);
-        }
-    }
-
     private static Optional<TypeElement> dependencyElement(
             TypeMirror type, Types types, boolean includeProviderTargets) {
         Optional<TypeMirror> inner = providerInner(type);
@@ -1264,6 +1269,7 @@ final class ModelFactory {
      * {@code null} when {@code type} isn't exactly one of those (raw, wrong arity, non-String map key, or a
      * {@code Provider} element); emits no diagnostics, unlike {@link #typeExpression}}
      */
+    @SuppressWarnings("checkstyle:ReturnCount")
     private @Nullable CodeBlock collectionKeyExpression(TypeMirror type, Types types) {
         if (!(type instanceof DeclaredType declared) || !(declared.asElement() instanceof TypeElement element)) {
             return null;

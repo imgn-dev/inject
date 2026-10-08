@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import be.imgn.inject.InterceptorResolutionException;
+import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -16,16 +19,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-import be.imgn.inject.InterceptorResolutionException;
-import be.imgn.inject.Key;
-import be.imgn.inject.Provider;
-
 class MethodInterceptionTest {
-
     @Retention(RetentionPolicy.RUNTIME)
     @interface Outer {}
 
@@ -34,34 +31,6 @@ class MethodInterceptionTest {
 
     private static final AnnotationValue OUTER = AnnotationValue.of(Outer.class, Map.of("value", "o"), Set.of());
     private static final AnnotationValue INNER = AnnotationValue.of(Inner.class, Map.of("value", "i"), Set.of());
-
-    /** A context that resolves interceptors from a fixed map and nothing else. */
-    record StubContext(Map<Class<? extends Annotation>, MethodInterceptor> interceptors) implements Context {
-        @Override
-        public <T> Provider<T> getProvider(Key<T> key) {
-            throw new UnsupportedOperationException("not used");
-        }
-
-        @Override
-        public Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
-            MethodInterceptor interceptor = interceptors.get(annotationType);
-            if (interceptor == null) {
-                throw new InterceptorResolutionException("No interceptor bean for @" + annotationType.getSimpleName());
-            }
-            return () -> interceptor;
-        }
-    }
-
-    /** Records entry and exit around the rest of the chain. */
-    record Recorder(String name, List<String> log) implements MethodInterceptor {
-        @Override
-        public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
-            log.add(name + ":enter:" + invocation.annotation().annotationType().getSimpleName());
-            Object result = invocation.proceed();
-            log.add(name + ":exit");
-            return result;
-        }
-    }
 
     private static InterceptedMethod greet(List<AnnotationValue> bindings) {
         return InterceptedMethod.of(String.class, "greet", String.class, List.of(String.class), bindings);
@@ -330,6 +299,8 @@ class MethodInterceptionTest {
     }
 
     /** Runs a chain, rethrowing any checked throwable as an unchecked one so tests stay readable. */
+    // MethodInterception.invoke declares Throwable.
+    @SuppressWarnings("checkstyle:IllegalCatch")
     private static @Nullable Object invoke(MethodInterception chain, Object[] arguments, Joinpoint joinpoint) {
         try {
             return chain.invoke("target", arguments, joinpoint);
@@ -337,6 +308,34 @@ class MethodInterceptionTest {
             throw e;
         } catch (Throwable t) {
             throw new IllegalStateException(t);
+        }
+    }
+
+    /** A context that resolves interceptors from a fixed map and nothing else. */
+    record StubContext(Map<Class<? extends Annotation>, MethodInterceptor> interceptors) implements Context {
+        @Override
+        public <T> Provider<T> getProvider(Key<T> key) {
+            throw new UnsupportedOperationException("not used");
+        }
+
+        @Override
+        public Provider<MethodInterceptor> interceptor(Class<? extends Annotation> annotationType) {
+            MethodInterceptor interceptor = interceptors.get(annotationType);
+            if (interceptor == null) {
+                throw new InterceptorResolutionException("No interceptor bean for @" + annotationType.getSimpleName());
+            }
+            return () -> interceptor;
+        }
+    }
+
+    /** Records entry and exit around the rest of the chain. */
+    record Recorder(String name, List<String> log) implements MethodInterceptor {
+        @Override
+        public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
+            log.add(name + ":enter:" + invocation.annotation().annotationType().getSimpleName());
+            Object result = invocation.proceed();
+            log.add(name + ":exit");
+            return result;
         }
     }
 }

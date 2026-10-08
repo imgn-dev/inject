@@ -1,9 +1,8 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.ConditionalOnProperty;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
-
-import be.imgn.inject.ConditionalOnProperty;
 
 /** Built-in {@link Condition} for {@link ConditionalOnProperty}. */
 public final class OnPropertyCondition implements Condition {

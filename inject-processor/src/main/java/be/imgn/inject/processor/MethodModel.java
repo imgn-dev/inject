@@ -1,8 +1,7 @@
 package be.imgn.inject.processor;
 
-import java.util.List;
-
 import com.palantir.javapoet.CodeBlock;
+import java.util.List;
 
 /**
  * An {@code @Inject} method to generate injection for.

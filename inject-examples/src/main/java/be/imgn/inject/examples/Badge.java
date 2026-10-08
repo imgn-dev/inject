@@ -21,17 +21,29 @@ public final class Badge {
         this.role = role;
     }
 
-    /** {@return the container-resolved registry} */
+    /**
+     * Returns the container-resolved registry.
+     *
+     * @return the container-resolved registry
+     */
     public Registry registry() {
         return registry;
     }
 
-    /** {@return the caller-supplied owner label} */
+    /**
+     * Returns the caller-supplied owner label.
+     *
+     * @return the caller-supplied owner label
+     */
     public String owner() {
         return owner;
     }
 
-    /** {@return the caller-supplied role label} */
+    /**
+     * Returns the caller-supplied role label.
+     *
+     * @return the caller-supplied role label
+     */
     public String role() {
         return role;
     }

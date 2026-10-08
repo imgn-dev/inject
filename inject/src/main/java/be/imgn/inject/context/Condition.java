@@ -11,14 +11,19 @@ import java.lang.annotation.Annotation;
  */
 public interface Condition {
 
-    /** {@return the conditioning annotation this condition handles} */
+    /**
+     * Returns the conditioning annotation this condition handles.
+     *
+     * @return the conditioning annotation this condition handles
+     */
     Class<? extends Annotation> annotationType();
 
     /**
-     * {@return whether the bean should be registered}
+     * Returns whether the bean should be registered.
      *
      * @param context the evaluation environment
      * @param annotation the conditioning annotation's captured value, including its members
+     * @return whether the bean should be registered
      */
     boolean matches(ConditionContext context, AnnotationValue annotation);
 }

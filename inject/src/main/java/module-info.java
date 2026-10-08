@@ -1,6 +1,6 @@
 /** The zero-reflection dependency injection runtime. */
 module be.imgn.inject {
-    requires static org.jspecify;
+    requires static transitive org.jspecify;
 
     exports be.imgn.inject;
     exports be.imgn.inject.context;

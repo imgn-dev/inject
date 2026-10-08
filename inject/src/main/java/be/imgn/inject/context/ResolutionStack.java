@@ -1,11 +1,10 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.CircularDependencyException;
+import be.imgn.inject.Key;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.StringJoiner;
-
-import be.imgn.inject.CircularDependencyException;
-import be.imgn.inject.Key;
 
 /**
  * The per-thread resolution path of one context: detects dependency cycles and renders the requester chain for

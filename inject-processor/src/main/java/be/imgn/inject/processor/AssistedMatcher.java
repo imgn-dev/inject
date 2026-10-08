@@ -1,5 +1,7 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.Assisted;
+import be.imgn.inject.AssistedFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,12 +15,8 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
 
-import be.imgn.inject.Assisted;
-import be.imgn.inject.AssistedFactory;
-
 /** Resolves an {@code @AssistedFactory} method to its recipe and validates the assisted-parameter bijection. */
 final class AssistedMatcher {
-
     private final Types types;
     private final Diagnostics diagnostics;
 
@@ -27,19 +25,10 @@ final class AssistedMatcher {
         this.diagnostics = diagnostics;
     }
 
-    /**
-     * The implementation class and recipe-map key a factory method links to, before the recipe lookup.
-     *
-     * @param implementationElement the class implementing the recipe
-     * @param key the {@code Gathered.assistedRecipes()} lookup key
-     * @param recipeMethod the linked {@code @Provides} method name, or empty for a constructor recipe
-     */
-    record Link(TypeElement implementationElement, String key, String recipeMethod) {}
-
     /** {@return the method's implementation link, or empty when malformed ({@link #resolve} reports the error)} */
     static Optional<Link> link(ExecutableElement method, AssistedFactory annotation) {
         TypeMirror linked = annotationClassValue(annotation);
-        boolean hasValue = !(linked.toString().equals("void"));
+        boolean hasValue = !linked.toString().equals("void");
         String recipeMethod = annotation.method();
         if (!recipeMethod.isEmpty() && !hasValue) {
             return Optional.empty();
@@ -56,6 +45,7 @@ final class AssistedMatcher {
     }
 
     /** {@return the resolved method, or empty after reporting the failure} */
+    @SuppressWarnings("checkstyle:ReturnCount")
     Optional<AssistedFactoryMethod> resolve(
             ExecutableElement method, AssistedFactory annotation, Map<String, List<AssistedRecipe>> recipes) {
         Optional<Link> link = link(method, annotation);
@@ -148,4 +138,13 @@ final class AssistedMatcher {
             return e.getTypeMirror();
         }
     }
+
+    /**
+     * The implementation class and recipe-map key a factory method links to, before the recipe lookup.
+     *
+     * @param implementationElement the class implementing the recipe
+     * @param key the {@code Gathered.assistedRecipes()} lookup key
+     * @param recipeMethod the linked {@code @Provides} method name, or empty for a constructor recipe
+     */
+    record Link(TypeElement implementationElement, String key, String recipeMethod) {}
 }

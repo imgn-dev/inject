@@ -4,19 +4,87 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
 import be.imgn.inject.Singleton;
 import be.imgn.inject.Types;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
 
 class LifecycleCloseTest {
+    @Test
+    void closeInvokesPreDestroyLifoForCreatedSingletons() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context = new DefaultContext(
+                List.of(new ComponentFactory("a", destroyed, false), new ComponentFactory("b", destroyed, false)),
+                List.of(new SingletonScope()));
+        // create both, in order a then b
+        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
+        context.getProvider(Key.of(Component.class, Names.named("b"))).get();
+        context.close();
+        // LIFO
+        assertThat(destroyed).containsExactly("b", "a");
+    }
+
+    @Test
+    void uncreatedSingletonIsNotDestroyed() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context =
+                new DefaultContext(List.of(new ComponentFactory("a", destroyed, false)), List.of(new SingletonScope()));
+        // Never resolved
+        context.close();
+        assertThat(destroyed).isEmpty();
+    }
+
+    @Test
+    void closeCompletesEvenWhenACallbackThrows() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context = new DefaultContext(
+                List.of(new ComponentFactory("a", destroyed, false), new ComponentFactory("b", destroyed, true)),
+                List.of(new SingletonScope()));
+        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
+        context.getProvider(Key.of(Component.class, Names.named("b"))).get();
+        assertThatThrownBy(context::close)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("boom-b");
+        // "b" threw, "a" was still destroyed
+        assertThat(destroyed).containsExactly("b", "a");
+    }
+
+    @Test
+    void doubleCloseIsANoOp() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context =
+                new DefaultContext(List.of(new ComponentFactory("a", destroyed, false)), List.of(new SingletonScope()));
+        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
+        context.close();
+        context.close();
+        // Once
+        assertThat(destroyed).containsExactly("a");
+    }
+
+    @Test
+    void resolutionAfterCloseThrows() {
+        DefaultContext context = new DefaultContext(List.of(), List.of());
+        context.close();
+        assertThatExceptionOfType(IllegalStateException.class)
+                .isThrownBy(() -> context.getProvider(Key.of(String.class)));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void singletonSetContributorIsDestroyedOnClose() {
+        List<String> destroyed = new ArrayList<>();
+        DefaultContext context =
+                new DefaultContext(List.of(new ElementContribFactory(destroyed)), List.of(new SingletonScope()));
+        // Force creation of the singleton contributor
+        context.getProvider(Key.of(Types.setOf(Element.class))).get();
+        context.close();
+        assertThat(destroyed).containsExactly("element");
+    }
 
     /** A named component recording its destruction into a shared log. */
     record Component(String name) {}
@@ -63,61 +131,6 @@ class LifecycleCloseTest {
         }
     }
 
-    @Test
-    void closeInvokesPreDestroyLifoForCreatedSingletons() {
-        List<String> destroyed = new ArrayList<>();
-        DefaultContext context = new DefaultContext(
-                List.of(new ComponentFactory("a", destroyed, false), new ComponentFactory("b", destroyed, false)),
-                List.of(new SingletonScope()));
-        // create both, in order a then b
-        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
-        context.getProvider(Key.of(Component.class, Names.named("b"))).get();
-        context.close();
-        assertThat(destroyed).containsExactly("b", "a"); // LIFO
-    }
-
-    @Test
-    void uncreatedSingletonIsNotDestroyed() {
-        List<String> destroyed = new ArrayList<>();
-        DefaultContext context =
-                new DefaultContext(List.of(new ComponentFactory("a", destroyed, false)), List.of(new SingletonScope()));
-        context.close(); // never resolved
-        assertThat(destroyed).isEmpty();
-    }
-
-    @Test
-    void closeCompletesEvenWhenACallbackThrows() {
-        List<String> destroyed = new ArrayList<>();
-        DefaultContext context = new DefaultContext(
-                List.of(new ComponentFactory("a", destroyed, false), new ComponentFactory("b", destroyed, true)),
-                List.of(new SingletonScope()));
-        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
-        context.getProvider(Key.of(Component.class, Names.named("b"))).get();
-        assertThatThrownBy(context::close)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("boom-b");
-        assertThat(destroyed).containsExactly("b", "a"); // b threw, a still destroyed
-    }
-
-    @Test
-    void doubleCloseIsANoOp() {
-        List<String> destroyed = new ArrayList<>();
-        DefaultContext context =
-                new DefaultContext(List.of(new ComponentFactory("a", destroyed, false)), List.of(new SingletonScope()));
-        context.getProvider(Key.of(Component.class, Names.named("a"))).get();
-        context.close();
-        context.close();
-        assertThat(destroyed).containsExactly("a"); // once
-    }
-
-    @Test
-    void resolutionAfterCloseThrows() {
-        DefaultContext context = new DefaultContext(List.of(), List.of());
-        context.close();
-        assertThatExceptionOfType(IllegalStateException.class)
-                .isThrownBy(() -> context.getProvider(Key.of(String.class)));
-    }
-
     /** A marker interface contributed into a {@code Set}. */
     interface Element {}
 
@@ -162,16 +175,5 @@ class LifecycleCloseTest {
         protected void preDestroy(Element instance) {
             destroyed.add("element");
         }
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void singletonSetContributorIsDestroyedOnClose() {
-        List<String> destroyed = new ArrayList<>();
-        DefaultContext context =
-                new DefaultContext(List.of(new ElementContribFactory(destroyed)), List.of(new SingletonScope()));
-        context.getProvider(Key.of(Types.setOf(Element.class))).get(); // force creation of the singleton contributor
-        context.close();
-        assertThat(destroyed).containsExactly("element");
     }
 }

@@ -2,9 +2,8 @@ package be.imgn.inject.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.Injector;
+import org.junit.jupiter.api.Test;
 
 class InterceptionExampleTest {
 

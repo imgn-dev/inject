@@ -3,13 +3,11 @@ package be.imgn.inject.processor;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 
-import java.io.IOException;
-import javax.tools.JavaFileObject;
-
 import com.google.common.truth.StringSubject;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-
+import java.io.IOException;
+import javax.tools.JavaFileObject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 

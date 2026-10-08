@@ -1,10 +1,9 @@
 package be.imgn.inject.examples;
 
-import java.util.logging.Logger;
-
 import be.imgn.inject.Inject;
 import be.imgn.inject.Singleton;
 import be.imgn.inject.log.Log;
+import java.util.logging.Logger;
 
 /** A singleton-scoped collaborator whose logger is injected through the constructor by the {@code @Log} plugin. */
 @Singleton
@@ -17,7 +16,11 @@ public final class Registry implements Cataloged {
         this.logger = logger;
     }
 
-    /** {@return the plugin-injected logger} */
+    /**
+     * Returns the plugin-injected logger.
+     *
+     * @return the plugin-injected logger
+     */
     public Logger logger() {
         return logger;
     }

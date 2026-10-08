@@ -1,5 +1,12 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.Assisted;
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.JavaFile;
+import com.palantir.javapoet.MethodSpec;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeSpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,17 +16,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
-
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.JavaFile;
-import com.palantir.javapoet.MethodSpec;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeSpec;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.Assisted;
 
 /**
  * Emits an {@code @AssistedFactory} interface's implementation and its {@code Factory} registration: an impl class that
@@ -27,7 +24,6 @@ import be.imgn.inject.Assisted;
  * {@code Factory} subclass that constructs it.
  */
 final class AssistedFactoryGenerator {
-
     private static final ClassName FACTORY = ClassName.get("be.imgn.inject.context", "Factory");
     private static final ClassName CONTEXT = ClassName.get("be.imgn.inject.context", "Context");
     private static final ClassName ANNOTATION_METADATA = ClassName.get("be.imgn.inject.context", "AnnotationMetadata");
@@ -35,11 +31,6 @@ final class AssistedFactoryGenerator {
     private static final ClassName OBJECTS = ClassName.get("java.util", "Objects");
 
     private AssistedFactoryGenerator() {}
-
-    /**
-     * The generated impl and factory sources, plus the factory's qualified name for {@code ServiceLoader} registration.
-     */
-    record Generated(JavaFile implFile, JavaFile factoryFile, String factoryQualifiedName) {}
 
     static Generated generate(AssistedFactoryModel model, ModelFactory models, Elements elements) {
         TypeElement factoryInterface = model.factoryInterface();
@@ -206,4 +197,9 @@ final class AssistedFactoryGenerator {
         CodeBlock provider = CodeBlock.of("context.getProvider($L)", key);
         return isProvider ? provider : CodeBlock.of("$L.get()", provider);
     }
+
+    /**
+     * The generated impl and factory sources, plus the factory's qualified name for {@code ServiceLoader} registration.
+     */
+    record Generated(JavaFile implFile, JavaFile factoryFile, String factoryQualifiedName) {}
 }

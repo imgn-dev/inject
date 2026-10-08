@@ -1,12 +1,11 @@
 package be.imgn.inject;
 
+import be.imgn.inject.context.BeanDefinition;
+import be.imgn.inject.context.Context;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-
-import be.imgn.inject.context.BeanDefinition;
-import be.imgn.inject.context.Context;
 
 /** Default {@link Injector} delegating everything to a {@link Context}. */
 final class DefaultInjector implements Injector {

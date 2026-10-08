@@ -9,7 +9,11 @@ public final class LegacyStamp {
         this.text = text;
     }
 
-    /** {@return the stamp text} */
+    /**
+     * Returns the stamp text.
+     *
+     * @return the stamp text
+     */
     public String text() {
         return text;
     }

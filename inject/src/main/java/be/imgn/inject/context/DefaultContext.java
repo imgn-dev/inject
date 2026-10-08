@@ -1,5 +1,14 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.ConditionResolutionException;
+import be.imgn.inject.ConditioningAnnotation;
+import be.imgn.inject.DuplicateBindingException;
+import be.imgn.inject.Injector;
+import be.imgn.inject.InterceptorResolutionException;
+import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
+import be.imgn.inject.ScopeResolutionException;
+import be.imgn.inject.UnsatisfiedDependencyException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -15,18 +24,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.ConditionResolutionException;
-import be.imgn.inject.ConditioningAnnotation;
-import be.imgn.inject.DuplicateBindingException;
-import be.imgn.inject.Injector;
-import be.imgn.inject.InterceptorResolutionException;
-import be.imgn.inject.Key;
-import be.imgn.inject.Provider;
-import be.imgn.inject.ScopeResolutionException;
-import be.imgn.inject.UnsatisfiedDependencyException;
 
 /**
  * Default {@link Context}: loads all {@code Factory} and {@code Scope} services, wraps each factory provider with a
@@ -79,6 +77,7 @@ public final class DefaultContext implements Context {
         this(factories, scopes, conditions, name -> Optional.ofNullable(properties.get(name)), Map.of());
     }
 
+    @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
     DefaultContext(
             Iterable<Factory<?>> factories,
             Iterable<Scope> scopes,
@@ -102,7 +101,8 @@ public final class DefaultContext implements Context {
         Map<Class<? extends Annotation>, InterceptorEntry> interceptorIndex = new HashMap<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
-                continue; // an unmatched condition removes the bean from the graph entirely
+                // An unmatched condition removes the bean from the graph entirely
+                continue;
             }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
             Optional<Class<? extends Annotation>> intercepts = factory.intercepts();
@@ -331,7 +331,9 @@ public final class DefaultContext implements Context {
      * then rejects further resolution. Failures are collected as suppressed exceptions on the first one thrown, so
      * every instance is still given a chance to destroy. Idempotent.
      */
+    // One failing @PreDestroy must not keep the remaining instances from being destroyed.
     @Override
+    @SuppressWarnings("checkstyle:IllegalCatch")
     public void close() {
         if (closed) {
             return;
@@ -340,7 +342,8 @@ public final class DefaultContext implements Context {
         RuntimeException failure = null;
         synchronized (destroyables) {
             while (!destroyables.isEmpty()) {
-                TrackedInstance<?> tracked = destroyables.pop(); // LIFO: last created destroyed first
+                // LIFO: last created destroyed first
+                TrackedInstance<?> tracked = destroyables.pop();
                 try {
                     tracked.destroy();
                 } catch (RuntimeException e) {
@@ -356,22 +359,6 @@ public final class DefaultContext implements Context {
             throw failure;
         }
     }
-
-    /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
-    private record Contributor(Contribution contribution, Provider<?> provider) {}
-
-    /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
-    private record PendingDefault(Factory<?> factory, Provider<?> provider) {}
-
-    /** A created scoped instance paired with the factory that can destroy it. */
-    private record TrackedInstance<T>(Factory<T> factory, T instance) {
-        void destroy() {
-            factory.preDestroy(instance);
-        }
-    }
-
-    /** One indexed interceptor: the factory that declared it and its fully wrapped provider. */
-    private record InterceptorEntry(Factory<?> factory, Provider<MethodInterceptor> provider) {}
 
     /** {@return the aggregate provider for one collection key: a set provider, or a map provider when keys exist} */
     private static Provider<?> aggregate(Key<?> collectionKey, List<Contributor> contributors) {
@@ -391,4 +378,20 @@ public final class DefaultContext implements Context {
                 .collect(Collectors.toUnmodifiableMap(
                         Map.Entry::getKey, entry -> entry.getValue().get()));
     }
+
+    /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
+    private record Contributor(Contribution contribution, Provider<?> provider) {}
+
+    /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
+    private record PendingDefault(Factory<?> factory, Provider<?> provider) {}
+
+    /** A created scoped instance paired with the factory that can destroy it. */
+    private record TrackedInstance<T>(Factory<T> factory, T instance) {
+        void destroy() {
+            factory.preDestroy(instance);
+        }
+    }
+
+    /** One indexed interceptor: the factory that declared it and its fully wrapped provider. */
+    private record InterceptorEntry(Factory<?> factory, Provider<MethodInterceptor> provider) {}
 }

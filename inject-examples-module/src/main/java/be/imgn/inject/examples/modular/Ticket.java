@@ -18,12 +18,20 @@ public final class Ticket {
         this.label = label;
     }
 
-    /** {@return the container-resolved widget} */
+    /**
+     * Returns the container-resolved widget.
+     *
+     * @return the container-resolved widget
+     */
     public Widget widget() {
         return widget;
     }
 
-    /** {@return the caller-supplied label} */
+    /**
+     * Returns the caller-supplied label.
+     *
+     * @return the caller-supplied label
+     */
     public String label() {
         return label;
     }

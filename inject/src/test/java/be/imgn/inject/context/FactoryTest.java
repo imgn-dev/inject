@@ -3,16 +3,35 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import org.junit.jupiter.api.Test;
 
-import be.imgn.inject.Key;
-import be.imgn.inject.Provider;
-
 class FactoryTest {
+    @Test
+    void buildResolvesConstructorDependency() {
+        Context context = new StubContext(Map.of(Key.of(String.class), (Provider<String>) () -> "hi"));
+        assertThat(new GreetingFactory())
+                .returns(Greeting.class, Factory::type)
+                .returns(List.of(Key.of(Greeting.class)), Factory::exposedKeys)
+                .extracting(f -> f.build(context))
+                .isEqualTo(new Greeting("hi"));
+    }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void constructorRejectsNullType() {
+        assertThatNullPointerException().isThrownBy(() -> new Factory<Object>(null) {
+            @Override
+            protected Object createInstance(Context context) {
+                return new Object();
+            }
+        });
+    }
+
     /** A greeting bean whose message is injected via constructor. */
     record Greeting(String message) {}
 
@@ -47,26 +66,5 @@ class FactoryTest {
         protected Greeting createInstance(Context context) {
             return new Greeting(getInstanceForConstructor(0, context));
         }
-    }
-
-    @Test
-    void buildResolvesConstructorDependency() {
-        Context context = new StubContext(Map.of(Key.of(String.class), (Provider<String>) () -> "hi"));
-        assertThat(new GreetingFactory())
-                .returns(Greeting.class, Factory::type)
-                .returns(List.of(Key.of(Greeting.class)), Factory::exposedKeys)
-                .extracting(f -> f.build(context))
-                .isEqualTo(new Greeting("hi"));
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void constructorRejectsNullType() {
-        assertThatNullPointerException().isThrownBy(() -> new Factory<Object>(null) {
-            @Override
-            protected Object createInstance(Context context) {
-                return new Object();
-            }
-        });
     }
 }

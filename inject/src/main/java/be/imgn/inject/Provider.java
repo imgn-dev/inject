@@ -7,6 +7,10 @@ package be.imgn.inject;
  */
 @FunctionalInterface
 public interface Provider<T> {
-    /** {@return a provided instance of {@code T}} */
+    /**
+     * Returns a provided instance of {@code T}.
+     *
+     * @return a provided instance of {@code T}
+     */
     T get();
 }

@@ -1,10 +1,8 @@
 package be.imgn.inject.context;
 
-import java.util.Objects;
-
-import org.jspecify.annotations.Nullable;
-
 import be.imgn.inject.Provider;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wraps a provider so its delegate is invoked exactly once; every {@link #get()} returns the same instance. Thread-safe

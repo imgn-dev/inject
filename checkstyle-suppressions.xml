@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<!-- The checkstyle plugin reads a single suppressions file, so this one restates the parent's
+     (be/imgn/build/checkstyle-suppressions.xml in be.imgn.parent:parent:config) before adding the project's own. -->
+<suppressions>
+
+  <!-- Parent: generated sources, tests, module-info and package-info. -->
+  <suppress files="[\\/]generated-sources[\\/]" checks=".*"/>
+  <suppress files="[\\/]generated-test-sources[\\/]" checks=".*"/>
+  <suppress files="[\\/]src[\\/]test[\\/]" checks="MagicNumber|JavadocMethod|JavadocType|MethodLength|MethodName"/>
+  <suppress files="module-info\.java" checks="JavadocType|LineLength"/>
+  <suppress files="package-info\.java" checks="JavadocType"/>
+
+  <!-- The interception API mirrors java.lang.reflect.Method.invoke: an interceptor sees, and may rethrow, whatever
+       the intercepted method throws, checked exceptions included. -->
+  <suppress files="[\\/]inject[\\/]src[\\/]main[\\/]java[\\/]be[\\/]imgn[\\/]inject[\\/]context[\\/](Joinpoint|MethodInterceptor|MethodInvocation|MethodInterception)\.java" checks="IllegalThrows"/>
+
+</suppressions>

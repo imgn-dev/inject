@@ -1,11 +1,10 @@
 package be.imgn.inject.examples;
 
+import be.imgn.inject.ScopingAnnotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
-import be.imgn.inject.ScopingAnnotation;
 
 /**
  * Example user-defined scope: one instance per thread, resolved by {@link ThreadScope}. Demonstrates the {@code Scope}

@@ -4,14 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.annotation.Annotation;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.ConditionalOnProperty;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
@@ -20,71 +12,14 @@ import be.imgn.inject.Provider;
 import be.imgn.inject.Singleton;
 import be.imgn.inject.Types;
 import be.imgn.inject.UnsatisfiedDependencyException;
+import java.lang.annotation.Annotation;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class MultibindingTest {
-
-    /** A contributing factory: exposes nothing, joins the CharSequence collection. */
-    static class ContribFactory extends Factory<String> {
-        private final String value;
-        private final Contribution contribution;
-
-        ContribFactory(String value, Contribution contribution) {
-            super(String.class);
-            this.value = value;
-            this.contribution = contribution;
-        }
-
-        @Override
-        protected String createInstance(Context context) {
-            return value;
-        }
-
-        @Override
-        protected List<Key<?>> exposedKeys() {
-            return List.of();
-        }
-
-        @Override
-        protected Optional<Contribution> contribution() {
-            return Optional.of(contribution);
-        }
-    }
-
-    /**
-     * A contributing factory producing a fresh {@link Object} per {@code createInstance} call, with a configurable
-     * scope.
-     */
-    static class ObjectContribFactory extends Factory<Object> {
-        private final Contribution contribution;
-        private final Optional<Class<? extends Annotation>> scope;
-
-        ObjectContribFactory(Contribution contribution, Optional<Class<? extends Annotation>> scope) {
-            super(Object.class);
-            this.contribution = contribution;
-            this.scope = scope;
-        }
-
-        @Override
-        protected Object createInstance(Context context) {
-            return new Object();
-        }
-
-        @Override
-        protected List<Key<?>> exposedKeys() {
-            return List.of();
-        }
-
-        @Override
-        protected Optional<Contribution> contribution() {
-            return Optional.of(contribution);
-        }
-
-        @Override
-        protected Optional<Class<? extends Annotation>> scope() {
-            return scope;
-        }
-    }
-
     private static final Key<?> SET_KEY = Key.of(Types.setOf(CharSequence.class));
     private static final Key<?> MAP_KEY = Key.of(Types.mapOf(String.class, CharSequence.class));
     private static final Key<?> OBJECT_SET_KEY = Key.of(Types.setOf(Object.class));
@@ -201,5 +136,67 @@ class MultibindingTest {
         @SuppressWarnings("unchecked")
         Set<CharSequence> set = (Set<CharSequence>) context.getProvider(SET_KEY).get();
         assertThat(set).containsExactly("kept");
+    }
+
+    /** A contributing factory: exposes nothing, joins the CharSequence collection. */
+    static class ContribFactory extends Factory<String> {
+        private final String value;
+        private final Contribution contribution;
+
+        ContribFactory(String value, Contribution contribution) {
+            super(String.class);
+            this.value = value;
+            this.contribution = contribution;
+        }
+
+        @Override
+        protected String createInstance(Context context) {
+            return value;
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return List.of();
+        }
+
+        @Override
+        protected Optional<Contribution> contribution() {
+            return Optional.of(contribution);
+        }
+    }
+
+    /**
+     * A contributing factory producing a fresh {@link Object} per {@code createInstance} call, with a configurable
+     * scope.
+     */
+    static class ObjectContribFactory extends Factory<Object> {
+        private final Contribution contribution;
+        private final Optional<Class<? extends Annotation>> scope;
+
+        ObjectContribFactory(Contribution contribution, Optional<Class<? extends Annotation>> scope) {
+            super(Object.class);
+            this.contribution = contribution;
+            this.scope = scope;
+        }
+
+        @Override
+        protected Object createInstance(Context context) {
+            return new Object();
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return List.of();
+        }
+
+        @Override
+        protected Optional<Contribution> contribution() {
+            return Optional.of(contribution);
+        }
+
+        @Override
+        protected Optional<Class<? extends Annotation>> scope() {
+            return scope;
+        }
     }
 }

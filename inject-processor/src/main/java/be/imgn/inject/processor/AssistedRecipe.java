@@ -2,7 +2,6 @@ package be.imgn.inject.processor;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
-
 import org.jspecify.annotations.Nullable;
 
 /**

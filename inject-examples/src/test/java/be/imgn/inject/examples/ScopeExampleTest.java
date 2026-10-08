@@ -2,13 +2,11 @@ package be.imgn.inject.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import be.imgn.inject.Injector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import org.junit.jupiter.api.Test;
-
-import be.imgn.inject.Injector;
 
 class ScopeExampleTest {
 

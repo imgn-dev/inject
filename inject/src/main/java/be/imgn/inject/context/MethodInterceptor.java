@@ -8,10 +8,12 @@ import org.jspecify.annotations.Nullable;
  */
 public interface MethodInterceptor {
     /**
-     * {@return the call's result, which may be the value {@link MethodInvocation#proceed()} returned or one of this
-     * interceptor's own}
+     * Returns the call's result, which may be the value {@link MethodInvocation#proceed()} returned or one of this
+     * interceptor's own.
      *
      * @param invocation the call being intercepted
+     * @return the call's result, which may be the value {@link MethodInvocation#proceed()} returned or one of this
+     *     interceptor's own
      * @throws Throwable anything the rest of the chain or this interceptor raises
      */
     @Nullable

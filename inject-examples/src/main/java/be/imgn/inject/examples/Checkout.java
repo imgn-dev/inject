@@ -11,9 +11,10 @@ public class Checkout {
     public Checkout() {}
 
     /**
-     * {@return a receipt for {@code cart}}
+     * Returns a receipt for {@code cart}.
      *
      * @param cart the cart identifier
+     * @return a receipt for {@code cart}
      */
     @Timed("place")
     public String place(String cart) {

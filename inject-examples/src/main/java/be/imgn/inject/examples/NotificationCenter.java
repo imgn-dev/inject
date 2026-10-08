@@ -1,9 +1,8 @@
 package be.imgn.inject.examples;
 
+import be.imgn.inject.Inject;
 import java.util.Map;
 import java.util.Set;
-
-import be.imgn.inject.Inject;
 
 /** Consumes both collection bindings: every notifier, and formatters by name. */
 public final class NotificationCenter {
@@ -20,12 +19,20 @@ public final class NotificationCenter {
         this.formatters = formatters;
     }
 
-    /** {@return every contributed notifier} */
+    /**
+     * Returns every contributed notifier.
+     *
+     * @return every contributed notifier
+     */
     public Set<Notifier> notifiers() {
         return notifiers;
     }
 
-    /** {@return formatters by format name} */
+    /**
+     * Returns formatters by format name.
+     *
+     * @return formatters by format name
+     */
     public Map<String, Formatter> formatters() {
         return formatters;
     }

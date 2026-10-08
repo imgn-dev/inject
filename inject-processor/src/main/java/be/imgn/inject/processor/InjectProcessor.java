@@ -1,5 +1,7 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.processor.spi.InjectPlugin;
+import com.palantir.javapoet.JavaFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,12 +16,7 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
-
-import com.palantir.javapoet.JavaFile;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.processor.spi.InjectPlugin;
 
 /**
  * Orchestrates the zero-reflection factory-generation pipeline. Each round runs {@link GatherStage} then
@@ -30,9 +27,6 @@ import be.imgn.inject.processor.spi.InjectPlugin;
 @SupportedAnnotationTypes("*")
 public final class InjectProcessor extends AbstractProcessor {
 
-    /** Creates the processor. Instantiated by {@link java.util.ServiceLoader}. */
-    public InjectProcessor() {}
-
     private final List<String> factoryNames = new ArrayList<>();
     private final Set<String> emittedAnnotationImpls = new HashSet<>();
 
@@ -40,6 +34,9 @@ public final class InjectProcessor extends AbstractProcessor {
     private @Nullable GatherStage gatherStage;
     private @Nullable PlanStage planStage;
     private @Nullable ServiceRegistrar serviceRegistrar;
+
+    /** Creates the processor. Instantiated by {@link java.util.ServiceLoader}. */
+    public InjectProcessor() {}
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnvironment) {

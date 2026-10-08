@@ -1,5 +1,15 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.AssistedFactory;
+import be.imgn.inject.Default;
+import be.imgn.inject.ExposeAs;
+import be.imgn.inject.Inject;
+import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.InterceptingAnnotation;
+import be.imgn.inject.Intercepts;
+import be.imgn.inject.IntoMap;
+import be.imgn.inject.IntoSet;
+import be.imgn.inject.Provides;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,17 +25,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 
-import be.imgn.inject.AssistedFactory;
-import be.imgn.inject.Default;
-import be.imgn.inject.ExposeAs;
-import be.imgn.inject.Inject;
-import be.imgn.inject.InjectingAnnotation;
-import be.imgn.inject.InterceptingAnnotation;
-import be.imgn.inject.Intercepts;
-import be.imgn.inject.IntoMap;
-import be.imgn.inject.IntoSet;
-import be.imgn.inject.Provides;
-
 /** Stage 1: discovers injectable types and {@code @Provides} methods and builds their models. */
 final class GatherStage {
 
@@ -37,6 +36,7 @@ final class GatherStage {
         this.diagnostics = diagnostics;
     }
 
+    @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
     Gathered gather(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         Set<TypeElement> beanTypes = new LinkedHashSet<>();
         for (Element element : roundEnv.getElementsAnnotatedWith(Inject.class)) {
@@ -118,7 +118,8 @@ final class GatherStage {
                 // Assisted beans have no binding of their own: no BeanModel, no factory, no edges. They are
                 // reachable only through a generated @AssistedFactory implementation.
                 models.validateAssistedRecipe(bean);
-                models.lifecycleCallbacks(bean, false, true); // validate: @PreDestroy on assisted -> error
+                // Validate: @PreDestroy on assisted -> error
+                models.lifecycleCallbacks(bean, false, true);
                 String key = bean.getQualifiedName().toString();
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())
@@ -160,6 +161,7 @@ final class GatherStage {
                 .toList();
     }
 
+    @SuppressWarnings("checkstyle:CyclomaticComplexity")
     private List<AssistedFactoryModel> gatherAssistedFactories(
             RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> recipes) {
         Map<TypeElement, List<ExecutableElement>> byInterface = new LinkedHashMap<>();
@@ -314,7 +316,8 @@ final class GatherStage {
             }
             ExecutableElement method = (ExecutableElement) element;
             if (ModelFactory.isAssisted(method)) {
-                continue; // no generated factory calls it, so it needs no resolved dependencies
+                // No generated factory calls it, so it needs no resolved dependencies
+                continue;
             }
             if (!method.getModifiers().contains(Modifier.STATIC)
                     && method.getEnclosingElement() instanceof TypeElement host) {

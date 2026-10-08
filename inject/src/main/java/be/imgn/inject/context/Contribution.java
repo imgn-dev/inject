@@ -2,9 +2,8 @@ package be.imgn.inject.context;
 
 import static java.util.Objects.requireNonNull;
 
-import org.jspecify.annotations.Nullable;
-
 import be.imgn.inject.Key;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A factory's collection membership: instead of binding under its own keys, the factory's bean joins the collection

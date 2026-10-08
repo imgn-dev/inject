@@ -10,6 +10,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
 public @interface Named {
-    /** {@return the qualifier name} */
+    /**
+     * Returns the qualifier name.
+     *
+     * @return the qualifier name
+     */
     String value();
 }

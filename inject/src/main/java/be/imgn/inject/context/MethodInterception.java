@@ -1,14 +1,12 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.Provider;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.Provider;
 
 /**
  * A context-bound interceptor chain for one intercepted method: the call site plus one provider per binding, in order.
@@ -38,11 +36,12 @@ public final class MethodInterception {
     }
 
     /**
-     * {@return the call's result, after running every interceptor around {@code joinpoint}}
+     * Returns the call's result, after running every interceptor around {@code joinpoint}.
      *
      * @param target the intercepted instance
      * @param arguments the call arguments, positionally; the chain takes ownership of the array
      * @param joinpoint the call to the bean's own implementation
+     * @return the call's result, after running every interceptor around {@code joinpoint}
      * @throws Throwable anything an interceptor or the method itself raises
      */
     public @Nullable Object invoke(Object target, @Nullable Object[] arguments, Joinpoint joinpoint) throws Throwable {

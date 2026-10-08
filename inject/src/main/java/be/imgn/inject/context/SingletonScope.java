@@ -1,9 +1,8 @@
 package be.imgn.inject.context;
 
-import java.lang.annotation.Annotation;
-
 import be.imgn.inject.Provider;
 import be.imgn.inject.Singleton;
+import java.lang.annotation.Annotation;
 
 /** The built-in {@link Singleton} scope: memoizes the wrapped provider. */
 public final class SingletonScope implements Scope {

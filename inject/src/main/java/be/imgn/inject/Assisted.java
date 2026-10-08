@@ -13,6 +13,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)
 public @interface Assisted {
-    /** {@return the tag disambiguating same-typed assisted parameters; empty for untagged} */
+    /**
+     * Returns the tag disambiguating same-typed assisted parameters; empty for untagged.
+     *
+     * @return the tag disambiguating same-typed assisted parameters; empty for untagged
+     */
     String value() default "";
 }

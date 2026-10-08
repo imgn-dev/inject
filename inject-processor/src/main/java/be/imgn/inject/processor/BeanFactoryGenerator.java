@@ -1,9 +1,5 @@
 package be.imgn.inject.processor;
 
-import java.util.List;
-import java.util.stream.IntStream;
-import javax.lang.model.element.Modifier;
-
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.JavaFile;
@@ -12,6 +8,9 @@ import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
 import com.palantir.javapoet.WildcardTypeName;
+import java.util.List;
+import java.util.stream.IntStream;
+import javax.lang.model.element.Modifier;
 
 /** Emits a {@code Factory} subclass with constructor, field, and method injection, qualifiers, and scope. */
 final class BeanFactoryGenerator {

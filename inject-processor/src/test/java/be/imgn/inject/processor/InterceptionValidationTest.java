@@ -3,12 +3,10 @@ package be.imgn.inject.processor;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 
-import java.io.IOException;
-import javax.tools.JavaFileObject;
-
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
-
+import java.io.IOException;
+import javax.tools.JavaFileObject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -158,9 +156,10 @@ class InterceptionValidationTest {
                                 """));
 
         assertThat(compilation).failed();
-        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
-                        diagnostic.getMessage(null))
-                .contains("Remove final"));
+        Assertions.assertThat(compilation.errors())
+                .singleElement()
+                .satisfies(diagnostic ->
+                        Assertions.assertThat(diagnostic.getMessage(null)).contains("Remove final"));
     }
 
     @Test
@@ -351,9 +350,10 @@ class InterceptionValidationTest {
                 """);
 
         assertThat(compilation).failed();
-        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
-                        diagnostic.getMessage(null))
-                .contains("@Provides"));
+        Assertions.assertThat(compilation.errors())
+                .singleElement()
+                .satisfies(diagnostic ->
+                        Assertions.assertThat(diagnostic.getMessage(null)).contains("@Provides"));
     }
 
     @Test
@@ -419,9 +419,10 @@ class InterceptionValidationTest {
                 """);
 
         assertThat(compilation).failed();
-        Assertions.assertThat(compilation.errors()).singleElement().satisfies(diagnostic -> Assertions.assertThat(
-                        diagnostic.getMessage(null))
-                .contains("does not implement MethodInterceptor"));
+        Assertions.assertThat(compilation.errors())
+                .singleElement()
+                .satisfies(diagnostic -> Assertions.assertThat(diagnostic.getMessage(null))
+                        .contains("does not implement MethodInterceptor"));
     }
 
     @Test

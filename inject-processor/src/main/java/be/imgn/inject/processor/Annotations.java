@@ -1,5 +1,13 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.ConditioningAnnotation;
+import be.imgn.inject.InjectingAnnotation;
+import be.imgn.inject.InterceptingAnnotation;
+import be.imgn.inject.QualifyingAnnotation;
+import be.imgn.inject.ScopingAnnotation;
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.TypeName;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,16 +24,6 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
-
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
-
-import be.imgn.inject.ConditioningAnnotation;
-import be.imgn.inject.InjectingAnnotation;
-import be.imgn.inject.InterceptingAnnotation;
-import be.imgn.inject.QualifyingAnnotation;
-import be.imgn.inject.ScopingAnnotation;
 
 /** Reads framework-related annotations off elements and renders them as generated expressions. */
 final class Annotations {
@@ -144,10 +142,10 @@ final class Annotations {
                     .collect(CodeBlock.joining(", "));
             return CodeBlock.of("$T.of($L)", LIST, items);
         }
-        if (raw instanceof AnnotationMirror) {
+        if (raw instanceof AnnotationMirror nested) {
             // Nested annotations carry no binding or inspection meaning here; record the type only.
             return CodeBlock.of("$T.class", ClassName.get((TypeElement)
-                    ((AnnotationMirror) raw).getAnnotationType().asElement()));
+                    nested.getAnnotationType().asElement()));
         }
         return value(annotationValue);
     }
@@ -204,6 +202,7 @@ final class Annotations {
         return new RenderedQualifier(instance(annotationType, mirror, elements, targetPackage, implRequests), false);
     }
 
+    @SuppressWarnings("checkstyle:ReturnCount")
     private static CodeBlock value(AnnotationValue annotationValue) {
         Object raw = annotationValue.getValue();
         if (raw instanceof String string) {

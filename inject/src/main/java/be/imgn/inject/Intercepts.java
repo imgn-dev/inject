@@ -13,6 +13,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Intercepts {
-    /** {@return the intercepting annotation this interceptor handles} */
+    /**
+     * Returns the intercepting annotation this interceptor handles.
+     *
+     * @return the intercepting annotation this interceptor handles
+     */
     Class<? extends Annotation> value();
 }

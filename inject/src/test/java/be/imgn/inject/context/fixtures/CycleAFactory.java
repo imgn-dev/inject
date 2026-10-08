@@ -1,19 +1,15 @@
 package be.imgn.inject.context.fixtures;
 
-import java.util.List;
-import java.util.Optional;
-
 import be.imgn.inject.context.AnnotationMetadata;
 import be.imgn.inject.context.ConstructorInjectionPoint;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
 import be.imgn.inject.context.Parameter;
+import java.util.List;
+import java.util.Optional;
 
 /** Half of a two-bean cycle: A depends on B. */
 public final class CycleAFactory extends Factory<CycleAFactory.A> {
-    /** Bean A. */
-    public record A(CycleBFactory.B b) {}
-
     public CycleAFactory() {
         super(A.class);
     }
@@ -28,4 +24,7 @@ public final class CycleAFactory extends Factory<CycleAFactory.A> {
     protected A createInstance(Context context) {
         return new A(getInstanceForConstructor(0, context));
     }
+
+    /** Bean A. */
+    public record A(CycleBFactory.B b) {}
 }

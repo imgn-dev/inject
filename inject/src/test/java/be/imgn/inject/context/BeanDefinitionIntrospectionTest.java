@@ -3,45 +3,18 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Key;
 import be.imgn.inject.ScopingAnnotation;
 import be.imgn.inject.Singleton;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class BeanDefinitionIntrospectionTest {
-
     private static final AnnotationValue SCOPED =
             AnnotationValue.of(Singleton.class, Map.of(), Set.of(ScopingAnnotation.class));
-
-    /** A bean carrying definition-level metadata and one field injection point. */
-    static final class Widget {}
-
-    static final class WidgetFactory extends Factory<Widget> {
-        WidgetFactory() {
-            super(Widget.class);
-        }
-
-        @Override
-        protected Widget createInstance(Context context) {
-            return new Widget();
-        }
-
-        @Override
-        public AnnotationMetadata annotationMetadata() {
-            return AnnotationMetadata.of(SCOPED);
-        }
-
-        @Override
-        protected List<FieldInjectionPoint> fieldInjectionPoints() {
-            return List.of(new FieldInjectionPoint(this, "name", String.class, AnnotationMetadata.empty()));
-        }
-    }
 
     private Context context() {
         return new DefaultContext(List.of(new WidgetFactory()), List.of());
@@ -85,5 +58,29 @@ class BeanDefinitionIntrospectionTest {
         Context context = context();
         assertThatNullPointerException().isThrownBy(() -> context.getBeanDefinition(null));
         assertThatNullPointerException().isThrownBy(() -> context.getBeanDefinitionsByStereotype(null));
+    }
+
+    /** A bean carrying definition-level metadata and one field injection point. */
+    static final class Widget {}
+
+    static final class WidgetFactory extends Factory<Widget> {
+        WidgetFactory() {
+            super(Widget.class);
+        }
+
+        @Override
+        protected Widget createInstance(Context context) {
+            return new Widget();
+        }
+
+        @Override
+        public AnnotationMetadata annotationMetadata() {
+            return AnnotationMetadata.of(SCOPED);
+        }
+
+        @Override
+        protected List<FieldInjectionPoint> fieldInjectionPoints() {
+            return List.of(new FieldInjectionPoint(this, "name", String.class, AnnotationMetadata.empty()));
+        }
     }
 }

@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
 
 class ChildInjectorTest {
 
@@ -66,6 +64,8 @@ class ChildInjectorTest {
     }
 
     @Test
+    // The raw key smuggles a String past the compile-time type check.
+    @SuppressWarnings({"rawtypes", "unchecked"})
     void childBuilderRejectsFrameworkTypes() {
         Injector.ChildBuilder builder = Injector.create().childBuilder();
         assertThatIllegalArgumentException().isThrownBy(() -> builder.bind(Injector.class, Injector.create()));

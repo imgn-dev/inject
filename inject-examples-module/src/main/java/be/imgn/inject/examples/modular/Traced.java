@@ -1,11 +1,10 @@
 package be.imgn.inject.examples.modular;
 
+import be.imgn.inject.InterceptingAnnotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
-import be.imgn.inject.InterceptingAnnotation;
 
 /** Marks a call to be prefixed by the tracing interceptor. */
 @InterceptingAnnotation

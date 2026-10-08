@@ -3,18 +3,16 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Named;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.ScopingAnnotation;
 import be.imgn.inject.Singleton;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class AnnotationMetadataTest {
     private static final AnnotationValue NAMED_DB =
@@ -37,10 +35,11 @@ class AnnotationMetadataTest {
                 .returns(false, AnnotationMetadata::isEmpty)
                 .returns(true, m -> m.isPresent(Named.class))
                 .returns(Set.of(Named.class), AnnotationMetadata::types);
-        assertThat(metadata.get(Named.class)).hasValueSatisfying(named -> assertThat(named)
-                .returns(Named.class, AnnotationValue::annotationType)
-                .returns(Optional.of("db"), AnnotationValue::stringValue)
-                .returns(true, v -> v.hasStereotype(QualifyingAnnotation.class)));
+        assertThat(metadata.get(Named.class))
+                .hasValueSatisfying(named -> assertThat(named)
+                        .returns(Named.class, AnnotationValue::annotationType)
+                        .returns(Optional.of("db"), AnnotationValue::stringValue)
+                        .returns(true, v -> v.hasStereotype(QualifyingAnnotation.class)));
     }
 
     @Test

@@ -1,11 +1,9 @@
 package be.imgn.inject.processor;
 
-import java.util.List;
-
 import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
-
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**

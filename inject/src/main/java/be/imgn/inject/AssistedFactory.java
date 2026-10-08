@@ -16,9 +16,17 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface AssistedFactory {
-    /** {@return the implementation class, or the recipe's declaring class when {@link #method()} is set} */
+    /**
+     * Returns the implementation class, or the recipe's declaring class when {@link #method()} is set.
+     *
+     * @return the implementation class, or the recipe's declaring class when {@link #method()} is set
+     */
     Class<?> value() default void.class;
 
-    /** {@return the name of an assisted {@code @Provides} method on {@link #value()}; empty for constructor recipes} */
+    /**
+     * Returns the name of an assisted {@code @Provides} method on {@link #value()}; empty for constructor recipes.
+     *
+     * @return the name of an assisted {@code @Provides} method on {@link #value()}; empty for constructor recipes
+     */
     String method() default "";
 }

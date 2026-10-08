@@ -1,8 +1,7 @@
 package be.imgn.inject.processor.spi;
 
-import java.util.Optional;
-
 import com.palantir.javapoet.CodeBlock;
+import java.util.Optional;
 
 /**
  * Extension point for the annotation processor, discovered via {@link java.util.ServiceLoader}. A plugin handles fields
@@ -13,9 +12,10 @@ import com.palantir.javapoet.CodeBlock;
 public interface InjectPlugin {
 
     /**
-     * {@return an initializer expression for the given injection site, or empty to decline it}
+     * Returns an initializer expression for the given injection site, or empty to decline it.
      *
      * @param site the field or parameter injection site to consider
+     * @return an initializer expression for the given injection site, or empty to decline it
      */
     Optional<CodeBlock> initializer(InjectionSite site);
 }

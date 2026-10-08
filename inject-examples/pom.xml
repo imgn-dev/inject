@@ -28,6 +28,10 @@
             <artifactId>inject-log</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -49,6 +53,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!-- The inject processor reads every annotation, since meta-annotations can make any of them
+                         significant, and claims none so other processors still see them. javac's processing lint
+                         reports those as unclaimed. -->
+                    <compilerArgs combine.children="append">
+                        <arg>-Xlint:-processing</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths combine.children="append">
                         <path>
                             <groupId>be.imgn.inject</groupId>

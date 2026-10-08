@@ -3,40 +3,17 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditionalOnProperty;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.Key;
 import be.imgn.inject.UnsatisfiedDependencyException;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class ConditionalBeanTest {
-
-    /** A factory for {@code String} carrying a definition-level conditioning annotation. */
-    static final class GatedFactory extends Factory<String> {
-        private final AnnotationMetadata metadata;
-
-        GatedFactory(AnnotationValue condition) {
-            super(String.class);
-            this.metadata = AnnotationMetadata.of(condition);
-        }
-
-        @Override
-        protected String createInstance(Context context) {
-            return "gated";
-        }
-
-        @Override
-        public AnnotationMetadata annotationMetadata() {
-            return metadata;
-        }
-    }
-
     private static AnnotationValue onProperty(String name, String havingValue, boolean matchIfMissing) {
         return AnnotationValue.of(
                 ConditionalOnProperty.class,
@@ -89,5 +66,25 @@ class ConditionalBeanTest {
                 .isThrownBy(
                         () -> new DefaultContext(List.of(new GatedFactory(unknown)), List.of(), List.of(), Map.of()))
                 .withMessageContaining("ConditionalOnProperty");
+    }
+
+    /** A factory for {@code String} carrying a definition-level conditioning annotation. */
+    static final class GatedFactory extends Factory<String> {
+        private final AnnotationMetadata metadata;
+
+        GatedFactory(AnnotationValue condition) {
+            super(String.class);
+            this.metadata = AnnotationMetadata.of(condition);
+        }
+
+        @Override
+        protected String createInstance(Context context) {
+            return "gated";
+        }
+
+        @Override
+        public AnnotationMetadata annotationMetadata() {
+            return metadata;
+        }
     }
 }

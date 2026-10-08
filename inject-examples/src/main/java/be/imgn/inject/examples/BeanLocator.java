@@ -13,12 +13,20 @@ public final class BeanLocator {
         this.injector = injector;
     }
 
-    /** {@return the injector this bean was built by} */
+    /**
+     * Returns the injector this bean was built by.
+     *
+     * @return the injector this bean was built by
+     */
     public Injector injector() {
         return injector;
     }
 
-    /** {@return the registry resolved on demand through the injector} */
+    /**
+     * Returns the registry resolved on demand through the injector.
+     *
+     * @return the registry resolved on demand through the injector
+     */
     public Registry locateRegistry() {
         return injector.getInstance(Registry.class);
     }

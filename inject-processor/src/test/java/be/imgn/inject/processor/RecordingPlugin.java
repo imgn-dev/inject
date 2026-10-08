@@ -1,11 +1,9 @@
 package be.imgn.inject.processor;
 
-import java.util.Optional;
-
-import com.palantir.javapoet.CodeBlock;
-
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
+import com.palantir.javapoet.CodeBlock;
+import java.util.Optional;
 
 /** Test plugin that supplies a constant initializer for {@link Marker}-annotated fields. */
 public final class RecordingPlugin implements InjectPlugin {

@@ -1,12 +1,11 @@
 package be.imgn.inject.examples;
 
-import org.jspecify.annotations.Nullable;
-
 import be.imgn.inject.Inject;
 import be.imgn.inject.Intercepts;
 import be.imgn.inject.Singleton;
 import be.imgn.inject.context.MethodInterceptor;
 import be.imgn.inject.context.MethodInvocation;
+import org.jspecify.annotations.Nullable;
 
 /** Handles {@link Timed}: logs entry and exit, and strips a leading/trailing-blank first argument. */
 @Singleton

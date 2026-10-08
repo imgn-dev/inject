@@ -10,9 +10,10 @@ import java.util.Optional;
 public interface ConditionContext {
 
     /**
-     * {@return the value of property {@code name}, if set}
+     * Returns the value of property {@code name}, if set.
      *
      * @param name the property name
+     * @return the value of property {@code name}, if set
      */
     Optional<String> property(String name);
 }

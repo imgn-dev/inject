@@ -2,9 +2,8 @@ package be.imgn.inject.context;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.List;
-
 import be.imgn.inject.Key;
+import java.util.List;
 
 /**
  * The constructor injection point of a bean.

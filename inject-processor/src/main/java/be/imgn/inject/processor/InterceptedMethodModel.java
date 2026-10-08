@@ -1,12 +1,10 @@
 package be.imgn.inject.processor;
 
-import java.util.List;
-import javax.lang.model.element.Modifier;
-
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeVariableName;
-
+import java.util.List;
+import javax.lang.model.element.Modifier;
 import org.jspecify.annotations.Nullable;
 
 /**

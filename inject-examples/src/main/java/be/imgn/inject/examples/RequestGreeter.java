@@ -17,12 +17,20 @@ public final class RequestGreeter {
         this.request = request;
     }
 
-    /** {@return the application-wide registry} */
+    /**
+     * Returns the application-wide registry.
+     *
+     * @return the application-wide registry
+     */
     public Registry registry() {
         return registry;
     }
 
-    /** {@return the request-local context} */
+    /**
+     * Returns the request-local context.
+     *
+     * @return the request-local context
+     */
     public RequestContext request() {
         return request;
     }

@@ -3,10 +3,9 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.Key;
 import be.imgn.inject.Types;
+import org.junit.jupiter.api.Test;
 
 class ContributionTest {
     @Test

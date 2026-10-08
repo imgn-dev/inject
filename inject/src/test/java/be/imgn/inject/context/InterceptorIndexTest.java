@@ -3,82 +3,27 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
 import be.imgn.inject.Provider;
 import be.imgn.inject.Singleton;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 
 class InterceptorIndexTest {
-
     @Retention(RetentionPolicy.RUNTIME)
     @interface Timed {}
 
     @Retention(RetentionPolicy.RUNTIME)
     @interface Audited {}
-
-    /** A no-op interceptor that reports which bean instance served the call. */
-    record Noop(String name) implements MethodInterceptor {
-        @Override
-        public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
-            return invocation.proceed();
-        }
-    }
-
-    /**
-     * Factory for an interceptor bean; scoped when {@code singleton}, prototype otherwise. Exposes a qualified key
-     * (distinct across instances) unless {@code qualified} is {@code false}, in which case it exposes the bean's bare
-     * unqualified key so a test can override it the way {@code Injector.builder()} overrides an interceptor bean.
-     */
-    static final class NoopFactory extends Factory<Noop> {
-        private final Class<? extends Annotation> handled;
-        private final String name;
-        private final boolean singleton;
-        private final boolean qualified;
-
-        NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton) {
-            this(handled, name, singleton, true);
-        }
-
-        NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton, boolean qualified) {
-            super(Noop.class);
-            this.handled = handled;
-            this.name = name;
-            this.singleton = singleton;
-            this.qualified = qualified;
-        }
-
-        @Override
-        protected Noop createInstance(Context context) {
-            return new Noop(name);
-        }
-
-        @Override
-        protected Optional<Class<? extends Annotation>> intercepts() {
-            return Optional.of(handled);
-        }
-
-        @Override
-        protected Optional<Class<? extends Annotation>> scope() {
-            return singleton ? Optional.of(Singleton.class) : Optional.empty();
-        }
-
-        @Override
-        protected List<Key<?>> exposedKeys() {
-            return qualified ? List.of(Key.of(Noop.class, Names.named(name))) : List.of(Key.of(Noop.class));
-        }
-    }
 
     @Test
     void indexesInterceptorBeansByAnnotationType() {
@@ -172,5 +117,57 @@ class InterceptorIndexTest {
         assertThat(child.interceptor(Timed.class).get())
                 .as("but ChildContext.interceptor delegates to the parent, so the chain still runs the original")
                 .isEqualTo(new Noop("timing"));
+    }
+
+    /** A no-op interceptor that reports which bean instance served the call. */
+    record Noop(String name) implements MethodInterceptor {
+        @Override
+        public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
+            return invocation.proceed();
+        }
+    }
+
+    /**
+     * Factory for an interceptor bean; scoped when {@code singleton}, prototype otherwise. Exposes a qualified key
+     * (distinct across instances) unless {@code qualified} is {@code false}, in which case it exposes the bean's bare
+     * unqualified key so a test can override it the way {@code Injector.builder()} overrides an interceptor bean.
+     */
+    static final class NoopFactory extends Factory<Noop> {
+        private final Class<? extends Annotation> handled;
+        private final String name;
+        private final boolean singleton;
+        private final boolean qualified;
+
+        NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton) {
+            this(handled, name, singleton, true);
+        }
+
+        NoopFactory(Class<? extends Annotation> handled, String name, boolean singleton, boolean qualified) {
+            super(Noop.class);
+            this.handled = handled;
+            this.name = name;
+            this.singleton = singleton;
+            this.qualified = qualified;
+        }
+
+        @Override
+        protected Noop createInstance(Context context) {
+            return new Noop(name);
+        }
+
+        @Override
+        protected Optional<Class<? extends Annotation>> intercepts() {
+            return Optional.of(handled);
+        }
+
+        @Override
+        protected Optional<Class<? extends Annotation>> scope() {
+            return singleton ? Optional.of(Singleton.class) : Optional.empty();
+        }
+
+        @Override
+        protected List<Key<?>> exposedKeys() {
+            return qualified ? List.of(Key.of(Noop.class, Names.named(name))) : List.of(Key.of(Noop.class));
+        }
     }
 }

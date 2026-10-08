@@ -2,12 +2,10 @@ package be.imgn.inject.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import be.imgn.inject.Provider;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-
 import org.junit.jupiter.api.Test;
-
-import be.imgn.inject.Provider;
 
 class SingletonProviderTest {
     @Test

@@ -1,9 +1,8 @@
 package be.imgn.inject.examples;
 
-import java.time.Clock;
-
 import be.imgn.inject.Named;
 import be.imgn.inject.Provides;
+import java.time.Clock;
 
 /** Supplies types the container does not construct itself. */
 public final class Config {

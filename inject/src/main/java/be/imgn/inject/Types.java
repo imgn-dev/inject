@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
-
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,19 +23,21 @@ public final class Types {
     private Types() {}
 
     /**
-     * {@return the type {@code Set<elementType>}}
+     * Returns the type {@code Set<elementType>}.
      *
      * @param elementType the set's element type
+     * @return the type {@code Set<elementType>}
      */
     public static Type setOf(Class<?> elementType) {
         return new ParameterizedTypeImpl(Set.class, requireNonNull(elementType, "elementType"));
     }
 
     /**
-     * {@return the type {@code Map<keyType, valueType>}}
+     * Returns the type {@code Map<keyType, valueType>}.
      *
      * @param keyType the map's key type
      * @param valueType the map's value type
+     * @return the type {@code Map<keyType, valueType>}
      */
     public static Type mapOf(Class<?> keyType, Class<?> valueType) {
         return new ParameterizedTypeImpl(

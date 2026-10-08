@@ -4,11 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.DefaultContext;
 import be.imgn.inject.context.Factory;
+import org.junit.jupiter.api.Test;
 
 class InjectorInjectionTest {
 

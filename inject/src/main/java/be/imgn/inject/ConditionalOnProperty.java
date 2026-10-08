@@ -21,12 +21,24 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface ConditionalOnProperty {
 
-    /** {@return the property name to test} */
+    /**
+     * Returns the property name to test.
+     *
+     * @return the property name to test
+     */
     String value();
 
-    /** {@return the required property value; empty means "present with any value"} */
+    /**
+     * Returns the required property value; empty means "present with any value".
+     *
+     * @return the required property value; empty means "present with any value"
+     */
     String havingValue() default "";
 
-    /** {@return whether the bean is registered when the property is absent} */
+    /**
+     * Returns whether the bean is registered when the property is absent.
+     *
+     * @return whether the bean is registered when the property is absent
+     */
     boolean matchIfMissing() default false;
 }

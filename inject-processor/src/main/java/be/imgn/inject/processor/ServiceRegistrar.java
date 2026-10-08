@@ -1,13 +1,12 @@
 package be.imgn.inject.processor;
 
+import be.imgn.inject.context.Factory;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.List;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
-
-import be.imgn.inject.context.Factory;
 
 /** Stage 4: registers the generated factories for {@code ServiceLoader} and notes the module-path directives. */
 final class ServiceRegistrar {
@@ -55,7 +54,7 @@ final class ServiceRegistrar {
                     .openInputStream()
                     .close();
             return true;
-        } catch (Exception e) {
+        } catch (IOException | IllegalArgumentException e) {
             return false;
         }
     }

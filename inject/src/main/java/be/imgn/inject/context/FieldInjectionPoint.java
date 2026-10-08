@@ -2,12 +2,10 @@ package be.imgn.inject.context;
 
 import static java.util.Objects.requireNonNull;
 
+import be.imgn.inject.Key;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.Key;
 
 /**
  * A field injection point. A qualifier is either a marker annotation type ({@code qualifierType}) or a concrete

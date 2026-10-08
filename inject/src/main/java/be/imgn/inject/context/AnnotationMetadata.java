@@ -32,15 +32,20 @@ public final class AnnotationMetadata {
         this.annotations = annotations;
     }
 
-    /** {@return the shared empty metadata instance} */
+    /**
+     * Returns the shared empty metadata instance.
+     *
+     * @return the shared empty metadata instance
+     */
     public static AnnotationMetadata empty() {
         return EMPTY;
     }
 
     /**
-     * {@return metadata holding {@code annotations}, keyed by annotation type}
+     * Returns metadata holding {@code annotations}, keyed by annotation type.
      *
      * @param annotations the framework-related annotations present at the site; later entries win for a repeated type
+     * @return metadata holding {@code annotations}, keyed by annotation type
      */
     public static AnnotationMetadata of(AnnotationValue... annotations) {
         requireNonNull(annotations, "annotations");
@@ -56,9 +61,10 @@ public final class AnnotationMetadata {
     }
 
     /**
-     * {@return the annotation of {@code type} present at the site, if any}
+     * Returns the annotation of {@code type} present at the site, if any.
      *
      * @param type the annotation type to look up
+     * @return the annotation of {@code type} present at the site, if any
      */
     public Optional<AnnotationValue> get(Class<? extends Annotation> type) {
         requireNonNull(type, "type");
@@ -66,9 +72,10 @@ public final class AnnotationMetadata {
     }
 
     /**
-     * {@return whether an annotation of {@code type} is present at the site}
+     * Returns whether an annotation of {@code type} is present at the site.
      *
      * @param type the annotation type to test
+     * @return whether an annotation of {@code type} is present at the site
      */
     public boolean isPresent(Class<? extends Annotation> type) {
         requireNonNull(type, "type");
@@ -76,9 +83,10 @@ public final class AnnotationMetadata {
     }
 
     /**
-     * {@return every annotation at the site whose type carries {@code stereotype}}
+     * Returns every annotation at the site whose type carries {@code stereotype}.
      *
      * @param stereotype the meta-annotation to filter by, such as {@code QualifyingAnnotation.class}
+     * @return every annotation at the site whose type carries {@code stereotype}
      */
     public List<AnnotationValue> byStereotype(Class<? extends Annotation> stereotype) {
         requireNonNull(stereotype, "stereotype");
@@ -88,21 +96,30 @@ public final class AnnotationMetadata {
     }
 
     /**
-     * {@return whether any annotation at the site carries {@code stereotype}}
+     * Returns whether any annotation at the site carries {@code stereotype}.
      *
      * @param stereotype the meta-annotation to test
+     * @return whether any annotation at the site carries {@code stereotype}
      */
     public boolean hasStereotype(Class<? extends Annotation> stereotype) {
         requireNonNull(stereotype, "stereotype");
         return annotations.values().stream().anyMatch(annotation -> annotation.hasStereotype(stereotype));
     }
 
-    /** {@return the annotation types present at the site} */
+    /**
+     * Returns the annotation types present at the site.
+     *
+     * @return the annotation types present at the site
+     */
     public Set<Class<? extends Annotation>> types() {
         return annotations.keySet();
     }
 
-    /** {@return whether no framework-related annotation was present at the site} */
+    /**
+     * Returns whether no framework-related annotation was present at the site.
+     *
+     * @return whether no framework-related annotation was present at the site
+     */
     public boolean isEmpty() {
         return annotations.isEmpty();
     }

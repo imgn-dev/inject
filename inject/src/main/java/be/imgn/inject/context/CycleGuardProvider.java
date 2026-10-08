@@ -1,9 +1,8 @@
 package be.imgn.inject.context;
 
-import java.util.Objects;
-
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
+import java.util.Objects;
 
 /** Detects re-entrant resolution of the same key and reports the cycle path. */
 final class CycleGuardProvider<T> implements Provider<T> {

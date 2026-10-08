@@ -7,9 +7,13 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
 
 - Build command is **`./mvnw clean verify`**. Never `install`.
 - Use the Maven wrapper (`./mvnw`) everywhere — never a globally-installed `mvn`.
-- `verify` runs the full quality pipeline: Spotless format → Checkstyle → compile
-  with Error Prone + NullAway → tests (Surefire, Mockito agent where used) →
-  JaCoCo → Javadoc.
+- The root POM inherits `be.imgn.parent:parent` and imports `be.imgn.parent:bom`;
+  versions and quality gates come from there. Override only what this project
+  needs (see spec §10).
+- `verify` runs the full quality pipeline: Enforcer → Spotless format →
+  Checkstyle (shared ruleset + `checkstyle-suppressions.xml`) → compile with
+  `-Xlint:all -Werror`, Error Prone + NullAway → tests (Surefire) → JaCoCo →
+  Javadoc → dependency analysis.
 
 ## Documentation
 

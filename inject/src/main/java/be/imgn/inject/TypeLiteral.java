@@ -34,25 +34,31 @@ public class TypeLiteral<T> {
     }
 
     /**
-     * {@return a literal for the raw {@code type}}
+     * Returns a literal for the raw {@code type}.
      *
      * @param type the represented type
      * @param <T> the represented type
+     * @return a literal for the raw {@code type}
      */
     public static <T> TypeLiteral<T> of(Class<T> type) {
         return new TypeLiteral<>((Type) requireNonNull(type, "type"));
     }
 
     /**
-     * {@return a literal for a general {@link Type}}
+     * Returns a literal for a general {@link Type}.
      *
      * @param type the represented type (may be parameterized)
+     * @return a literal for a general {@link Type}
      */
     public static TypeLiteral<?> of(Type type) {
         return new TypeLiteral<>(type);
     }
 
-    /** {@return the underlying reflective type} */
+    /**
+     * Returns the underlying reflective type.
+     *
+     * @return the underlying reflective type
+     */
     public Type getType() {
         return type;
     }

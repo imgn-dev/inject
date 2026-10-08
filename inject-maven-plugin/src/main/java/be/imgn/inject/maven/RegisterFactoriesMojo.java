@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -29,9 +28,6 @@ import org.jspecify.annotations.Nullable;
 @Mojo(name = "register-factories", defaultPhase = LifecyclePhase.PROCESS_CLASSES, threadSafe = true)
 public class RegisterFactoriesMojo extends AbstractMojo {
 
-    /** Creates the mojo. Instantiated by Maven. */
-    public RegisterFactoriesMojo() {}
-
     /** The compiled output directory to scan and patch. */
     @Parameter(defaultValue = "${project.build.outputDirectory}", required = true)
     private @Nullable File classesDirectory;
@@ -51,6 +47,9 @@ public class RegisterFactoriesMojo extends AbstractMojo {
     @Parameter(defaultValue = "false", property = "inject.skip")
     private boolean skip;
 
+    /** Creates the mojo. Instantiated by Maven. */
+    public RegisterFactoriesMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (skip) {
@@ -66,9 +65,9 @@ public class RegisterFactoriesMojo extends AbstractMojo {
             Map<String, List<String>> providers = InjectServices.read(classes);
             if (providers.isEmpty()) {
                 getLog().debug("inject: no framework services registered, nothing to do");
-                return;
+            } else {
+                register(classes, providers);
             }
-            register(classes, providers);
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to register framework services: " + e.getMessage(), e);
         }

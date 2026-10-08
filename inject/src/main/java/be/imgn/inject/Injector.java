@@ -1,5 +1,10 @@
 package be.imgn.inject;
 
+import be.imgn.inject.context.BeanDefinition;
+import be.imgn.inject.context.ChildContext;
+import be.imgn.inject.context.Context;
+import be.imgn.inject.context.DefaultContext;
+import be.imgn.inject.context.Factory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -8,12 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-
-import be.imgn.inject.context.BeanDefinition;
-import be.imgn.inject.context.ChildContext;
-import be.imgn.inject.context.Context;
-import be.imgn.inject.context.DefaultContext;
-import be.imgn.inject.context.Factory;
 
 /**
  * The user-facing entry point for obtaining instances and providers.
@@ -33,73 +32,85 @@ import be.imgn.inject.context.Factory;
  */
 public interface Injector extends AutoCloseable {
     /**
-     * {@return an instance of {@code type}}
+     * Returns an instance of {@code type}.
      *
      * @param type the requested type
      * @param <T> the requested type
+     * @return an instance of {@code type}
      */
     <T> T getInstance(Class<T> type);
 
     /**
-     * {@return an instance for {@code key}}
+     * Returns an instance for {@code key}.
      *
      * @param key the requested key
      * @param <T> the requested type
+     * @return an instance for {@code key}
      */
     <T> T getInstance(Key<T> key);
 
     /**
-     * {@return an instance of the generic {@code type}}
+     * Returns an instance of the generic {@code type}.
      *
      * @param type the requested type literal
      * @param <T> the requested type
+     * @return an instance of the generic {@code type}
      */
     <T> T getInstance(TypeLiteral<T> type);
 
     /**
-     * {@return a provider of {@code type}}
+     * Returns a provider of {@code type}.
      *
      * @param type the requested type
      * @param <T> the requested type
+     * @return a provider of {@code type}
      */
     <T> Provider<T> getProvider(Class<T> type);
 
     /**
-     * {@return a provider of the generic {@code type}}
+     * Returns a provider of the generic {@code type}.
      *
      * @param type the requested type literal
      * @param <T> the requested type
+     * @return a provider of the generic {@code type}
      */
     <T> Provider<T> getProvider(TypeLiteral<T> type);
 
     /**
-     * {@return the provider for {@code key}}
+     * Returns the provider for {@code key}.
      *
      * @param key the requested key
      * @param <T> the requested type
+     * @return the provider for {@code key}
      */
     <T> Provider<T> getProvider(Key<T> key);
 
     /**
-     * {@return the definition bound to {@code key}, if any}
+     * Returns the definition bound to {@code key}, if any.
      *
      * <p>A read-only view for inspecting the graph — the bean's key, declared framework annotations, and injection
      * points — not for building instances.
      *
      * @param key the binding key, qualified or not
+     * @return the definition bound to {@code key}, if any
      */
     Optional<BeanDefinition> getBeanDefinition(Key<?> key);
 
     /**
-     * {@return every bean annotated with an annotation carrying {@code stereotype}}
+     * Returns every bean annotated with an annotation carrying {@code stereotype}.
      *
      * <p>For example {@code getBeanDefinitionsByStereotype(ScopingAnnotation.class)} lists every scoped bean.
      *
      * @param stereotype the meta-annotation to filter by
+     * @return every bean annotated with an annotation carrying {@code stereotype}
      */
     List<BeanDefinition> getBeanDefinitionsByStereotype(Class<? extends Annotation> stereotype);
 
-    /** {@return a builder for a child of this injector: its bindings layer over this injector's graph} */
+    /**
+     * Returns a builder for a child of this injector: its bindings layer over this injector's graph.
+     *
+     * @return a builder for a child of this injector: its bindings layer over this injector's graph
+     */
     ChildBuilder childBuilder();
 
     /**
@@ -110,7 +121,11 @@ public interface Injector extends AutoCloseable {
     @Override
     void close();
 
-    /** {@return a new injector backed by all registered factories and scopes} */
+    /**
+     * Returns a new injector backed by all registered factories and scopes.
+     *
+     * @return a new injector backed by all registered factories and scopes
+     */
     static Injector create() {
         DefaultContext context = new DefaultContext();
         DefaultInjector injector = new DefaultInjector(context);
@@ -118,7 +133,11 @@ public interface Injector extends AutoCloseable {
         return injector;
     }
 
-    /** {@return a builder for an injector whose instance bindings shadow discovered ones (a test seam)} */
+    /**
+     * Returns a builder for an injector whose instance bindings shadow discovered ones (a test seam).
+     *
+     * @return a builder for an injector whose instance bindings shadow discovered ones (a test seam)
+     */
     static Builder builder() {
         return new Builder();
     }
@@ -134,22 +153,24 @@ public interface Injector extends AutoCloseable {
         private Builder() {}
 
         /**
-         * {@return this builder, binding {@code instance} as the unqualified key for {@code type}}
+         * Returns this builder, binding {@code instance} as the unqualified key for {@code type}.
          *
          * @param type the bound type
          * @param instance the instance to return for that type
          * @param <T> the bound type
+         * @return this builder, binding {@code instance} as the unqualified key for {@code type}
          */
         public <T> Builder bind(Class<T> type, T instance) {
             return bind(Key.of(type), instance);
         }
 
         /**
-         * {@return this builder, binding {@code instance} to {@code key}}
+         * Returns this builder, binding {@code instance} to {@code key}.
          *
          * @param key the binding key
          * @param instance the instance to return for that key
          * @param <T> the bound type
+         * @return this builder, binding {@code instance} to {@code key}
          */
         public <T> Builder bind(Key<T> key, T instance) {
             Objects.requireNonNull(key, "key");
@@ -160,22 +181,24 @@ public interface Injector extends AutoCloseable {
         }
 
         /**
-         * {@return this builder, binding a provider evaluated on every resolution for {@code type}}
+         * Returns this builder, binding a provider evaluated on every resolution for {@code type}.
          *
          * @param type the bound type
          * @param provider the provider to consult for that type
          * @param <T> the bound type
+         * @return this builder, binding a provider evaluated on every resolution for {@code type}
          */
         public <T> Builder bindProvider(Class<T> type, Provider<T> provider) {
             return bindProvider(Key.of(type), provider);
         }
 
         /**
-         * {@return this builder, binding a provider evaluated on every resolution for {@code key}}
+         * Returns this builder, binding a provider evaluated on every resolution for {@code key}.
          *
          * @param key the binding key
          * @param provider the provider to consult for that key
          * @param <T> the bound type
+         * @return this builder, binding a provider evaluated on every resolution for {@code key}
          */
         public <T> Builder bindProvider(Key<T> key, Provider<T> provider) {
             Objects.requireNonNull(key, "key");
@@ -185,7 +208,11 @@ public interface Injector extends AutoCloseable {
             return this;
         }
 
-        /** {@return a new injector applying the configured overrides} */
+        /**
+         * Returns a new injector applying the configured overrides.
+         *
+         * @return a new injector applying the configured overrides
+         */
         public Injector build() {
             DefaultContext context = new DefaultContext(Map.copyOf(overrides));
             DefaultInjector injector = new DefaultInjector(context);
@@ -217,22 +244,24 @@ public interface Injector extends AutoCloseable {
         }
 
         /**
-         * {@return this builder, binding {@code instance} as the unqualified key for {@code type}}
+         * Returns this builder, binding {@code instance} as the unqualified key for {@code type}.
          *
          * @param type the bound type
          * @param instance the instance to return for that type
          * @param <T> the bound type
+         * @return this builder, binding {@code instance} as the unqualified key for {@code type}
          */
         public <T> ChildBuilder bind(Class<T> type, T instance) {
             return bind(Key.of(type), instance);
         }
 
         /**
-         * {@return this builder, binding {@code instance} to {@code key}}
+         * Returns this builder, binding {@code instance} to {@code key}.
          *
          * @param key the binding key
          * @param instance the instance to return for that key
          * @param <T> the bound type
+         * @return this builder, binding {@code instance} to {@code key}
          */
         public <T> ChildBuilder bind(Key<T> key, T instance) {
             Objects.requireNonNull(instance, "instance");
@@ -240,22 +269,25 @@ public interface Injector extends AutoCloseable {
         }
 
         /**
-         * {@return this builder, binding a provider evaluated on every resolution through the child}
+         * Returns this builder, binding a provider evaluated on every resolution through the child.
          *
          * @param type the bound type
          * @param provider the provider to consult for that type
          * @param <T> the bound type
+         * @return this builder, binding a provider evaluated on every resolution through the child
          */
         public <T> ChildBuilder bindProvider(Class<T> type, Provider<T> provider) {
             return bindProvider(Key.of(type), provider);
         }
 
         /**
-         * {@return this builder, binding a provider evaluated on every resolution through the child}
+         * Returns this builder, binding a provider evaluated on every resolution through the child.
          *
          * @param key the binding key
          * @param provider the provider to consult for that key
          * @param <T> the bound type
+         * @return this builder, binding a provider evaluated on every resolution through the child
+         * @throws IllegalArgumentException if {@code key} names a framework type or is already bound in this builder
          */
         public <T> ChildBuilder bindProvider(Key<T> key, Provider<T> provider) {
             Objects.requireNonNull(key, "key");
@@ -267,7 +299,11 @@ public interface Injector extends AutoCloseable {
             return this;
         }
 
-        /** {@return the child injector applying these bindings over the parent} */
+        /**
+         * Returns the child injector applying these bindings over the parent.
+         *
+         * @return the child injector applying these bindings over the parent
+         */
         public Injector build() {
             ChildContext context = new ChildContext(parentContext, bindings);
             DefaultInjector child = new DefaultInjector(context);

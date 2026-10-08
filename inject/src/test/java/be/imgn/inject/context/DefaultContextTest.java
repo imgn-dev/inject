@@ -4,10 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.Key;
 import be.imgn.inject.UnsatisfiedDependencyException;
@@ -15,6 +11,8 @@ import be.imgn.inject.context.fixtures.CycleAFactory;
 import be.imgn.inject.context.fixtures.CycleBFactory;
 import be.imgn.inject.context.fixtures.LeafFactory;
 import be.imgn.inject.context.fixtures.RootFactory;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class DefaultContextTest {
     @Test

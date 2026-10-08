@@ -36,12 +36,17 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 
 | Module | Coordinates | Contents |
 |--------|-------------|----------|
-| parent | `be.imgn.inject:inject-parent` | pom aggregator; Java 21; dependency & plugin versions |
+| parent | `be.imgn.inject:inject-parent` | pom aggregator; inherits `be.imgn.parent:parent`, imports `be.imgn.parent:bom`; Java 21 |
 | runtime | `be.imgn.inject:inject` | public API + annotations + runtime engine. `module be.imgn.inject` |
 | processor | `be.imgn.inject:inject-processor` | annotation processor (JavaPoet); depends on `inject` |
-| examples | `be.imgn.inject:inject-examples` | usage + integration tests; classpath and module-path runs; `@Log` plugin demo |
+| log | `be.imgn.inject:inject-log` | the `@Log` plugin annotation; depends on `inject` only |
+| log processor | `be.imgn.inject:inject-log-processor` | `LogPlugin`, the processor side of `@Log` |
+| maven plugin | `be.imgn.inject:inject-maven-plugin` | registers generated factories as `module-info` services |
+| examples | `be.imgn.inject:inject-examples` | classpath usage + integration tests; `@Log` plugin demo |
+| examples (module path) | `be.imgn.inject:inject-examples-module` | module-path usage + integration tests |
 
-`inject-processor` is a `provided`-scope dependency of any consumer.
+`inject-processor` and `inject-log-processor` belong on a consumer's annotation processor path, never on its
+classpath.
 
 ## 3. Package Structure
 
@@ -346,35 +351,30 @@ many facets.
 **Build command: `./mvnw clean verify` — never `install`.** The Maven wrapper is
 committed; all invocations use `./mvnw`.
 
-The parent POM (`inject-parent`) carries these recipes (from the Maven
-Configuration knowledge base, versions via `${…}` properties):
+`inject-parent` inherits the shared `be.imgn.parent:parent` POM and imports `be.imgn.parent:bom`, which supply
+plugin and library versions and the quality gates. The project overrides only:
 
-- **Version filtering** — `versions-maven-plugin` with regex `ignoreVersions`
-  excluding `-SNAPSHOT`/`-M`/`-RC`/`alpha`/`beta`, so
-  `versions:display-dependency-updates` suggests stable only.
-- **Error Prone + NullAway** — `maven-compiler-plugin` (`fork=true`) with the
-  Error Prone javac plugin and NullAway at `ERROR`; `AnnotatedPackages` set to
-  **`be.imgn.inject`** (not the recipe's `com.example` placeholder). Required
-  `--add-exports`/`--add-opens` mirrored in `.mvn/jvm.config`. `jspecify` provides
-  `@Nullable`. Generated sources excluded via `-XepExcludedPaths`.
-- **Custom Checkstyle rules** — `maven-checkstyle-plugin` bound to `validate`,
-  `checkstyle.xml` with the "no FQN in code" `RegexpSinglelineJava` rule plus
-  `module-info.java` / `package-info.java` suppressions.
-- **Spotless auto-formatting** — `spotless-maven-plugin` (Palantir Java Format,
-  `formatJavadoc=true`), `apply` bound to `validate`; import order kept in sync
-  with Checkstyle.
-- **Mockito as Java agent** — parent surefire carries only
-  `--sun-misc-unsafe-memory-access=allow`; modules that mock add the
-  `-javaagent:…mockito-core….jar` on top, chained with JaCoCo's `@{argLine}`.
-- **Maven wrapper** — `mvnw`/`mvnw.cmd` + `.mvn/wrapper/maven-wrapper.properties`
-  (`distributionType=only-script`), pinning the Maven version.
+- **Java release** — `java.release=21`; the shared parent defaults to a newer release.
+- **Error Prone extras** (`errorprone.extra.args`) — NullAway `ExcludedFieldAnnotations` for `@Inject` and every
+  consumed injecting-annotation plugin's annotation (`@Log`); `module-info.java` added to `-XepExcludedPaths`, since
+  module descriptors name services and providers by their fully qualified names; a few checks switched off.
+- **Checkstyle suppressions** — `checkstyle-suppressions.xml` restates the parent's suppressions (the plugin reads a
+  single file) and adds `IllegalThrows` for the `Throwable`-declaring interception API. Other deliberate exceptions
+  are `@SuppressWarnings("checkstyle:…")` at the site.
+- **Javadoc** — `doclint all` (the parent omits `missing`), `failOnWarnings`, bound to `package` with goal
+  `javadoc-no-fork`, so an undocumented or malformed public API member fails the build, consistent with the
+  docs-always-current rule in `CLAUDE.md`. The two example modules set `maven.javadoc.skip`: they are read as
+  source, not as API.
+- **JaCoCo** — agent and report, which the parent does not configure.
+- **Surefire** — `--sun-misc-unsafe-memory-access=allow`, chained with JaCoCo's `@{argLine}`.
 
-Pipeline (single `./mvnw clean verify`): Spotless → Checkstyle (`validate`) →
-Error Prone + NullAway (`compile`) → Surefire + Mockito agent + JaCoCo (`test`) →
-Javadoc (`package`, goal `javadoc-no-fork`). Javadoc runs with `doclint all` and
-`failOnWarnings`, so an undocumented or malformed public API member fails the
-build, consistent with the docs-always-current rule in `CLAUDE.md`. The two
-example modules set `maven.javadoc.skip`: they are read as source, not as API.
+The two example modules add `-Xlint:-processing`: the inject processor reads every annotation and claims none, which
+javac's `processing` lint would otherwise report under `-Werror`.
+
+Pipeline (single `./mvnw clean verify`): Enforcer → Spotless → Checkstyle (`validate`) → javac with `-Xlint:all
+-Werror`, Error Prone + NullAway (`compile`) → Surefire + JaCoCo (`test`) → Javadoc (`package`) → dependency analysis
+(`verify`). The enforcer's `reactorModuleConvergence` rule rejects partial reactors, so `-pl` builds fail unless they
+include the root.
 
 ## 11. Bootstrap Summary
 

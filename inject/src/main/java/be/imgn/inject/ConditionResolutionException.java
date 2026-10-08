@@ -1,7 +1,12 @@
 package be.imgn.inject;
 
+import java.io.Serial;
+
 /** Thrown when a conditioning annotation has no registered {@link be.imgn.inject.context.Condition}. */
 public class ConditionResolutionException extends InjectionException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     /**
      * Creates the exception.
      *

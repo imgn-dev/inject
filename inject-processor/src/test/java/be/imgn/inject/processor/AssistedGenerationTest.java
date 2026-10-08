@@ -3,15 +3,13 @@ package be.imgn.inject.processor;
 import static com.google.testing.compile.Compiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.CompilationSubject;
+import com.google.testing.compile.JavaFileObjects;
 import java.io.IOException;
 import java.util.Optional;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.CompilationSubject;
-import com.google.testing.compile.JavaFileObjects;
-
 import org.junit.jupiter.api.Test;
 
 class AssistedGenerationTest {

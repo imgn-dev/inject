@@ -1,10 +1,9 @@
 package be.imgn.inject.examples;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import be.imgn.inject.Inject;
 import be.imgn.inject.Singleton;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Shared sink both interceptors write to, showing that an interceptor is an injected bean like any other. */
 @Singleton
@@ -25,7 +24,11 @@ public class CallLog {
         entries.add(entry);
     }
 
-    /** {@return the entries recorded so far, in order} */
+    /**
+     * Returns the entries recorded so far, in order.
+     *
+     * @return the entries recorded so far, in order
+     */
     public List<String> entries() {
         return List.copyOf(entries);
     }

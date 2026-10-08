@@ -1,9 +1,5 @@
 package be.imgn.inject.processor;
 
-import java.util.Locale;
-import java.util.stream.IntStream;
-import javax.lang.model.element.Modifier;
-
 import com.palantir.javapoet.AnnotationSpec;
 import com.palantir.javapoet.ArrayTypeName;
 import com.palantir.javapoet.ClassName;
@@ -15,6 +11,9 @@ import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import com.palantir.javapoet.TypeSpec;
 import com.palantir.javapoet.TypeVariableName;
+import java.util.Locale;
+import java.util.stream.IntStream;
+import javax.lang.model.element.Modifier;
 
 /**
  * Emits the {@code $Bean$$Intercepted} subclass: one static call-site descriptor and one chain field per intercepted
@@ -143,6 +142,7 @@ final class InterceptedProxyGenerator {
     }
 
     /** {@return the override that runs the chain, falling through to {@code super} before the chain is assigned} */
+    @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
     private static MethodSpec override(BeanModel model, InterceptedMethodModel method) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(method.name())
                 .addAnnotation(Override.class)

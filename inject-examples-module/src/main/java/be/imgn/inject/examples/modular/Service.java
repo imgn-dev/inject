@@ -12,7 +12,11 @@ public final class Service {
         this.widget = widget;
     }
 
-    /** {@return the injected widget} */
+    /**
+     * Returns the injected widget.
+     *
+     * @return the injected widget
+     */
     public Widget widget() {
         return widget;
     }

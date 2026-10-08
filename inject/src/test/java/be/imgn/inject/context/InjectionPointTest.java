@@ -3,13 +3,11 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.Key;
 import be.imgn.inject.Named;
 import be.imgn.inject.Names;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class InjectionPointTest {
     private static final Factory<Object> FACTORY = new Factory<>(Object.class) {

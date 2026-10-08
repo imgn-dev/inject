@@ -12,6 +12,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface IntoSet {
-    /** {@return the set's element type; the bean must be assignable to it} */
+    /**
+     * Returns the set's element type; the bean must be assignable to it.
+     *
+     * @return the set's element type; the bean must be assignable to it
+     */
     Class<?> value();
 }

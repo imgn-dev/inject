@@ -1,8 +1,7 @@
 package be.imgn.inject.examples.modular;
 
-import java.util.Set;
-
 import be.imgn.inject.Inject;
+import java.util.Set;
 
 /** Injects every contributed {@link Plugin}. */
 public final class PluginHost {
@@ -14,7 +13,11 @@ public final class PluginHost {
         this.plugins = plugins;
     }
 
-    /** {@return every contributed plugin} */
+    /**
+     * Returns every contributed plugin.
+     *
+     * @return every contributed plugin
+     */
     public Set<Plugin> plugins() {
         return plugins;
     }

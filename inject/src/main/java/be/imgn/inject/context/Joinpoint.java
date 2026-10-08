@@ -6,9 +6,10 @@ import org.jspecify.annotations.Nullable;
 @FunctionalInterface
 public interface Joinpoint {
     /**
-     * {@return the intercepted method's own result}
+     * Returns the intercepted method's own result.
      *
      * @param arguments the arguments to call it with, positionally
+     * @return the intercepted method's own result
      * @throws Throwable anything the method raises
      */
     @Nullable

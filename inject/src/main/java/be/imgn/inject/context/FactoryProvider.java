@@ -1,8 +1,7 @@
 package be.imgn.inject.context;
 
-import java.util.Objects;
-
 import be.imgn.inject.Provider;
+import java.util.Objects;
 
 /**
  * A {@link Provider} that builds instances by invoking a {@link Factory} with a {@link Context}.

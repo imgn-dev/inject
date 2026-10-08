@@ -3,16 +3,14 @@ package be.imgn.inject.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import be.imgn.inject.Named;
+import be.imgn.inject.QualifyingAnnotation;
+import be.imgn.inject.ScopingAnnotation;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
 import org.junit.jupiter.api.Test;
-
-import be.imgn.inject.Named;
-import be.imgn.inject.QualifyingAnnotation;
-import be.imgn.inject.ScopingAnnotation;
 
 class AnnotationValueTest {
     private enum Level {

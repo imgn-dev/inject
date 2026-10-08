@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
-
 import org.junit.jupiter.api.Test;
 
 class TypeLiteralTest {

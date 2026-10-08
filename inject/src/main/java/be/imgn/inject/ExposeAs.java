@@ -14,8 +14,11 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface ExposeAs {
     /**
-     * {@return the types the bean (or {@code @Provides} result) is exposed as; must be non-empty and each a supertype
-     * of the produced type}
+     * Returns the types the bean (or {@code @Provides} result) is exposed as; must be non-empty and each a supertype of
+     * the produced type.
+     *
+     * @return the types the bean (or {@code @Provides} result) is exposed as; must be non-empty and each a supertype of
+     *     the produced type
      */
     Class<?>[] value();
 }

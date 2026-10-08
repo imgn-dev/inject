@@ -3,8 +3,6 @@ package be.imgn.inject.examples;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import org.junit.jupiter.api.Test;
-
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Names;
@@ -12,6 +10,7 @@ import be.imgn.inject.ScopingAnnotation;
 import be.imgn.inject.Singleton;
 import be.imgn.inject.UnsatisfiedDependencyException;
 import be.imgn.inject.context.BeanDefinition;
+import org.junit.jupiter.api.Test;
 
 class ExamplesClasspathTest {
 
@@ -103,7 +102,8 @@ class ExamplesClasspathTest {
 
         Engine engine = injector.getInstance(Engine.class);
         assertThat(engine).isNotNull().isInstanceOf(V8Engine.class);
-        assertThat(injector.getInstance(Engine.class)).isSameAs(engine); // singleton
+        // Singleton
+        assertThat(injector.getInstance(Engine.class)).isSameAs(engine);
         assertThatExceptionOfType(UnsatisfiedDependencyException.class)
                 .isThrownBy(() -> injector.getInstance(V8Engine.class));
     }
@@ -153,8 +153,10 @@ class ExamplesClasspathTest {
         assertThat(badge)
                 .returns("olivier", Badge::owner)
                 .returns("admin", Badge::role)
-                .returns(injector.getInstance(Registry.class), Badge::registry); // singleton respected
-        assertThat(badges.create("olivier", "admin")).isNotSameAs(badge); // fresh per call
+                // Singleton respected
+                .returns(injector.getInstance(Registry.class), Badge::registry);
+        // Fresh per call
+        assertThat(badges.create("olivier", "admin")).isNotSameAs(badge);
 
         LegacyStamp stamp = injector.getInstance(StampFactory.class).create("world");
         assertThat(stamp.text()).isEqualTo("Hello world");
@@ -185,7 +187,8 @@ class ExamplesClasspathTest {
         Ledger ledger;
         try (Injector app = Injector.create()) {
             ledger = app.getInstance(Ledger.class);
-            assertThat(ledger.events()).containsExactly("opened"); // @PostConstruct ran during build
+            // @PostConstruct ran during build
+            assertThat(ledger.events()).containsExactly("opened");
         }
         // close() invoked @PreDestroy on the created singleton
         assertThat(ledger.events()).containsExactly("opened", "closed");

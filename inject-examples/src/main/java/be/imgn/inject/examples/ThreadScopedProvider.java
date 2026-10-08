@@ -5,6 +5,9 @@ import be.imgn.inject.Provider;
 /** Memoizes the delegate per thread: the first {@code get()} on a thread builds the instance; later calls reuse it. */
 final class ThreadScopedProvider<T> implements Provider<T> {
     private final Provider<T> delegate;
+
+    // One memo per scoped binding, so the ThreadLocal belongs to this instance.
+    @SuppressWarnings("ThreadLocalUsage")
     private final ThreadLocal<T> perThread = new ThreadLocal<>();
 
     ThreadScopedProvider(Provider<T> delegate) {

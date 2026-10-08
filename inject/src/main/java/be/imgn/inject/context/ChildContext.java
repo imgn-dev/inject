@@ -1,17 +1,15 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.Injector;
+import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
+import be.imgn.inject.ScopingAnnotation;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-
 import org.jspecify.annotations.Nullable;
-
-import be.imgn.inject.Injector;
-import be.imgn.inject.Key;
-import be.imgn.inject.Provider;
-import be.imgn.inject.ScopingAnnotation;
 
 /**
  * A child {@link Context}: nearest-ancestor local bindings first (walking up through any intermediate

@@ -1,8 +1,7 @@
 package be.imgn.inject.context;
 
-import java.util.List;
-
 import be.imgn.inject.Key;
+import java.util.List;
 
 /**
  * A read-only view of a registered bean: its primary key, the framework annotations declared on it, and its injection
@@ -11,12 +10,24 @@ import be.imgn.inject.Key;
  */
 public interface BeanDefinition {
 
-    /** {@return the bean's primary (unqualified) key} */
+    /**
+     * Returns the bean's primary (unqualified) key.
+     *
+     * @return the bean's primary (unqualified) key
+     */
     Key<?> key();
 
-    /** {@return the framework annotations declared on the bean itself} */
+    /**
+     * Returns the framework annotations declared on the bean itself.
+     *
+     * @return the framework annotations declared on the bean itself
+     */
     AnnotationMetadata annotationMetadata();
 
-    /** {@return the bean's injection points: its constructor (when it injects), then methods, then fields} */
+    /**
+     * Returns the bean's injection points: its constructor (when it injects), then methods, then fields.
+     *
+     * @return the bean's injection points: its constructor (when it injects), then methods, then fields
+     */
     List<InjectionPoint> injectionPoints();
 }

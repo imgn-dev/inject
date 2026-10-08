@@ -1,7 +1,12 @@
 package be.imgn.inject;
 
+import java.io.Serial;
+
 /** Thrown when an interceptor throws something the intercepted method does not declare, or returns an illegal value. */
 public class InterceptionException extends InjectionException {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     /**
      * Creates the exception.
      *

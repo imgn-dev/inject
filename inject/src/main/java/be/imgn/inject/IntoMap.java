@@ -13,9 +13,17 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface IntoMap {
-    /** {@return the map's value type; the bean must be assignable to it} */
+    /**
+     * Returns the map's value type; the bean must be assignable to it.
+     *
+     * @return the map's value type; the bean must be assignable to it
+     */
     Class<?> value();
 
-    /** {@return the map key for this contribution; must not be blank} */
+    /**
+     * Returns the map key for this contribution; must not be blank.
+     *
+     * @return the map key for this contribution; must not be blank
+     */
     String key();
 }

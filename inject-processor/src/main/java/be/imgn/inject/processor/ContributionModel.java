@@ -1,7 +1,6 @@
 package be.imgn.inject.processor;
 
 import com.palantir.javapoet.TypeName;
-
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -9,7 +9,11 @@ public class TracedService {
     @Inject
     public TracedService() {}
 
-    /** {@return the service's own answer, before interception} */
+    /**
+     * Returns the service's own answer, before interception.
+     *
+     * @return the service's own answer, before interception
+     */
     @Traced
     public String answer() {
         return "answer";
