@@ -24,7 +24,9 @@ Injector injector = Injector.builder()
 ```
 
 Everything downstream sees the override: any bean depending on `Clock`
-receives the fixed one, with the rest of the graph untouched.
+receives the fixed one, with the rest of the graph untouched. That includes
+resolutions through a [child injector](child-injectors.md), which never
+rebuilds the discovered bean an override replaced.
 
 - `bind(...)` — a fixed instance, returned for every resolution.
 - `bindProvider(...)` — a provider consulted on every resolution.

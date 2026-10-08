@@ -84,14 +84,8 @@ public final class DefaultContext implements Context {
             Iterable<Condition> conditions,
             ConditionContext conditionContext,
             Map<Key<?>, Provider<?>> overrides) {
-        Map<Class<? extends Annotation>, Scope> scopesByAnnotation = new HashMap<>();
-        for (Scope scope : scopes) {
-            scopesByAnnotation.put(scope.annotationType(), scope);
-        }
-        Map<Class<? extends Annotation>, Condition> conditionsByAnnotation = new HashMap<>();
-        for (Condition condition : conditions) {
-            conditionsByAnnotation.put(condition.annotationType(), condition);
-        }
+        Map<Class<? extends Annotation>, Scope> scopesByAnnotation = indexScopes(scopes);
+        Map<Class<? extends Annotation>, Condition> conditionsByAnnotation = indexConditions(conditions);
 
         Map<Key<?>, Provider<?>> built = new HashMap<>();
         Map<Key<?>, BeanDefinition> definitionsByKey = new HashMap<>();
@@ -160,8 +154,14 @@ public final class DefaultContext implements Context {
                 definitionList.add(pending.factory());
             }
         }
-        // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check.
+        // Overrides intentionally shadow discovered bindings (test seams); they win without a duplicate check. An
+        // overridden key has no definition: the discovered factory no longer serves it, so a child injector must not
+        // rebuild that factory in place of the override.
         built.putAll(overrides);
+        definitionsByKey.keySet().removeAll(overrides.keySet());
+        definitionList.removeIf(definition -> definition instanceof Factory<?> factory
+                && factory.contribution().isEmpty()
+                && overrides.keySet().containsAll(factory.exposedKeys()));
         // An override for an interceptor bean's own key also replaces its provider in the interceptor chain, so a
         // builder override reaches an interceptor invoked as part of a call, not just direct resolution.
         for (Map.Entry<Class<? extends Annotation>, InterceptorEntry> entry : interceptorIndex.entrySet()) {
@@ -180,6 +180,34 @@ public final class DefaultContext implements Context {
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
         this.interceptors = Map.copyOf(interceptorIndex);
+    }
+
+    private static Map<Class<? extends Annotation>, Scope> indexScopes(Iterable<Scope> scopes) {
+        Map<Class<? extends Annotation>, Scope> byAnnotation = new HashMap<>();
+        for (Scope scope : scopes) {
+            Scope existing = byAnnotation.putIfAbsent(scope.annotationType(), scope);
+            if (existing != null) {
+                throw new ScopeResolutionException("Duplicate scope for @"
+                        + scope.annotationType().getSimpleName() + ": "
+                        + existing.getClass().getName() + " and "
+                        + scope.getClass().getName());
+            }
+        }
+        return byAnnotation;
+    }
+
+    private static Map<Class<? extends Annotation>, Condition> indexConditions(Iterable<Condition> conditions) {
+        Map<Class<? extends Annotation>, Condition> byAnnotation = new HashMap<>();
+        for (Condition condition : conditions) {
+            Condition existing = byAnnotation.putIfAbsent(condition.annotationType(), condition);
+            if (existing != null) {
+                throw new ConditionResolutionException("Duplicate condition for @"
+                        + condition.annotationType().getSimpleName() + ": "
+                        + existing.getClass().getName() + " and "
+                        + condition.getClass().getName());
+            }
+        }
+        return byAnnotation;
     }
 
     private static boolean conditionsPass(

@@ -8,6 +8,7 @@ import be.imgn.inject.ConditionalOnProperty;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.Key;
 import be.imgn.inject.UnsatisfiedDependencyException;
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +69,18 @@ class ConditionalBeanTest {
                 .withMessageContaining("ConditionalOnProperty");
     }
 
+    @Test
+    void twoConditionsForOneAnnotationAreAnError() {
+        AnnotationValue condition = onProperty("feature.x", "on", false);
+        List<Condition> conditions = List.of(new OnPropertyCondition(), new AlwaysMatchingCondition());
+        assertThatExceptionOfType(ConditionResolutionException.class)
+                .isThrownBy(
+                        () -> new DefaultContext(List.of(new GatedFactory(condition)), List.of(), conditions, Map.of()))
+                .withMessageContaining("Duplicate condition for @ConditionalOnProperty")
+                .withMessageContaining(OnPropertyCondition.class.getName())
+                .withMessageContaining(AlwaysMatchingCondition.class.getName());
+    }
+
     /** A factory for {@code String} carrying a definition-level conditioning annotation. */
     static final class GatedFactory extends Factory<String> {
         private final AnnotationMetadata metadata;
@@ -85,6 +98,19 @@ class ConditionalBeanTest {
         @Override
         public AnnotationMetadata annotationMetadata() {
             return metadata;
+        }
+    }
+
+    /** A second condition claiming {@code @ConditionalOnProperty}, as a stray jar on the classpath could. */
+    static final class AlwaysMatchingCondition implements Condition {
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return ConditionalOnProperty.class;
+        }
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotationValue annotation) {
+            return true;
         }
     }
 }

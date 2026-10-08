@@ -54,5 +54,7 @@ annotation's attribute values and decides `matches`.
   `UnsatisfiedDependencyException`. Consumers must treat the bean as optional —
   via a [collection](multibindings.md) or an
   [injector probe](injector-injection.md).
-- A conditioning annotation with no registered `Condition` implementation is
-  an error at injector creation (`ConditionResolutionException`).
+- A conditioning annotation with no registered `Condition` implementation, or
+  with more than one, is an error at injector creation
+  (`ConditionResolutionException`), so a jar cannot silently replace a
+  condition.

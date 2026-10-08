@@ -74,6 +74,10 @@ resolution goes through the returned wrapper.
   concern, handled by [lifecycle callbacks](lifecycle-callbacks.md): a
   `@PreDestroy` method runs when the owning injector closes.
 - A bean carries at most one scoping annotation.
+- A scoping annotation has exactly one `Scope`: two discovered implementations
+  for the same annotation are an error at injector creation
+  (`ScopeResolutionException`), so a jar cannot silently replace a scope,
+  built-in `@Singleton` included.
 - Scopes are declared on the bean, not chosen at the injection point; a
   consumer cannot request "a fresh instance" of a singleton (though injecting a
   [`Provider`](provider-injection.md) of a prototype bean gives fresh instances

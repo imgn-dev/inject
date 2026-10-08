@@ -114,6 +114,22 @@ class ChildContextTest {
         assertThat(parent.getProvider(Key.of(String.class)).get()).isEqualTo("parent");
     }
 
+    @Test
+    void parentOverrideReachesBeansTheChildRebuilds() {
+        DefaultContext parent = new DefaultContext(
+                List.of(new ParentStringFactory(), new HolderFactory()),
+                List.of(),
+                Map.of(Key.of(String.class), () -> "override"));
+        ChildContext context = child(parent, Map.of());
+        assertThat(context.getProvider(Key.of(String.class)).get()).isEqualTo("override");
+        assertThat(context.getProvider(Key.of(Holder.class)).get())
+                .as("an unscoped bean rebuilt by the child sees the parent's override, not the discovered binding")
+                .isEqualTo(new Holder("override"));
+        assertThat(parent.getBeanDefinition(Key.of(String.class)))
+                .as("the overridden discovered factory no longer describes the key")
+                .isEmpty();
+    }
+
     /** An unscoped bean holding the String dependency it was built with. */
     record Holder(String value) {}
 

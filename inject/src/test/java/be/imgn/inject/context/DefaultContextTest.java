@@ -6,11 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import be.imgn.inject.CircularDependencyException;
 import be.imgn.inject.Key;
+import be.imgn.inject.Provider;
+import be.imgn.inject.ScopeResolutionException;
+import be.imgn.inject.Singleton;
 import be.imgn.inject.UnsatisfiedDependencyException;
 import be.imgn.inject.context.fixtures.CycleAFactory;
 import be.imgn.inject.context.fixtures.CycleBFactory;
 import be.imgn.inject.context.fixtures.LeafFactory;
 import be.imgn.inject.context.fixtures.RootFactory;
+import java.lang.annotation.Annotation;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -74,5 +78,28 @@ class DefaultContextTest {
         assertThatExceptionOfType(UnsatisfiedDependencyException.class)
                 .isThrownBy(() -> context.getProvider(Key.of(Long.class)).get())
                 .withMessageContaining("Long");
+    }
+
+    @Test
+    void twoScopesForOneAnnotationAreAnError() {
+        List<Scope> scopes = List.of(new SingletonScope(), new ReplacementSingletonScope());
+        assertThatExceptionOfType(ScopeResolutionException.class)
+                .isThrownBy(() -> new DefaultContext(List.of(new LeafFactory()), scopes))
+                .withMessageContaining("Duplicate scope for @Singleton")
+                .withMessageContaining(SingletonScope.class.getName())
+                .withMessageContaining(ReplacementSingletonScope.class.getName());
+    }
+
+    /** A second scope claiming {@code @Singleton}, as a stray jar on the classpath could. */
+    static final class ReplacementSingletonScope implements Scope {
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return Singleton.class;
+        }
+
+        @Override
+        public <T> Provider<T> wrap(Provider<T> provider) {
+            return provider;
+        }
     }
 }
