@@ -64,6 +64,10 @@ nearest binding.
   resolves `Injector` to itself.
 - A child holds a reference to its parent; it is a view over the parent's
   graph, not a detachable copy.
+- A child shadows bindings; it cannot supply one the root lacks. The root
+  injector checks at creation that every bean's dependencies are bound, so a
+  dependency meant to vary per child needs a root-level binding too — an
+  app-level default, as `RequestContext` has above.
 - A child binding for an [interceptor](interception.md) bean's own key shadows
   direct resolution through the child, but not the interceptor chain:
   `ChildContext.interceptor` always delegates to the parent, so intercepted

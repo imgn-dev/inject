@@ -63,8 +63,9 @@ class ChildContextTest {
 
     @Test
     void cycleThroughChildRebuildIsReported() {
-        // Holder depends on String; bind String through a provider that resolves Holder -> cycle via the child.
-        DefaultContext parent = new DefaultContext(List.of(new HolderFactory()), List.of());
+        // Holder depends on String; the child shadows String with a provider that resolves Holder -> cycle via the
+        // child.
+        DefaultContext parent = new DefaultContext(List.of(new ParentStringFactory(), new HolderFactory()), List.of());
         ChildContext[] hole = new ChildContext[1];
         ChildContext context = child(parent, Map.of(Key.of(String.class), () -> {
             hole[0].getProvider(Key.of(Holder.class)).get();

@@ -67,12 +67,15 @@ errors, with no cost deferred to runtime.
 - New instances are created per resolution by default (see
   [scopes](scopes.md)); nothing is cached unless a scope says so.
 - The graph is assembled from whatever factories `ServiceLoader` finds at
-  runtime. A dependency missing from that set is reported on first resolution
-  of the bean that needs it (`UnsatisfiedDependencyException`), not at injector
-  creation.
+  runtime, plus any [builder bindings](builder-overrides.md). Creating the
+  injector checks that every bean's dependencies are bound, and fails with one
+  `UnsatisfiedDependencyException` listing every missing one. A key requested
+  directly from the injector but never bound fails on that request.
 - A class without an `@Inject` constructor gets a generated default factory
   only when something in the same compilation depends on it, nothing in that
   compilation binds it already (a `@Provides` method or a bean's exposed
   type), and it is a concrete class with an accessible no-argument
-  constructor. Types you do not control are supplied through
-  [`@Provides` methods](provides-methods.md).
+  constructor. Any other dependency — a type you do not control, or a value
+  such as a configuration record — is supplied through a
+  [`@Provides` method](provides-methods.md) or a
+  [builder binding](builder-overrides.md).

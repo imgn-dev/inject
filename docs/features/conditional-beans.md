@@ -50,8 +50,8 @@ annotation's attribute values and decides `matches`.
   afterwards has no effect on an existing injector; conditions are for
   deployment-time shape, not runtime toggling.
 - There is no fallback mechanism: when a condition removes a bean, nothing
-  takes its place, and a consumer that hard-depends on it fails with
-  `UnsatisfiedDependencyException`. Consumers must treat the bean as optional —
+  takes its place, and a consumer that hard-depends on it makes injector
+  creation fail with `UnsatisfiedDependencyException`. Consumers must treat the bean as optional —
   via a [collection](multibindings.md) or an
   [injector probe](injector-injection.md).
 - A conditioning annotation with no registered `Condition` implementation, or

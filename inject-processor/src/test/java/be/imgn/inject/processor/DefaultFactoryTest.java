@@ -108,6 +108,22 @@ class DefaultFactoryTest {
                         || file.getName().contains("$Base$$Factory"));
     }
 
+    @Test
+    void noDefaultFactoryForAConcreteTypeWithoutAUsableConstructor() {
+        JavaFileObject display = TestCompiler.source("example.DisplayConfig", """
+                package example;
+
+                public record DisplayConfig(int width, int height) {}
+                """);
+
+        Compilation compilation =
+                javac().withProcessors(new InjectProcessor()).compile(display, consumerOf("DisplayConfig"));
+
+        assertThat(compilation).succeeded();
+        Assertions.assertThat(compilation.generatedSourceFiles())
+                .noneMatch(file -> file.getName().contains("$DisplayConfig$$Factory"));
+    }
+
     private static JavaFileObject consumerOf(String type) {
         return TestCompiler.source("example.Consumer", """
                 package example;

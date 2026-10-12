@@ -29,7 +29,7 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 | Qualifier identity | Annotation **type + attribute values** (`@Named("db")` ≠ `@Named("cache")`; marker qualifiers match by type alone). |
 | `@Provides` host | **Any class.** Static method → called directly. Instance method → host resolved via its own factory first. |
 | `Provider<T>` injection | **Supported** — a `Provider<Foo>` dependency injects the provider itself (deferred/repeated `get()`). |
-| Validation | **Compile-time where the processor can see it; runtime for the rest** (dynamically-loaded factories re-checked at first resolution). |
+| Validation | **Compile-time where the processor can see it; at injector creation for the rest**: every live bean's dependencies must be bound, by a discovered factory or a builder binding. |
 | Concurrency | **Thread-safe.** `Injector`/`Context` registry immutable post-construction; `SingletonProvider` instantiates exactly once under contention. |
 
 ## 2. Module Layout
@@ -221,7 +221,8 @@ will exist:
 - otherwise **must have an accessible no-arg constructor** → a default factory is
   generated for it (a dependency does **not** need `@Inject`, but it always needs a
   Factory);
-- otherwise → **compile error**.
+- otherwise → no factory; it must be bound elsewhere (typically `Injector.builder().bind`),
+  checked when the injector is created.
 
 Plugins may contribute virtual injection points here (e.g. `@Log` → `Logger(Bean.class)`).
 
@@ -395,5 +396,8 @@ include the root.
 
 `Injector.create()` → constructs `Context` → `Context` `ServiceLoader`s all
 `Factory` and `Scope` providers → wraps each `FactoryProvider` per its declared
-scope → returns a thread-safe `Injector` over the immutable registry. Resolution is
-lazy and memoized; unsatisfiable or cyclic keys fail fast with a descriptive path.
+scope → checks that every live bean's injection points (except those a plugin
+supplies) name a bound key, throwing one `UnsatisfiedDependencyException` that
+lists every missing dependency → returns a thread-safe `Injector` over the immutable
+registry. Resolution is lazy and memoized; a key requested directly but never
+bound, or a cyclic key, fails fast with a descriptive path.

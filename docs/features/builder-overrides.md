@@ -31,6 +31,21 @@ rebuilds the discovered bean an override replaced.
 - `bind(...)` — a fixed instance, returned for every resolution.
 - `bindProvider(...)` — a provider consulted on every resolution.
 
+A binding does not need a discovered binding to replace: it also supplies a
+dependency nothing else binds, such as a configuration record built in `main`.
+A type that neither has an `@Inject` constructor nor an accessible no-argument
+constructor gets no generated factory, so a binding is how it enters the
+graph:
+
+```java
+Injector injector = Injector.builder()
+        .bind(DisplayConfig.class, new DisplayConfig(1920, 1080))
+        .build();
+```
+
+`build()` checks that every bean's dependencies are bound, overrides included,
+and throws one `UnsatisfiedDependencyException` listing every missing one.
+
 The same pair of operations exists on
 [`childBuilder()`](child-injectors.md); the difference is lifecycle. Builder
 overrides bake replacement into a standalone injector at creation; a child

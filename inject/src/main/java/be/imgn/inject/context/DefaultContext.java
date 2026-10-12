@@ -3,6 +3,7 @@ package be.imgn.inject.context;
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
+import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Injector;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
@@ -28,8 +29,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Default {@link Context}: loads all {@code Factory} and {@code Scope} services, wraps each factory provider with a
- * cycle guard and its declared scope, and resolves keys lazily. Fallback factories ({@code Factory#isDefault()}) bind
- * only keys no other live factory claims. The registry is immutable after construction; resolution is thread-safe.
+ * cycle guard and its declared scope, checks that every live bean's dependencies are bound, and resolves keys lazily.
+ * Fallback factories ({@code Factory#isDefault()}) bind only keys no other live factory claims. The registry is
+ * immutable after construction; resolution is thread-safe.
  *
  * <p>{@code new DefaultContext()} loads all registered {@code Factory}, {@code Scope}, and {@code Condition} services.
  * The injector that owns this context attaches itself via {@link #setInjector(Injector)} immediately after
@@ -176,10 +178,60 @@ public final class DefaultContext implements Context {
         // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
+        requireSatisfied(definitionList, built.keySet());
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
         this.interceptors = Map.copyOf(interceptorIndex);
+    }
+
+    /**
+     * Fails fast when a live bean depends on a key nothing binds, listing every such dependency at once. A bean's
+     * dependencies are those of its injection points, except the ones a processor plugin supplies.
+     */
+    private static void requireSatisfied(List<BeanDefinition> beans, Set<Key<?>> bound) {
+        List<String> missing = new ArrayList<>();
+        for (BeanDefinition bean : beans) {
+            for (InjectionPoint point : bean.injectionPoints()) {
+                switch (point) {
+                    case ConstructorInjectionPoint constructor ->
+                        constructor
+                                .parameters()
+                                .forEach(parameter -> checkBound(
+                                        bean, "constructor parameter " + parameter.name(), parameter, bound, missing));
+                    case MethodInjectionPoint method ->
+                        method.parameters()
+                                .forEach(parameter -> checkBound(
+                                        bean,
+                                        "parameter " + parameter.name() + " of method " + method.methodName(),
+                                        parameter,
+                                        bound,
+                                        missing));
+                    case FieldInjectionPoint field -> {
+                        if (!field.annotationMetadata().hasStereotype(InjectingAnnotation.class)
+                                && !bound.contains(field.key())) {
+                            missing.add(describe(bean, "field " + field.fieldName(), field.key()));
+                        }
+                    }
+                }
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new UnsatisfiedDependencyException("Unsatisfied dependencies:" + System.lineSeparator()
+                    + String.join(System.lineSeparator(), missing));
+        }
+    }
+
+    private static void checkBound(
+            BeanDefinition bean, String site, Parameter parameter, Set<Key<?>> bound, List<String> missing) {
+        if (!parameter.annotationMetadata().hasStereotype(InjectingAnnotation.class)
+                && !bound.contains(parameter.key())) {
+            missing.add(describe(bean, site, parameter.key()));
+        }
+    }
+
+    private static String describe(BeanDefinition bean, String site, Key<?> key) {
+        return "  No binding for " + key + " (required by " + bean.key() + " " + site + ")";
     }
 
     private static Map<Class<? extends Annotation>, Scope> indexScopes(Iterable<Scope> scopes) {

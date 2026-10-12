@@ -56,7 +56,8 @@ work.
 - On the module path, factory registration is a consumer-side obligation:
   keep the manual `provides` list in sync with the processor's note, or adopt
   the build plugin. A factory missing from the descriptor is simply not
-  discovered, surfacing as `UnsatisfiedDependencyException` at resolution.
+  discovered, surfacing as `UnsatisfiedDependencyException`: at injector
+  creation when a bean depends on it, otherwise when it is requested.
 - The build plugin is Maven-only; other build tools take the manual route.
 - All `ServiceLoader`-discovered extension points — factories,
   [scopes](scopes.md), [conditions](conditional-beans.md) — share this

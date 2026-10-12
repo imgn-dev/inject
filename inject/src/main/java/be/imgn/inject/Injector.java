@@ -125,6 +125,8 @@ public interface Injector extends AutoCloseable {
      * Returns a new injector backed by all registered factories and scopes.
      *
      * @return a new injector backed by all registered factories and scopes
+     * @throws UnsatisfiedDependencyException if a bean depends on a key nothing binds; the message lists every such
+     *     dependency
      */
     static Injector create() {
         DefaultContext context = new DefaultContext();
@@ -212,6 +214,8 @@ public interface Injector extends AutoCloseable {
          * Returns a new injector applying the configured overrides.
          *
          * @return a new injector applying the configured overrides
+         * @throws UnsatisfiedDependencyException if a bean depends on a key that neither a discovered factory nor an
+         *     override binds; the message lists every such dependency
          */
         public Injector build() {
             DefaultContext context = new DefaultContext(Map.copyOf(overrides));

@@ -158,13 +158,9 @@ final class PlanStage {
             if (models.hasAccessibleNoArgConstructor(dependency)) {
                 beans.put(dependency, models.defaultModel(dependency));
                 edges.put(dependency, List.of());
-            } else {
-                diagnostics.error(
-                        "Cannot satisfy dependency " + dependency.getQualifiedName()
-                                + ": it has no @Inject constructor and no accessible no-argument constructor."
-                                + " Annotate it with @Inject or provide it with @Provides.",
-                        dependency);
             }
+            // Otherwise no factory can build it: it must be bound elsewhere, for instance by Injector.builder().bind,
+            // and the injector checks that when it is created
         }
     }
 

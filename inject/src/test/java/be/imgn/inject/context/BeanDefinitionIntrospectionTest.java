@@ -7,6 +7,7 @@ import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Key;
 import be.imgn.inject.ScopingAnnotation;
 import be.imgn.inject.Singleton;
+import be.imgn.inject.context.fixtures.LeafFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,7 +18,7 @@ class BeanDefinitionIntrospectionTest {
             AnnotationValue.of(Singleton.class, Map.of(), Set.of(ScopingAnnotation.class));
 
     private Context context() {
-        return new DefaultContext(List.of(new WidgetFactory()), List.of());
+        return new DefaultContext(List.of(new WidgetFactory(), new LeafFactory()), List.of());
     }
 
     @Test

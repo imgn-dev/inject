@@ -76,8 +76,8 @@ assignable to its declared element type.
 - No ordering: `Set` iteration order is unspecified, and there is no priority
   attribute.
 - A collection with zero live contributions is not an empty collection — the
-  key is simply unbound, and injecting it fails with
-  `UnsatisfiedDependencyException`. At least one contribution must match.
+  key is simply unbound, and a bean injecting it makes injector creation fail
+  with `UnsatisfiedDependencyException`. At least one contribution must match.
 - Duplicate `@IntoMap` keys are rejected at compile time within one
   compilation; across separately compiled artifacts they surface at injector
   creation.
