@@ -76,8 +76,8 @@
                         <suppressionsLocation>${maven.multiModuleProjectDirectory}/checkstyle-suppressions.xml</suppressionsLocation>
                     </configuration>
                 </plugin>
-                <!-- The release profile hands every reactor module to Central; the examples are read as source, not
-                     consumed as artifacts. -->
+                <!-- The release profile hands every reactor module to Central. The examples are read as source, not
+                     consumed as artifacts, and the @Log modules exercise the processor plugin SPI. -->
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
                     <artifactId>central-publishing-maven-plugin</artifactId>
@@ -85,6 +85,8 @@
                         <excludeArtifacts>
                             <excludeArtifact>inject-examples</excludeArtifact>
                             <excludeArtifact>inject-examples-module</excludeArtifact>
+                            <excludeArtifact>inject-log</excludeArtifact>
+                            <excludeArtifact>inject-log-processor</excludeArtifact>
                         </excludeArtifacts>
                     </configuration>
                 </plugin>

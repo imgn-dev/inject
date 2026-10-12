@@ -2,16 +2,15 @@
 #
 # Walks through publishing be.imgn.inject to Maven Central.
 #
-# One reactor build publishes six artifacts as ONE deployment:
+# One reactor build publishes four artifacts as ONE deployment:
 #
 #   be.imgn.inject:inject-parent          the parent POM the modules inherit
 #   be.imgn.inject:inject                 runtime and public API
 #   be.imgn.inject:inject-processor       annotation processor
-#   be.imgn.inject:inject-log             the @Log annotation
-#   be.imgn.inject:inject-log-processor   the @Log processor plugin
 #   be.imgn.inject:inject-maven-plugin    module-info service registration
 #
-# The two example modules are built but excluded from the bundle.
+# The two example modules and the two @Log modules, which exercise the
+# processor plugin SPI, are built but excluded from the bundle.
 #
 # Safe to re-run: every step detects what is already done and skips it. Nothing
 # becomes public until you press Publish in the Central portal, which this
@@ -306,7 +305,7 @@ run_release() {
     info "Release version : $RELEASE_VERSION"
     info "Next version    : $NEXT_VERSION-SNAPSHOT"
     info "Artifacts       : be.imgn.inject:inject-parent, inject, inject-processor,"
-    info "                  inject-log, inject-log-processor, inject-maven-plugin"
+    info "                  inject-maven-plugin"
     info 'This publishes signed artifacts to Central, tags the commit and pushes.'
     info 'Nothing becomes public until you press Publish in the portal.'
     confirm 'Start the release workflow?'
@@ -329,11 +328,12 @@ run_release() {
     if gh run watch "$id" --repo "$REPO" --exit-status --interval 15; then
         bold 'Published to the staging area'
         info "Open $PORTAL"
-        info "Expect ONE deployment, be.imgn.inject:$RELEASE_VERSION, holding six components:"
+        info "Expect ONE deployment, be.imgn.inject:$RELEASE_VERSION, holding four components:"
         info '  inject-parent                       pom only'
-        info '  inject, inject-processor, inject-log, inject-log-processor,'
+        info '  inject, inject-processor,'
         info '  inject-maven-plugin                 jar, sources, javadoc'
-        info 'No inject-examples or inject-examples-module: they are excluded.'
+        info 'No inject-examples, inject-examples-module, inject-log or'
+        info 'inject-log-processor: they are excluded.'
         info 'Inspect the uploaded files first — that button is the point of no return.'
     else
         die "Run $id failed. Inspect it with: gh run view $id --repo $REPO --log-failed"

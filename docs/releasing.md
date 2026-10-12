@@ -40,19 +40,19 @@ the release version and the next development version, both
 
 `autoPublish` is false: the deployment waits in the
 [Central portal](https://central.sonatype.com/publishing/deployments) until a
-human presses **Publish**. One deployment holds six components:
+human presses **Publish**. One deployment holds four components:
 
 | Artifact | Published files |
 |---|---|
 | `be.imgn.inject:inject-parent` | POM |
 | `be.imgn.inject:inject` | jar, sources, javadoc |
 | `be.imgn.inject:inject-processor` | jar, sources, javadoc |
-| `be.imgn.inject:inject-log` | jar, sources, javadoc |
-| `be.imgn.inject:inject-log-processor` | jar, sources, javadoc |
 | `be.imgn.inject:inject-maven-plugin` | jar, sources, javadoc |
 
-`inject-examples` and `inject-examples-module` are built but excluded from the
-bundle (`excludeArtifacts` in the root POM).
+`inject-examples`, `inject-examples-module`, and the `@Log` modules
+`inject-log` and `inject-log-processor`, which exercise the processor plugin
+SPI, are built but excluded from the bundle (`excludeArtifacts` in the root
+POM).
 
 `scripts/publish.sh <releaseVersion> <nextVersion>` walks through the one-time
 setup below (signing key, keyserver, repository secrets, a vault copy of the
@@ -78,7 +78,10 @@ It needs JDK 24+, a clean tree on `main` in sync with `origin`, and a free
 echoing them. They are kept only in the Maven process's environment:
 `scripts/release-settings.xml` reads the token from `CENTRAL_TOKEN_USERNAME`
 and `CENTRAL_TOKEN_PASSWORD`, and `maven-gpg-plugin` reads
-`MAVEN_GPG_PASSPHRASE`. Export those three beforehand to skip the prompts.
+`MAVEN_GPG_PASSPHRASE`. Export those three beforehand to skip the prompts. Before building, the
+script signs a throwaway text with the key and the passphrase, as
+`maven-gpg-plugin` will: a wrong passphrase is asked again, up to three times,
+or stops the script at once when it came from the environment.
 The parent signs with `--pinentry-mode loopback`, so gpg-agent never asks for
 the passphrase itself.
 

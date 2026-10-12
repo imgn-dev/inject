@@ -111,7 +111,46 @@ credentials() {
         prompt_secret CENTRAL_TOKEN_USERNAME 'Central token username'
         prompt_secret CENTRAL_TOKEN_PASSWORD 'Central token password'
     fi
-    prompt_secret MAVEN_GPG_PASSPHRASE "Passphrase for key $KEY_ID"
+
+    # A wrong passphrase would otherwise surface only when maven-gpg-plugin
+    # signs, after the whole build.
+    local from_env='' attempt error
+    [[ -n ${MAVEN_GPG_PASSPHRASE:-} ]] && from_env=yes
+    for attempt in 1 2 3; do
+        prompt_secret MAVEN_GPG_PASSPHRASE "Passphrase for key $KEY_ID"
+        if error=$(passphrase_unlocks_key); then
+            ok "passphrase unlocks $KEY_ID"
+            return
+        fi
+        warn "Key $KEY_ID did not sign with that passphrase: $error"
+        [[ -z $from_env ]] || die 'MAVEN_GPG_PASSPHRASE from the environment is wrong.'
+        unset MAVEN_GPG_PASSPHRASE
+    done
+    die "Three wrong passphrases for key $KEY_ID."
+}
+
+# Signs a throwaway text the way maven-gpg-plugin does: passphrase on stdin,
+# loopback pinentry. The key's cached passphrase is forgotten first, so an
+# earlier unlock cannot vouch for a wrong passphrase. On failure, prints gpg's
+# last diagnostic.
+passphrase_unlocks_key() {
+    local grip probe error status=0
+    if command -v gpg-connect-agent >/dev/null; then
+        for grip in $(gpg --list-secret-keys --with-colons --with-keygrip "$KEY_ID" 2>/dev/null \
+                      | awk -F: '$1 == "grp" {print $10}'); do
+            gpg-connect-agent "CLEAR_PASSPHRASE --mode=normal $grip" /bye >/dev/null 2>&1 || true
+        done
+    fi
+    probe=$(mktemp)
+    printf 'imgn release passphrase check\n' >"$probe"
+    # printf is a builtin: the passphrase never appears in a process list.
+    error=$(printf '%s' "$MAVEN_GPG_PASSPHRASE" \
+            | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+                  --local-user "$KEY_ID" --armor --detach-sign --output - "$probe" 2>&1 >/dev/null) \
+        || status=$?
+    rm -f "$probe"
+    [[ $status -eq 0 ]] || printf '%s\n' "${error##*$'\n'}"
+    return "$status"
 }
 
 # Restores the POMs to the committed state. Safe because preflight demands a
@@ -139,7 +178,7 @@ build() {
         bold 'Dry run passed'
         info 'Every artifact built, verified and signed. POMs restored; nothing uploaded.'
         local module
-        for module in inject inject-processor inject-log inject-log-processor inject-maven-plugin; do
+        for module in inject inject-processor inject-maven-plugin; do
             info "  $module: $(ls "$module/target/"*.asc 2>/dev/null | wc -l | tr -d ' ') signatures"
         done
         exit 0
@@ -222,10 +261,12 @@ release_main() {
 
     bold "Released $RELEASE_VERSION to the staging area"
     info "Open $PORTAL"
-    info "Expect ONE deployment, be.imgn.inject:$RELEASE_VERSION, holding six components:"
+    info "Expect ONE deployment, be.imgn.inject:$RELEASE_VERSION, holding four components:"
     info '  inject-parent                       pom only'
-    info '  inject, inject-processor, inject-log, inject-log-processor,'
+    info '  inject, inject-processor,'
     info '  inject-maven-plugin                 jar, sources, javadoc'
+    info 'No inject-examples, inject-examples-module, inject-log or'
+    info 'inject-log-processor: they are excluded.'
     info 'Inspect the files, then press Publish. That button is the point of no return.'
 }
 
