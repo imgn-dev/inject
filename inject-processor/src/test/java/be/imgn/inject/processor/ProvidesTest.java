@@ -55,7 +55,7 @@ class ProvidesTest {
         AbstractStringAssert<?> source =
                 assertThat(compilation).generatedSourceFile("example.$Config$provideName$$Factory");
         source.contains("new Parameter(\"host\", Config.class)");
-        source.contains("Config host = getInstanceForConstructor(0, context)");
+        source.contains("Config host = this.<Config>getInstanceForConstructor(0, Config.class, context)");
         source.contains("return host.provideName()");
         // the host itself gets a default factory
         assertThat(compilation).generatedSourceFile("example.$Config$$Factory");
@@ -82,7 +82,7 @@ class ProvidesTest {
         AbstractStringAssert<?> source =
                 assertThat(compilation).generatedSourceFile("example.$Config$greeting$$Factory");
         source.contains("new Parameter(\"count\", Integer.class,");
-        source.contains("return Config.greeting(getInstanceForConstructor(0, context))");
+        source.contains("return Config.greeting(this.<Integer>getInstanceForConstructor(0, Integer.class, context))");
     }
 
     @Test

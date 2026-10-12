@@ -34,7 +34,7 @@ class ConstructorInjectionTest {
         source.contains("super(Greeter.class)");
         source.contains("new Parameter(\"name\", String.class,");
         source.contains("AnnotationMetadata.empty()");
-        source.contains("return new Greeter(getInstanceForConstructor(0, context))");
+        source.contains("return new Greeter(this.<String>getInstanceForConstructor(0, String.class, context))");
     }
 
     @Test
@@ -56,7 +56,7 @@ class ConstructorInjectionTest {
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Pair$$Factory");
         source.contains("new Parameter(\"first\", String.class,");
         source.contains("new Parameter(\"second\", Integer.class,");
-        source.contains("getInstanceForConstructor(0, context)");
-        source.contains("getInstanceForConstructor(1, context)");
+        source.contains("this.<String>getInstanceForConstructor(0, String.class, context)");
+        source.contains("this.<Integer>getInstanceForConstructor(1, Integer.class, context)");
     }
 }

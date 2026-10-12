@@ -89,7 +89,8 @@ class InterceptedProxyGenerationTest {
 
         assertThat(compilation)
                 .generatedSourceFile("example.$Orders$$Factory")
-                .contains("new $Orders$$Intercepted(context, getInstanceForConstructor(0, context))");
+                .contains("new $Orders$$Intercepted(context, "
+                        + "this.<String>getInstanceForConstructor(0, String.class, context))");
     }
 
     @Test

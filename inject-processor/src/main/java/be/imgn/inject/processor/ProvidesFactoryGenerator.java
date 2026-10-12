@@ -111,7 +111,11 @@ final class ProvidesFactoryGenerator {
         if (model.isStatic()) {
             builder.addStatement("return $T.$L($L)", model.hostType(), model.methodName(), arguments);
         } else {
-            builder.addStatement("$T host = getInstanceForConstructor(0, context)", model.hostType())
+            builder.addStatement(
+                            "$T host = this.<$T>getInstanceForConstructor(0, $T.class, context)",
+                            model.hostType(),
+                            model.hostType(),
+                            model.hostType())
                     .addStatement("return host.$L($L)", model.methodName(), arguments);
         }
         return builder.build();
@@ -184,13 +188,17 @@ final class ProvidesFactoryGenerator {
 
     private static CodeBlock argument(ParameterModel parameter, int index) {
         CodeBlock pluginInitializer = parameter.pluginInitializer();
-        return pluginInitializer != null ? pluginInitializer : resolve(parameter.isProvider(), index);
+        return pluginInitializer != null
+                ? pluginInitializer
+                : resolve(parameter.isProvider(), parameter.typeArgument(), parameter.erasure(), index);
     }
 
-    private static CodeBlock resolve(boolean isProvider, int index) {
-        return isProvider
-                ? CodeBlock.of("getProviderForConstructor($L, context)", index)
-                : CodeBlock.of("getInstanceForConstructor($L, context)", index);
+    /**
+     * {@return a resolution call for a {@code @Provides} method parameter; see {@link BeanFactoryGenerator#resolution}}
+     */
+    private static CodeBlock resolve(boolean isProvider, TypeName typeArgument, TypeName erasure, int index) {
+        return BeanFactoryGenerator.resolution(
+                isProvider, typeArgument, erasure, "Constructor", CodeBlock.of("$L", index));
     }
 
     private static CodeBlock parameter(ParameterModel parameter) {

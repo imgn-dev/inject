@@ -305,7 +305,7 @@ constructor calling `super()`. The generated factory changes in one place:
 ```java
 @Override
 protected OrderService createInstance(Context context) {
-    return new $OrderService$$Intercepted(context, getInstanceForConstructor(0, context));
+    return new $OrderService$$Intercepted(context, this.<Repo>getInstanceForConstructor(0, Repo.class, context));
 }
 ```
 

@@ -22,7 +22,7 @@ public final class CycleBFactory extends Factory<CycleBFactory.B> {
 
     @Override
     protected B createInstance(Context context) {
-        return new B(getInstanceForConstructor(0, context));
+        return new B(this.<CycleAFactory.A>getInstanceForConstructor(0, CycleAFactory.A.class, context));
     }
 
     /** Bean B. */

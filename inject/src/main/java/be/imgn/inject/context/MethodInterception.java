@@ -4,7 +4,6 @@ import be.imgn.inject.Provider;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -16,16 +15,6 @@ import org.jspecify.annotations.Nullable;
  * interceptor that calls {@code proceed()} more than once are both correct.
  */
 public final class MethodInterception {
-
-    private static final Map<Class<?>, Class<?>> WRAPPERS = Map.of(
-            boolean.class, Boolean.class,
-            byte.class, Byte.class,
-            char.class, Character.class,
-            short.class, Short.class,
-            int.class, Integer.class,
-            long.class, Long.class,
-            float.class, Float.class,
-            double.class, Double.class);
 
     private final InterceptedMethod method;
     private final List<Provider<MethodInterceptor>> interceptors;
@@ -76,7 +65,7 @@ public final class MethodInterception {
                 }
                 continue;
             }
-            Class<?> accepted = declared.isPrimitive() ? Objects.requireNonNull(WRAPPERS.get(declared)) : declared;
+            Class<?> accepted = InjectionTypes.boxed(declared);
             if (!accepted.isInstance(value)) {
                 throw new IllegalArgumentException(method + " argument " + index + " expects " + declared.getName()
                         + " but got " + value.getClass().getName() + ".");

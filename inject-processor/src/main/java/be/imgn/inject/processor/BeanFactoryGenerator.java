@@ -144,7 +144,10 @@ final class BeanFactoryGenerator {
                 .addParameter(CONTEXT, "context");
         for (int index = 0; index < model.fields().size(); index++) {
             FieldModel field = model.fields().get(index);
-            builder.addStatement("instance.$L = $L", field.name(), resolve(field.isProvider(), "Field", index));
+            builder.addStatement(
+                    "instance.$L = $L",
+                    field.name(),
+                    resolve(field.isProvider(), field.typeArgument(), field.erasure(), "Field", index));
         }
         for (PluginField pluginField : model.pluginFields()) {
             builder.addStatement("instance.$L = $L", pluginField.name(), pluginField.initializer());
@@ -285,26 +288,46 @@ final class BeanFactoryGenerator {
 
     private static CodeBlock argument(ParameterModel parameter, String kind, int index) {
         CodeBlock pluginInitializer = parameter.pluginInitializer();
-        return pluginInitializer != null ? pluginInitializer : resolve(parameter.isProvider(), kind, index);
+        return pluginInitializer != null
+                ? pluginInitializer
+                : resolve(parameter.isProvider(), parameter.typeArgument(), parameter.erasure(), kind, index);
     }
 
     private static CodeBlock methodArgument(ParameterModel parameter, int methodIndex, int paramIndex) {
         CodeBlock pluginInitializer = parameter.pluginInitializer();
         return pluginInitializer != null
                 ? pluginInitializer
-                : resolveMethod(parameter.isProvider(), methodIndex, paramIndex);
+                : resolveMethod(
+                        parameter.isProvider(), parameter.typeArgument(), parameter.erasure(), methodIndex, paramIndex);
     }
 
-    private static CodeBlock resolve(boolean isProvider, String kind, int index) {
-        return isProvider
-                ? CodeBlock.of("getProviderFor$L($L, context)", kind, index)
-                : CodeBlock.of("getInstanceFor$L($L, context)", kind, index);
+    /**
+     * {@return a resolution call: the explicit type argument gives it an exact static type, so the call selects the
+     * right overload, and the class literal is checked at runtime against the injection point and the resolved value}
+     *
+     * <p>A primitive dependency is resolved as its wrapper and cast back, so that {@code m(int)} is still chosen over
+     * {@code m(Integer)}.
+     */
+    static CodeBlock resolution(
+            boolean isProvider, TypeName typeArgument, TypeName erasure, String kind, CodeBlock indexes) {
+        CodeBlock call = CodeBlock.of(
+                "this.<$T>get$LFor$L($L, $T.class, context)",
+                typeArgument,
+                isProvider ? "Provider" : "Instance",
+                kind,
+                indexes,
+                erasure);
+        return erasure.isPrimitive() && !isProvider ? CodeBlock.of("($T) $L", erasure, call) : call;
     }
 
-    private static CodeBlock resolveMethod(boolean isProvider, int methodIndex, int paramIndex) {
-        return isProvider
-                ? CodeBlock.of("getProviderForMethod($L, $L, context)", methodIndex, paramIndex)
-                : CodeBlock.of("getInstanceForMethod($L, $L, context)", methodIndex, paramIndex);
+    private static CodeBlock resolve(
+            boolean isProvider, TypeName typeArgument, TypeName erasure, String kind, int index) {
+        return resolution(isProvider, typeArgument, erasure, kind, CodeBlock.of("$L", index));
+    }
+
+    private static CodeBlock resolveMethod(
+            boolean isProvider, TypeName typeArgument, TypeName erasure, int methodIndex, int paramIndex) {
+        return resolution(isProvider, typeArgument, erasure, "Method", CodeBlock.of("$L, $L", methodIndex, paramIndex));
     }
 
     private static CodeBlock parameterList(List<ParameterModel> parameters) {

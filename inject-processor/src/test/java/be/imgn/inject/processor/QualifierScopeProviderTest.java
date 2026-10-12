@@ -72,7 +72,7 @@ class QualifierScopeProviderTest {
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Lazy$$Factory");
         source.contains("new Parameter(\"provider\", String.class,");
-        source.contains("return new Lazy(getProviderForConstructor(0, context))");
+        source.contains("return new Lazy(this.<String>getProviderForConstructor(0, String.class, context))");
     }
 
     @Test

@@ -30,13 +30,15 @@ import javax.tools.ToolProvider;
 final class TestCompiler {
 
     private final List<Processor> processors;
+    private final List<String> options;
 
-    private TestCompiler(List<Processor> processors) {
+    private TestCompiler(List<Processor> processors, List<String> options) {
         this.processors = processors;
+        this.options = options;
     }
 
     static TestCompiler javac() {
-        return new TestCompiler(List.of());
+        return new TestCompiler(List.of(), List.of());
     }
 
     /** {@return an in-memory compilation unit for the top-level type {@code qualifiedName}} */
@@ -51,7 +53,12 @@ final class TestCompiler {
     }
 
     TestCompiler withProcessors(Processor... processors) {
-        return new TestCompiler(List.of(processors));
+        return new TestCompiler(List.of(processors), options);
+    }
+
+    /** {@return a compiler passing {@code options} to javac, after {@code -proc:full}} */
+    TestCompiler withOptions(String... options) {
+        return new TestCompiler(processors, List.of(options));
     }
 
     Compilation compile(JavaFileObject... sources) {
@@ -68,7 +75,7 @@ final class TestCompiler {
             fileManager.setLocationFromPaths(StandardLocation.CLASS_OUTPUT, List.of(classOutput));
             fileManager.setLocationFromPaths(StandardLocation.SOURCE_OUTPUT, List.of(sourceOutput));
             JavaCompiler.CompilationTask task =
-                    compiler.getTask(null, fileManager, diagnostics, List.of("-proc:full"), null, sources);
+                    compiler.getTask(null, fileManager, diagnostics, javacOptions(), null, sources);
             task.setProcessors(processors);
             boolean success = task.call();
             List<JavaFileObject> generated = new ArrayList<>();
@@ -81,6 +88,13 @@ final class TestCompiler {
             deleteRecursively(classOutput);
             deleteRecursively(sourceOutput);
         }
+    }
+
+    private List<String> javacOptions() {
+        List<String> all = new ArrayList<>();
+        all.add("-proc:full");
+        all.addAll(options);
+        return all;
     }
 
     private static List<JavaFileObject> readBack(StandardLocation location, Path root) throws IOException {

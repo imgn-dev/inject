@@ -26,7 +26,7 @@ class FieldAndMethodInjectionTest {
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$$Factory");
         source.contains("new FieldInjectionPoint(this, \"greeting\"");
-        source.contains("instance.greeting = getInstanceForField(0, context)");
+        source.contains("instance.greeting = this.<String>getInstanceForField(0, String.class, context)");
     }
 
     @Test
@@ -47,7 +47,7 @@ class FieldAndMethodInjectionTest {
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Service$$Factory");
         source.contains("new MethodInjectionPoint(this, \"setClock\"");
         source.contains("new Parameter(\"clock\", String.class,");
-        source.contains("instance.setClock(getInstanceForMethod(0, 0, context))");
+        source.contains("instance.setClock(this.<String>getInstanceForMethod(0, 0, String.class, context))");
     }
 
     @Test
@@ -72,8 +72,8 @@ class FieldAndMethodInjectionTest {
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Bean$$Factory");
         source.contains("super(Bean.class)");
-        source.contains("return new Bean(getInstanceForConstructor(0, context))");
-        source.contains("instance.counter = getInstanceForField(0, context)");
-        source.contains("instance.init(getInstanceForMethod(0, 0, context))");
+        source.contains("return new Bean(this.<String>getInstanceForConstructor(0, String.class, context))");
+        source.contains("instance.counter = this.<Integer>getInstanceForField(0, Integer.class, context)");
+        source.contains("instance.init(this.<Long>getInstanceForMethod(0, 0, Long.class, context))");
     }
 }

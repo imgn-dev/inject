@@ -49,11 +49,14 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.MirroredTypesException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import org.jspecify.annotations.Nullable;
@@ -1132,6 +1135,8 @@ final class ModelFactory {
         return new ParameterModel(
                 parameter.getSimpleName().toString(),
                 dependency.type(),
+                dependency.typeArgument(),
+                dependency.erasure(),
                 qualifier,
                 dependency.isProvider(),
                 pluginArgument,
@@ -1210,6 +1215,8 @@ final class ModelFactory {
         return new FieldModel(
                 fieldElement.getSimpleName().toString(),
                 dependency.type(),
+                dependency.typeArgument(),
+                dependency.erasure(),
                 qualifier,
                 dependency.isProvider(),
                 Annotations.metadata(List.of(fieldElement), elements));
@@ -1217,10 +1224,39 @@ final class ModelFactory {
 
     private Dependency dependency(TypeMirror type, Types types, Element site) {
         Optional<TypeMirror> providerInner = providerInner(type);
-        if (providerInner.isPresent()) {
-            return new Dependency(typeExpression(providerInner.get(), types, site), true);
-        }
-        return new Dependency(typeExpression(type, types, site), false);
+        TypeMirror dependency = providerInner.orElse(type);
+        TypeMirror erasure = types.erasure(dependency);
+        return new Dependency(
+                typeExpression(dependency, types, site),
+                providerInner.isPresent(),
+                typeArgument(dependency, erasure),
+                TypeName.get(erasure));
+    }
+
+    /**
+     * {@return the type to name as the explicit type argument of a resolution call: {@code dependency} itself, boxed;
+     * its erasure when it is a wildcard or mentions a type variable, neither of which the factory can name}
+     */
+    private static TypeName typeArgument(TypeMirror dependency, TypeMirror erasure) {
+        boolean nameable = dependency.getKind() != TypeKind.WILDCARD && !mentionsTypeVariable(dependency);
+        return TypeName.get(nameable ? dependency : erasure).box();
+    }
+
+    /** {@return whether {@code type} is, or has among its type arguments or components, a type variable} */
+    private static boolean mentionsTypeVariable(TypeMirror type) {
+        return switch (type) {
+            case TypeVariable ignored -> true;
+            case DeclaredType declared ->
+                declared.getTypeArguments().stream().anyMatch(ModelFactory::mentionsTypeVariable);
+            case ArrayType array -> mentionsTypeVariable(array.getComponentType());
+            case WildcardType wildcard -> {
+                TypeMirror extendsBound = wildcard.getExtendsBound();
+                TypeMirror superBound = wildcard.getSuperBound();
+                yield (extendsBound != null && mentionsTypeVariable(extendsBound))
+                        || (superBound != null && mentionsTypeVariable(superBound));
+            }
+            default -> false;
+        };
     }
 
     /** {@return the runtime type expression for a dependency: a class literal, or a Types factory call} */
@@ -1321,5 +1357,13 @@ final class ModelFactory {
         return List.copyOf(chain);
     }
 
-    private record Dependency(CodeBlock type, boolean isProvider) {}
+    /**
+     * A dependency as the generated code needs it.
+     *
+     * @param type the runtime type expression for its injection point
+     * @param isProvider whether it is injected as a {@code Provider} of the type
+     * @param typeArgument the explicit type argument of the resolution call
+     * @param erasure the erased type, passed to the resolution call as a class literal
+     */
+    private record Dependency(CodeBlock type, boolean isProvider, TypeName typeArgument, TypeName erasure) {}
 }

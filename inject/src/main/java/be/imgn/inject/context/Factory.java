@@ -1,8 +1,10 @@
 package be.imgn.inject.context;
 
+import be.imgn.inject.InjectionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -176,30 +178,44 @@ public abstract class Factory<T> implements BeanDefinition {
     /**
      * {@return the provider for the {@code paramIndex}-th constructor parameter}
      *
+     * <p>Generated code names the dependency type twice: {@code <D>}, so that the call has an exact static type and
+     * selects the right overload, and {@code type}, its erasure, which is checked against the declared parameter type
+     * and against every value the provider returns.
+     *
      * @param paramIndex the zero-based parameter index
+     * @param type the erasure of the parameter's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared parameter type, or, from the
+     *     provider, if a resolved value is not a {@code type}
      */
-    protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Context context) {
+    protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Class<? super D> type, Context context) {
+        Objects.requireNonNull(type, "type");
         Objects.requireNonNull(context, "context");
         ConstructorInjectionPoint point = constructorInjectionPoint()
                 .orElseThrow(() -> new IllegalStateException("No constructor injection point for " + type().getName()));
         checkIndex(paramIndex, point.parameters().size(), "constructor");
-        return context.getProvider(point.<D>keyForParameter(paramIndex));
+        Parameter parameter = point.parameters().get(paramIndex);
+        String site = "constructor parameter " + parameter.name();
+        checkDeclaredType(site, parameter.type(), type);
+        return checked(site, type, context.getProvider(point.<D>keyForParameter(paramIndex)));
     }
 
     /**
      * {@return the resolved instance for the {@code paramIndex}-th constructor parameter}
      *
      * @param paramIndex the zero-based parameter index
+     * @param type the erasure of the parameter's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared parameter type, or the resolved
+     *     value is not a {@code type}
+     * @see #getProviderForConstructor(int, Class, Context)
      */
-    // D is chosen by the generated caller and matches the key at that index; the accessor exists so the
-    // generated code needs no casts.
+    // D is chosen by the generated caller with an explicit type argument, and checked through type.
     @SuppressWarnings("TypeParameterUnusedInFormals")
-    protected final <D> D getInstanceForConstructor(int paramIndex, Context context) {
-        return this.<D>getProviderForConstructor(paramIndex, context).get();
+    protected final <D> D getInstanceForConstructor(int paramIndex, Class<? super D> type, Context context) {
+        return this.<D>getProviderForConstructor(paramIndex, type, context).get();
     }
 
     /**
@@ -207,14 +223,23 @@ public abstract class Factory<T> implements BeanDefinition {
      *
      * @param methodIndex the index into {@link #methodInjectionPoints()}
      * @param paramIndex the zero-based parameter index
+     * @param type the erasure of the parameter's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared parameter type, or, from the
+     *     provider, if a resolved value is not a {@code type}
+     * @see #getProviderForConstructor(int, Class, Context)
      */
-    protected final <D> Provider<D> getProviderForMethod(int methodIndex, int paramIndex, Context context) {
+    protected final <D> Provider<D> getProviderForMethod(
+            int methodIndex, int paramIndex, Class<? super D> type, Context context) {
+        Objects.requireNonNull(type, "type");
         Objects.requireNonNull(context, "context");
         MethodInjectionPoint point = methodInjectionPoints().get(methodIndex);
         checkIndex(paramIndex, point.parameters().size(), "method");
-        return context.getProvider(point.<D>keyForParameter(paramIndex));
+        Parameter parameter = point.parameters().get(paramIndex);
+        String site = "parameter " + parameter.name() + " of method " + point.methodName();
+        checkDeclaredType(site, parameter.type(), type);
+        return checked(site, type, context.getProvider(point.<D>keyForParameter(paramIndex)));
     }
 
     /**
@@ -222,37 +247,75 @@ public abstract class Factory<T> implements BeanDefinition {
      *
      * @param methodIndex the index into {@link #methodInjectionPoints()}
      * @param paramIndex the zero-based parameter index
+     * @param type the erasure of the parameter's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared parameter type, or the resolved
+     *     value is not a {@code type}
+     * @see #getProviderForConstructor(int, Class, Context)
      */
     @SuppressWarnings("TypeParameterUnusedInFormals")
-    protected final <D> D getInstanceForMethod(int methodIndex, int paramIndex, Context context) {
-        return this.<D>getProviderForMethod(methodIndex, paramIndex, context).get();
+    protected final <D> D getInstanceForMethod(
+            int methodIndex, int paramIndex, Class<? super D> type, Context context) {
+        return this.<D>getProviderForMethod(methodIndex, paramIndex, type, context)
+                .get();
     }
 
     /**
      * {@return the provider for the field at {@code fieldIndex}}
      *
      * @param fieldIndex the index into {@link #fieldInjectionPoints()}
+     * @param type the erasure of the field's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared field type, or, from the provider,
+     *     if a resolved value is not a {@code type}
+     * @see #getProviderForConstructor(int, Class, Context)
      */
-    protected final <D> Provider<D> getProviderForField(int fieldIndex, Context context) {
+    protected final <D> Provider<D> getProviderForField(int fieldIndex, Class<? super D> type, Context context) {
+        Objects.requireNonNull(type, "type");
         Objects.requireNonNull(context, "context");
         FieldInjectionPoint point = fieldInjectionPoints().get(fieldIndex);
-        return context.getProvider(point.<D>key());
+        String site = "field " + point.fieldName();
+        checkDeclaredType(site, point.fieldType(), type);
+        return checked(site, type, context.getProvider(point.<D>key()));
     }
 
     /**
      * {@return the resolved instance for a field}
      *
      * @param fieldIndex the index into {@link #fieldInjectionPoints()}
+     * @param type the erasure of the field's dependency type
      * @param context the resolution context
      * @param <D> the dependency type
+     * @throws InjectionException if {@code type} is not the erasure of the declared field type, or the resolved value
+     *     is not a {@code type}
+     * @see #getProviderForConstructor(int, Class, Context)
      */
     @SuppressWarnings("TypeParameterUnusedInFormals")
-    protected final <D> D getInstanceForField(int fieldIndex, Context context) {
-        return this.<D>getProviderForField(fieldIndex, context).get();
+    protected final <D> D getInstanceForField(int fieldIndex, Class<? super D> type, Context context) {
+        return this.<D>getProviderForField(fieldIndex, type, context).get();
+    }
+
+    private void checkDeclaredType(String site, Type declared, Class<?> type) {
+        if (InjectionTypes.erasure(declared) != type) {
+            throw new InjectionException(this.type.getName() + " " + site + " is declared as " + declared.getTypeName()
+                    + ", but is resolved as " + type.getName() + ".");
+        }
+    }
+
+    private <D> Provider<D> checked(String site, Class<? super D> type, Provider<D> provider) {
+        Class<?> accepted = InjectionTypes.boxed(type);
+        return () -> {
+            D value = provider.get();
+            // Null passes for a reference type, as it always has; only a primitive cannot take it.
+            if (value == null ? type.isPrimitive() : !accepted.isInstance(value)) {
+                throw new InjectionException(
+                        this.type.getName() + " " + site + " expects " + type.getName() + ", but was given "
+                                + (value == null ? "null" : value.getClass().getName()) + ".");
+            }
+            return value;
+        };
     }
 
     private void checkIndex(int index, int size, String kind) {

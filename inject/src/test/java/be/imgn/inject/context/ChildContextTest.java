@@ -147,7 +147,7 @@ class ChildContextTest {
 
         @Override
         protected Holder createInstance(Context context) {
-            return new Holder(getInstanceForConstructor(0, context));
+            return new Holder(this.<String>getInstanceForConstructor(0, String.class, context));
         }
     }
 
@@ -176,7 +176,7 @@ class ChildContextTest {
 
         @Override
         protected Holder createInstance(Context context) {
-            return new Holder(getInstanceForConstructor(0, context));
+            return new Holder(this.<String>getInstanceForConstructor(0, String.class, context));
         }
     }
 

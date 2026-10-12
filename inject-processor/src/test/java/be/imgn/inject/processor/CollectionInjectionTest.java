@@ -71,7 +71,7 @@ class CollectionInjectionTest {
         assertThat(compilation).generatedSourceFile("example.$Lazy$$Factory").contains("Types.setOf(String.class)");
         assertThat(compilation)
                 .generatedSourceFile("example.$Lazy$$Factory")
-                .contains("getProviderForConstructor(0, context)");
+                .contains("this.<Set<String>>getProviderForConstructor(0, Set.class, context)");
     }
 
     @Test

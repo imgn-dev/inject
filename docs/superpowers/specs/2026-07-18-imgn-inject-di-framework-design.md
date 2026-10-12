@@ -171,8 +171,8 @@ public abstract class Factory<T> {
     protected abstract T createInstance(Context context);
     protected void injectMethods(T instance, Context context);   // empty default
     protected void injectFields(T instance, Context context);    // empty default
-    protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Context context);
-    protected final <D> D getInstanceForConstructor(int paramIndex, Context context);
+    protected final <D> Provider<D> getProviderForConstructor(int paramIndex, Class<? super D> type, Context context);
+    protected final <D> D getInstanceForConstructor(int paramIndex, Class<? super D> type, Context context);
     // getProviderForMethod / getInstanceForMethod / getProviderForField / getInstanceForField
     protected List<Key<?>> exposedKeys();           // default: List.of(Key.of(type))
 }
@@ -191,6 +191,17 @@ public abstract class Factory<T> {
   `Provider<Foo>` has `isProvider = true` and its `type`/`fieldType` set to the inner
   `Foo`; the generated factory injects the provider itself (via
   `getProviderFor…`) rather than a resolved `Foo` (via `getInstanceFor…`).
+- **Resolution calls name the dependency type twice.** Generated code calls
+  `this.<Foo>getInstanceForConstructor(0, Foo.class, context)`. The explicit type
+  argument gives the call an exact static type, so javac selects the injected
+  overload when the bean has constructors or methods of the same arity; it is the
+  declared type, boxed, or its erasure when the factory cannot name it (a type
+  variable or a wildcard). A primitive dependency is cast back
+  (`(int) this.<Integer>…(0, int.class, context)`) so that `m(int)` is still chosen
+  over `m(Integer)`. The class literal is the erasure: the helper checks that it is
+  the erasure of the injection point's declared type, and that every resolved value
+  is an instance of it (a primitive's wrapper, never `null`), throwing
+  `InjectionException` naming the bean, the injection point and both types.
 
 ## 6. Annotation Processor (`inject-processor`)
 

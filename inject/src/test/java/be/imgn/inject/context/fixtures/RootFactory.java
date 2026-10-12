@@ -29,7 +29,7 @@ public final class RootFactory extends Factory<RootFactory.Root> {
 
     @Override
     protected Root createInstance(Context context) {
-        return new Root(getInstanceForConstructor(0, context));
+        return new Root(this.<String>getInstanceForConstructor(0, String.class, context));
     }
 
     /** The produced bean. */
