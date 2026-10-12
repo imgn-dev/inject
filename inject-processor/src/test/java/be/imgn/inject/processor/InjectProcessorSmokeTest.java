@@ -13,4 +13,19 @@ class InjectProcessorSmokeTest {
 
         assertThat(compilation).succeeded();
     }
+
+    @Test
+    void processorAddsNoWarningAtTheCompilersOwnSourceVersion() {
+        Compilation compilation =
+                javac().withProcessors(new InjectProcessor()).compile(TestCompiler.source("example.Bean", """
+                        package example;
+
+                        public class Bean {
+                            @be.imgn.inject.Inject
+                            public Bean() {}
+                        }
+                        """));
+
+        assertThat(compilation).succeeded().hadNoWarnings();
+    }
 }

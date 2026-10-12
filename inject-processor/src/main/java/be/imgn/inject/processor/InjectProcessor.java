@@ -57,9 +57,18 @@ public final class InjectProcessor extends AbstractProcessor {
         this.serviceRegistrar = new ServiceRegistrar(processingEnvironment, diagnostics);
     }
 
+    /**
+     * Supports every source version the running compiler supports.
+     *
+     * <p>The processor reads only declarations and annotations, which newer language versions extend without changing
+     * what it relies on. Anything older than this would make javac warn on every build with a newer {@code -source},
+     * which fails builds that use {@code -Werror}.
+     *
+     * @return the latest source version of the running compiler
+     */
     @Override
     public SourceVersion getSupportedSourceVersion() {
-        return SourceVersion.RELEASE_21;
+        return SourceVersion.latestSupported();
     }
 
     @Override

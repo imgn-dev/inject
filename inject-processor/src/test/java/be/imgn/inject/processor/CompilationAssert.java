@@ -50,6 +50,16 @@ final class CompilationAssert extends AbstractAssert<CompilationAssert, Compilat
         return hadDiagnosticContaining(Diagnostic.Kind.NOTE, expected);
     }
 
+    /** Verifies that javac reported no warning, mandatory or not. */
+    CompilationAssert hadNoWarnings() {
+        isNotNull();
+        if (!actual.diagnostics(Diagnostic.Kind.WARNING).isEmpty()
+                || !actual.diagnostics(Diagnostic.Kind.MANDATORY_WARNING).isEmpty()) {
+            failWithMessage("Expected no warning, but the diagnostics were:%n%s", describeDiagnostics());
+        }
+        return this;
+    }
+
     /** Verifies that the source of {@code qualifiedName} was generated, and returns assertions on its content. */
     AbstractStringAssert<?> generatedSourceFile(String qualifiedName) {
         isNotNull();
