@@ -26,6 +26,19 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
   gone, the reference is noise. Delete it.
 - When code changes, update its docs in the same change. Stale docs are a defect.
 
+## Changelog
+
+- `CHANGELOG.md` records every change since 0.1.0, the first release. Keep it
+  current at all times.
+- One section per release, newest first; changes not yet released go under
+  `## Unreleased`. Within a section, list entries in the order the changes
+  landed.
+- Each entry says what changed for users and references its commits by short
+  hash, linked to `https://github.com/ogregoire/imgn-inject/commit/<hash>`. A
+  commit cannot name its own hash, so the entry follows in the next commit.
+- On release, rename `## Unreleased` to `## X.Y.Z — YYYY-MM-DD` and reference
+  the `Release X.Y.Z` commit.
+
 ## Testing
 
 - JUnit 6 + AssertJ. Validate all inputs; test the thrown exceptions.

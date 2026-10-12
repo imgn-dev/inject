@@ -79,3 +79,15 @@ errors, with no cost deferred to runtime.
   such as a configuration record — is supplied through a
   [`@Provides` method](provides-methods.md) or a
   [builder binding](builder-overrides.md).
+- The annotation processor reads every annotation and claims none, so other
+  processors still see them all. javac's `processing` lint reports each
+  annotation no processor claims (`No processor claimed any of these
+  annotations: …`), which fails a build compiling with `-Xlint:all -Werror`.
+  Disable that one category with `-Xlint:all,-processing`:
+
+  ```xml
+  <compilerArgs>
+      <arg>-Xlint:all,-processing</arg>
+      <arg>-Werror</arg>
+  </compilerArgs>
+  ```
