@@ -18,12 +18,12 @@
 
     <name>imgn inject parent</name>
     <description>Build configuration shared by the imgn inject modules.</description>
-    <url>https://github.com/ogregoire/imgn-inject</url>
+    <url>https://github.com/imgn-dev/inject</url>
 
     <scm>
-        <connection>scm:git:https://github.com/ogregoire/imgn-inject.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/ogregoire/imgn-inject.git</developerConnection>
-        <url>https://github.com/ogregoire/imgn-inject</url>
+        <connection>scm:git:https://github.com/imgn-dev/inject.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/imgn-dev/inject.git</developerConnection>
+        <url>https://github.com/imgn-dev/inject</url>
         <tag>HEAD</tag>
     </scm>
 

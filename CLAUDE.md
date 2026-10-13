@@ -34,7 +34,7 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
   `## Unreleased`. Within a section, list entries in the order the changes
   landed.
 - Each entry says what changed for users and references its commits by short
-  hash, linked to `https://github.com/ogregoire/imgn-inject/commit/<hash>`. A
+  hash, linked to `https://github.com/imgn-dev/inject/commit/<hash>`. A
   commit cannot name its own hash, so the entry follows in the next commit.
 - On release, rename `## Unreleased` to `## X.Y.Z — YYYY-MM-DD` and reference
   the `Release X.Y.Z` commit.
