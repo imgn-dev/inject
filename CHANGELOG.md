@@ -31,6 +31,25 @@ the order the changes landed, each referencing its commits.
   failing on the first resolution that needs it. **Breaking:** a dependency
   bound only in child injectors now also needs a root-level binding.
   ([b215bdb](https://github.com/imgn-dev/inject/commit/b215bdb))
+- **The repository moved to `imgn-dev/inject`.** It is public at
+  https://github.com/imgn-dev/inject; the POMs' URL and SCM point there.
+  ([2a3bee2](https://github.com/imgn-dev/inject/commit/2a3bee2))
+- **The processor builds on Gaia.** `inject-processor` uses `gaia-processing`
+  instead of JavaPoet.
+  - Generated sources are pure ASCII, and carry
+    `@javax.annotation.processing.Generated` when the compilation can see it.
+  - The factory service file lists its entries sorted, and fails the build if
+    one cannot be loaded by `ServiceLoader`. On an incremental build it keeps
+    the entries already in the class output, minus those whose class no longer
+    exists.
+  - A bean whose signature names a type another processor has not generated yet
+    waits for the round that generates it.
+  - A dependency compiled from source in any round gets a default factory,
+    unless a binding from that round or an earlier one already serves it.
+  - **Breaking:** `InjectPlugin.initializer` returns
+    `Optional<be.imgn.gaia.processing.source.CodeBlock>`; processor plugins
+    must move from JavaPoet to `gaia-processing`.
+  ([04004a5](https://github.com/imgn-dev/inject/commit/04004a5))
 
 ## 0.1.0 — 2026-10-12
 
