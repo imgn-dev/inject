@@ -68,26 +68,35 @@ commit and tag, next `-SNAPSHOT` commit, push, and a GitHub release through
 `gh`, which uses no Actions minutes.
 
 ```bash
-scripts/release.sh --dry-run 0.1.0 0.2.0   # build, verify and sign; upload nothing
+scripts/release.sh --dry-run 0.1.0 0.2.0   # every prompt and the same build; upload nothing
 scripts/release.sh 0.1.0 0.2.0             # the release
 ```
 
-It needs JDK 24+, a clean tree on `main` in sync with `origin`, and a free
-`vX` tag. It walks through choosing the signing key, the same step as
+It needs JDK 24+, `curl`, a clean tree on `main` in sync with `origin`, and a
+free `vX` tag. It walks through choosing the signing key, the same step as
 `publish.sh`, and prompts for the Central token and the key passphrase without
 echoing them. They are kept only in the Maven process's environment:
 `scripts/release-settings.xml` reads the token from `CENTRAL_TOKEN_USERNAME`
 and `CENTRAL_TOKEN_PASSWORD`, and `maven-gpg-plugin` reads
-`MAVEN_GPG_PASSPHRASE`. Export those three beforehand to skip the prompts. Before building, the
-script signs a throwaway text with the key and the passphrase, as
-`maven-gpg-plugin` will: a wrong passphrase is asked again, up to three times,
-or stops the script at once when it came from the environment.
-The parent signs with `--pinentry-mode loopback`, so gpg-agent never asks for
-the passphrase itself.
+`MAVEN_GPG_PASSPHRASE`. Export those three beforehand to skip the prompts.
 
-`--dry-run` runs everything up to the upload, including the signatures, then
-restores the POMs. Run it first. If the build fails before the upload, the
-POMs are restored too. Once the upload has succeeded, nothing is rolled back.
+Before building, the script checks both secrets. It asks the Central portal
+whether the release is already published, a call that needs a valid token: a
+refused token is asked again, up to three times. If the portal cannot be
+reached, it warns and goes on, and the upload will tell. It then signs a
+throwaway text with the key and the passphrase, as `maven-gpg-plugin` will: a
+wrong passphrase is asked again, up to three times. A wrong token or
+passphrase from the environment stops the script at once. The parent signs
+with `--pinentry-mode loopback`, so gpg-agent never asks for the passphrase
+itself.
+
+`--dry-run` goes through every check, prompt and question of a release, in the
+same order, so each one can be foreseen. It runs the deployment's build with
+`verify` instead of `deploy`: everything is built, verified and signed, and
+nothing is uploaded. It then restores the POMs, and prints what a release
+would upload, commit, tag, push and create instead of doing it. Run it first.
+If the build fails before the upload, the POMs are restored too. Once the
+upload has succeeded, nothing is rolled back.
 
 The `be.imgn` releases so far were signed by key `81F8496A2F65610C`
 (RSA 4096, *The IMGN developers &lt;imgn@imgn.be&gt;*, on keyserver.ubuntu.com).
