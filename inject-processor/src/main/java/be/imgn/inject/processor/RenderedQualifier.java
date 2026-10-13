@@ -1,6 +1,6 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.CodeBlock;
+import be.imgn.gaia.processing.source.CodeBlock;
 
 /**
  * A generated qualifier expression together with how it keys a binding.

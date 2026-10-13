@@ -1,12 +1,12 @@
 package be.imgn.inject.processor;
 
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.JavaFile;
+import be.imgn.gaia.processing.source.Method;
+import be.imgn.gaia.processing.source.ParameterizedTypeName;
+import be.imgn.gaia.processing.source.Type;
 import be.imgn.inject.Assisted;
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.JavaFile;
-import com.palantir.javapoet.MethodSpec;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeSpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,11 +26,11 @@ import org.jspecify.annotations.Nullable;
  * {@code Factory} subclass that constructs it.
  */
 final class AssistedFactoryGenerator {
-    private static final ClassName FACTORY = ClassName.get("be.imgn.inject.context", "Factory");
-    private static final ClassName CONTEXT = ClassName.get("be.imgn.inject.context", "Context");
-    private static final ClassName ANNOTATION_METADATA = ClassName.get("be.imgn.inject.context", "AnnotationMetadata");
-    private static final ClassName KEY = ClassName.get("be.imgn.inject", "Key");
-    private static final ClassName OBJECTS = ClassName.get("java.util", "Objects");
+    private static final ClassName FACTORY = ClassName.of("be.imgn.inject.context", "Factory");
+    private static final ClassName CONTEXT = ClassName.of("be.imgn.inject.context", "Context");
+    private static final ClassName ANNOTATION_METADATA = ClassName.of("be.imgn.inject.context", "AnnotationMetadata");
+    private static final ClassName KEY = ClassName.of("be.imgn.inject", "Key");
+    private static final ClassName OBJECTS = ClassName.of("java.util", "Objects");
 
     private AssistedFactoryGenerator() {}
 
@@ -38,27 +38,27 @@ final class AssistedFactoryGenerator {
         TypeElement factoryInterface = model.factoryInterface();
         String packageName =
                 elements.getPackageOf(factoryInterface).getQualifiedName().toString();
-        ClassName interfaceType = ClassName.get(factoryInterface);
+        ClassName interfaceType = ClassName.of(factoryInterface);
         List<String> chain = ModelFactory.enclosingChain(factoryInterface);
-        ClassName implType = ClassName.get(packageName, GeneratedNames.implName(chain));
+        ClassName implType = ClassName.of(packageName, GeneratedNames.implName(chain));
         String factorySimpleName = GeneratedNames.factoryName(chain);
 
-        JavaFile implFile = JavaFile.builder(packageName, implType(model, models, interfaceType, implType))
+        JavaFile implFile = JavaFile.newBuilder(packageName, implType(model, models, interfaceType, implType))
                 .build();
-        JavaFile factoryFile = JavaFile.builder(
+        JavaFile factoryFile = JavaFile.newBuilder(
                         packageName,
                         factoryType(factorySimpleName, interfaceType, implType, factoryInterface, elements))
                 .build();
-        return new Generated(implFile, factoryFile, packageName + "." + factorySimpleName);
+        return new Generated(implFile, factoryFile);
     }
 
-    private static TypeSpec implType(
+    private static Type implType(
             AssistedFactoryModel model, ModelFactory models, ClassName interfaceType, ClassName implType) {
-        TypeSpec.Builder type = TypeSpec.classBuilder(implType)
+        Type.Builder type = Type.newClassBuilder(implType)
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .addSuperinterface(interfaceType)
                 .addField(CONTEXT, "context", Modifier.PRIVATE, Modifier.FINAL)
-                .addMethod(MethodSpec.constructorBuilder()
+                .addMethod(Method.newConstructorBuilder()
                         .addModifiers(Modifier.PUBLIC)
                         .addParameter(CONTEXT, "context")
                         .addStatement("this.context = $T.requireNonNull(context, $S)", OBJECTS, "context")
@@ -69,27 +69,27 @@ final class AssistedFactoryGenerator {
         return type.build();
     }
 
-    private static TypeSpec factoryType(
+    private static Type factoryType(
             String factorySimpleName,
             ClassName interfaceType,
             ClassName implType,
             TypeElement factoryInterface,
             Elements elements) {
-        return TypeSpec.classBuilder(factorySimpleName)
+        return Type.newClassBuilder(factorySimpleName)
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                .superclass(ParameterizedTypeName.get(FACTORY, interfaceType))
-                .addMethod(MethodSpec.constructorBuilder()
+                .superclass(ParameterizedTypeName.of(FACTORY, interfaceType))
+                .addMethod(Method.newConstructorBuilder()
                         .addModifiers(Modifier.PUBLIC)
                         .addStatement("super($T.class)", interfaceType)
                         .build())
-                .addMethod(MethodSpec.methodBuilder("createInstance")
+                .addMethod(Method.newBuilder("createInstance")
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PROTECTED)
                         .returns(interfaceType)
                         .addParameter(CONTEXT, "context")
                         .addStatement("return new $T(context)", implType)
                         .build())
-                .addMethod(MethodSpec.methodBuilder("annotationMetadata")
+                .addMethod(Method.newBuilder("annotationMetadata")
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PUBLIC)
                         .returns(ANNOTATION_METADATA)
@@ -98,8 +98,8 @@ final class AssistedFactoryGenerator {
                 .build();
     }
 
-    private static MethodSpec createMethod(AssistedFactoryMethod factoryMethod, ModelFactory models) {
-        MethodSpec.Builder method = MethodSpec.overriding(factoryMethod.method());
+    private static Method createMethod(AssistedFactoryMethod factoryMethod, ModelFactory models) {
+        Method.Builder method = Method.overriding(factoryMethod.method());
         AssistedRecipe recipe = factoryMethod.recipe();
         CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe));
         // The body's locals must not collide with the factory-method parameters it copies; the context is always
@@ -132,13 +132,13 @@ final class AssistedFactoryGenerator {
     }
 
     private static void constructorBody(
-            MethodSpec.Builder method,
+            Method.Builder method,
             AssistedRecipe recipe,
             CodeBlock arguments,
             MemberInjection members,
             ModelFactory models,
             String instance) {
-        ClassName beanType = ClassName.get(recipe.owner());
+        ClassName beanType = ClassName.of(recipe.owner());
         method.addStatement("$T $N = new $T($L)", beanType, instance, beanType, arguments);
         // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
         // injectFields emits them).
@@ -166,13 +166,13 @@ final class AssistedFactoryGenerator {
     }
 
     private static void providesBody(
-            MethodSpec.Builder method,
+            Method.Builder method,
             AssistedRecipe recipe,
             ExecutableElement providesMethod,
             CodeBlock arguments,
             String host) {
         String methodName = providesMethod.getSimpleName().toString();
-        ClassName hostType = ClassName.get(recipe.owner());
+        ClassName hostType = ClassName.of(recipe.owner());
         if (providesMethod.getModifiers().contains(Modifier.STATIC)) {
             method.addStatement("return $T.$L($L)", hostType, methodName, arguments);
         } else {
@@ -227,8 +227,6 @@ final class AssistedFactoryGenerator {
         return isProvider ? provider : CodeBlock.of("$L.get()", provider);
     }
 
-    /**
-     * The generated impl and factory sources, plus the factory's qualified name for {@code ServiceLoader} registration.
-     */
-    record Generated(JavaFile implFile, JavaFile factoryFile, String factoryQualifiedName) {}
+    /** The generated impl and factory sources. */
+    record Generated(JavaFile implFile, JavaFile factoryFile) {}
 }

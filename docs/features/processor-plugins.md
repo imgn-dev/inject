@@ -33,7 +33,7 @@ public final class LogPlugin implements InjectPlugin {
         }
         // emits: Logger.getLogger(<declaring class>.class.getName())
         return Optional.of(CodeBlock.of("$T.getLogger($T.class.getName())",
-                LOGGER, ClassName.get(site.beanType())));
+                LOGGER, ClassName.of(site.beanType())));
     }
 }
 ```
@@ -66,9 +66,10 @@ A plugin ships as two artifacts, mirroring `inject` / `inject-processor`:
 - `inject-log` holds the `@Log` annotation and depends only on `inject`. It is
   a regular dependency of the code that writes `@Log`.
 - `inject-log-processor` holds `LogPlugin` and its `ServiceLoader`
-  registration, and depends on `inject-processor` and JavaPoet. It belongs on
-  the annotation processor path only, so neither it nor its code-generation
-  dependencies reach the application classpath.
+  registration, and depends on `inject-processor` and gaia-processing, whose
+  `CodeBlock` the plugin returns. It belongs on the annotation processor path
+  only, so neither it nor its code-generation dependencies reach the
+  application classpath.
 
 ```xml
 <dependency>

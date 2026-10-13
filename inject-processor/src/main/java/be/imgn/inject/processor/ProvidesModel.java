@@ -1,9 +1,10 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.TypeName;
 import java.util.List;
+import javax.lang.model.element.ExecutableElement;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @param producedKeyType the parameterized collection key type expression for a Set/Map-returning method, or
  *     {@code null}
  * @param isDefault whether the method is a {@code @Default} fallback recipe
+ * @param origin the {@code @Provides} method, which the factory is generated from
  */
 record ProvidesModel(
         String packageName,
@@ -43,4 +45,5 @@ record ProvidesModel(
         List<TypeName> exposedTypes,
         @Nullable ContributionModel contribution,
         @Nullable CodeBlock producedKeyType,
-        boolean isDefault) {}
+        boolean isDefault,
+        ExecutableElement origin) {}

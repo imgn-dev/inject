@@ -38,7 +38,7 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 |--------|-------------|----------|
 | parent | `be.imgn.inject:inject-parent` | pom aggregator; inherits `be.imgn.parent:parent`, imports `be.imgn.parent:bom`; Java 21 |
 | runtime | `be.imgn.inject:inject` | public API + annotations + runtime engine. `module be.imgn.inject` |
-| processor | `be.imgn.inject:inject-processor` | annotation processor (JavaPoet); depends on `inject` |
+| processor | `be.imgn.inject:inject-processor` | annotation processor (gaia-processing); depends on `inject` |
 | log | `be.imgn.inject:inject-log` | the `@Log` plugin annotation; depends on `inject` only |
 | log processor | `be.imgn.inject:inject-log-processor` | `LogPlugin`, the processor side of `@Log` |
 | maven plugin | `be.imgn.inject:inject-maven-plugin` | registers generated factories as `module-info` services |
@@ -205,17 +205,28 @@ public abstract class Factory<T> {
 
 ## 6. Annotation Processor (`inject-processor`)
 
-JavaPoet-based. `@SupportedAnnotationTypes("*")` so it can see `@Inject`,
-`@Provides`, and any user annotation meta-annotated with the three meta-annotations.
-Plugins discovered via `ServiceLoader<InjectPlugin>`.
+Built on `be.imgn.gaia:gaia-processing`. `InjectProcessor` is a gaia `StepProcessor`
+with one step, `InjectStep`, which receives the elements annotated with the
+framework's annotations (`@Inject`, `@Provides`, `@Intercepts`, `@AssistedFactory`,
+`@ExposeAs`, `@IntoSet`, `@IntoMap`, `@Default`) and those carrying an annotation
+meta-annotated with `@InjectingAnnotation` or `@InterceptingAnnotation`. The
+processor therefore supports `*`, and claims nothing. An element whose signature
+names a type not generated yet, typically by another processor, is held back
+until a later round resolves it. gaia's `source` package models the generated
+code, `GeneratedSources` writes it in ASCII, and `ProcessingContext` reads
+annotation values and reports diagnostics. Plugins are discovered via
+`ServiceLoader<InjectPlugin>`.
 
 ### Pipeline (4 stages)
 
 **1. Gather.** Collect every `@Inject` site, every `@Provides` method, and every
 meta-annotated annotation. For each *dependency type* encountered, ensure a factory
 will exist:
-- has `@Inject`, is produced by `@Provides`, or is exposed by a bean → that
-  binding's factory serves it, and no other factory is generated for it;
+- has `@Inject`, is produced by `@Provides`, or is exposed by a bean, in this
+  round or an earlier one → that binding's factory serves it, and no other factory
+  is generated for it;
+- not compiled from source in this compilation (a library or another module) → no
+  factory here; it is bound elsewhere, checked at runtime;
 - an interface or abstract class → no factory; an implementation must be bound
   elsewhere, checked at runtime;
 - otherwise **must have an accessible no-arg constructor** → a default factory is
@@ -273,6 +284,9 @@ joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`:
   (and `...Scope`). The processor owns these files exclusively — if a matching
   service file **already exists on the source path** (hand-authored or checked in),
   **compilation fails** to prevent stale/duplicate registration.
+  gaia's `ServiceFiles` writes the file after the last round: entries sorted, each
+  checked to be loadable by `ServiceLoader`, merged with the file an incremental
+  build left in the class output, minus the entries whose class no longer exists.
 - **Module path:** the generated service files are honored by JPMS only if the
   consumer module declares the corresponding `provides` directives. A processor
   cannot edit the user's `module-info.java`, so it emits a **compile-time note**
@@ -281,19 +295,13 @@ joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`:
 ### Plugin SPI
 ```java
 public interface InjectPlugin {
-    default void onGather(GatherContext ctx) {}
-    default void onPlan(PlanContext ctx) {}
-    default void onGenerate(GenerateContext ctx) {}
+    Optional<CodeBlock> initializer(InjectionSite site);
 }
 ```
-Discovered by the processor via `ServiceLoader`. Hooks fire at the matching stage.
-**Every method is a `default` no-op**, so a plugin overrides only the stage(s) it
-cares about.
-
-> **Provisional.** This interface is a first cut — it is not yet proven that this
-> exact shape supports real plugins (e.g. `@Log`) cleanly. Expect to adapt the
-> method set and the `*Context` parameter types as implementation reveals what
-> plugins actually need. The default-no-op contract is the one fixed guarantee.
+Discovered by the processor via `ServiceLoader`. For each field or parameter
+carrying an annotation meta-annotated `@InjectingAnnotation`, the processor asks
+each plugin for the expression that initializes it; a plugin declines a site with
+`Optional.empty()`. `CodeBlock` is `be.imgn.gaia.processing.source.CodeBlock`.
 
 ## 7. Module Path vs Classpath
 
@@ -371,6 +379,8 @@ committed; all invocations use `./mvnw`.
 plugin and library versions and the quality gates. The project overrides only:
 
 - **Java release** — `java.release=21`; the shared parent defaults to a newer release.
+- **gaia** — `be.imgn.gaia:gaia-bom` is imported next to `be.imgn.parent:bom`, at `gaia.version`. The processor
+  modules use `gaia-processing` to generate code and `gaia-processing-testing` to compile sources in tests.
 - **Error Prone extras** (`errorprone.extra.args`) — NullAway `ExcludedFieldAnnotations` for `@Inject` and every
   consumed injecting-annotation plugin's annotation (`@Log`); `module-info.java` added to `-XepExcludedPaths`, since
   module descriptors name services and providers by their fully qualified names; a few checks switched off.

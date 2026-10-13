@@ -9,7 +9,8 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
 - Use the Maven wrapper (`./mvnw`) everywhere — never a globally-installed `mvn`.
 - The root POM inherits `be.imgn.parent:parent` and imports `be.imgn.parent:bom`;
   versions and quality gates come from there. Override only what this project
-  needs (see spec §10).
+  needs (see spec §10). It also imports `be.imgn.gaia:gaia-bom`: the processor
+  modules build on `gaia-processing` and test with `gaia-processing-testing`.
 - `verify` runs the full quality pipeline: Enforcer → Spotless format →
   Checkstyle (shared ruleset + `checkstyle-suppressions.xml`) → compile with
   `-Xlint:all -Werror`, Error Prone + NullAway → tests (Surefire) → JaCoCo →

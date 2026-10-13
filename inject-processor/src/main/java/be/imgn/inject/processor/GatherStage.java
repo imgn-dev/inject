@@ -1,5 +1,9 @@
 package be.imgn.inject.processor;
 
+import be.imgn.gaia.processing.AnnotatedElements;
+import be.imgn.gaia.processing.AnnotationReader;
+import be.imgn.gaia.processing.Diagnostics;
+import be.imgn.gaia.processing.ProcessingContext;
 import be.imgn.inject.AssistedFactory;
 import be.imgn.inject.Default;
 import be.imgn.inject.ExposeAs;
@@ -18,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -28,72 +31,63 @@ import javax.lang.model.element.TypeElement;
 /** Stage 1: discovers injectable types and {@code @Provides} methods and builds their models. */
 final class GatherStage {
 
+    private final ProcessingContext context;
     private final ModelFactory models;
     private final Diagnostics diagnostics;
 
-    GatherStage(ModelFactory models, Diagnostics diagnostics) {
+    GatherStage(ProcessingContext context, ModelFactory models, Diagnostics diagnostics) {
+        this.context = context;
         this.models = models;
         this.diagnostics = diagnostics;
     }
 
     @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
-    Gathered gather(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    Gathered gather(AnnotatedElements round) {
         Set<TypeElement> beanTypes = new LinkedHashSet<>();
-        for (Element element : roundEnv.getElementsAnnotatedWith(Inject.class)) {
+        for (Element element : round.annotatedWith(Inject.class.getCanonicalName())) {
             if (element.getEnclosingElement() instanceof TypeElement bean) {
                 beanTypes.add(bean);
             }
         }
-        for (Element element : roundEnv.getElementsAnnotatedWith(Intercepts.class)) {
+        for (Element element : round.annotatedWith(Intercepts.class.getCanonicalName())) {
             if (element instanceof TypeElement interceptor) {
                 beanTypes.add(interceptor);
             }
         }
-        for (TypeElement annotation : annotations) {
-            if (annotation.getAnnotation(InjectingAnnotation.class) == null) {
-                continue;
-            }
-            for (Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
-                if (element.getKind() == ElementKind.FIELD
-                        && element.getEnclosingElement() instanceof TypeElement bean) {
-                    beanTypes.add(bean);
-                }
+        for (Element element : round.withAnnotationsAnnotatedWith(InjectingAnnotation.class.getCanonicalName())) {
+            if (element.getKind() == ElementKind.FIELD && element.getEnclosingElement() instanceof TypeElement bean) {
+                beanTypes.add(bean);
             }
         }
-        for (TypeElement annotation : annotations) {
-            if (annotation.getAnnotation(InterceptingAnnotation.class) == null) {
-                continue;
-            }
-            for (Element element : roundEnv.getElementsAnnotatedWith(annotation)) {
-                if (element instanceof TypeElement bean) {
-                    beanTypes.add(bean);
-                } else if (element.getKind() == ElementKind.METHOD
-                        && element.getEnclosingElement() instanceof TypeElement bean) {
-                    beanTypes.add(bean);
-                }
+        for (Element element : round.withAnnotationsAnnotatedWith(InterceptingAnnotation.class.getCanonicalName())) {
+            if (element instanceof TypeElement bean) {
+                beanTypes.add(bean);
+            } else if (element.getKind() == ElementKind.METHOD
+                    && element.getEnclosingElement() instanceof TypeElement bean) {
+                beanTypes.add(bean);
             }
         }
-        for (Element element : roundEnv.getElementsAnnotatedWith(ExposeAs.class)) {
+        for (Element element : round.annotatedWith(ExposeAs.class.getCanonicalName())) {
             if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
-                diagnostics.error("@ExposeAs on a method is only allowed together with @Provides.", element);
+                diagnostics.on(element).error("@ExposeAs on a method is only allowed together with @Provides.");
             }
         }
         Set<Element> markerElements = new LinkedHashSet<>();
-        markerElements.addAll(roundEnv.getElementsAnnotatedWith(IntoSet.class));
-        markerElements.addAll(roundEnv.getElementsAnnotatedWith(IntoMap.class));
+        markerElements.addAll(round.annotatedWith(IntoSet.class.getCanonicalName()));
+        markerElements.addAll(round.annotatedWith(IntoMap.class.getCanonicalName()));
         for (Element element : markerElements) {
             if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
-                diagnostics.error("@IntoSet/@IntoMap on a method requires @Provides.", element);
+                diagnostics.on(element).error("@IntoSet/@IntoMap on a method requires @Provides.");
             }
         }
 
-        for (Element element : roundEnv.getElementsAnnotatedWith(Default.class)) {
+        for (Element element : round.annotatedWith(Default.class.getCanonicalName())) {
             if (element.getAnnotation(Provides.class) == null) {
-                diagnostics.error("@Default requires @Provides.", element);
+                diagnostics.on(element).error("@Default requires @Provides.");
             } else if (element.getAnnotation(IntoSet.class) != null || element.getAnnotation(IntoMap.class) != null) {
-                diagnostics.error("@Default cannot join a collection contribution (@IntoSet/@IntoMap).", element);
+                diagnostics.on(element).error("@Default cannot join a collection contribution (@IntoSet/@IntoMap).");
             } else if (element instanceof ExecutableElement method && ModelFactory.isAssisted(method)) {
-                diagnostics.error("@Default cannot mark an assisted recipe.", element);
+                diagnostics.on(element).error("@Default cannot mark an assisted recipe.");
             }
         }
 
@@ -137,9 +131,9 @@ final class GatherStage {
             seeds.addAll(models.dependencies(bean, true));
         }
 
-        List<ProvidesModel> provides = gatherProvides(roundEnv, assistedRecipes, seeds, assistedReferences);
-        seeds.addAll(providesDependencies(roundEnv));
-        List<AssistedFactoryModel> assistedFactories = gatherAssistedFactories(roundEnv, assistedRecipes);
+        List<ProvidesModel> provides = gatherProvides(round, assistedRecipes, seeds, assistedReferences);
+        seeds.addAll(providesDependencies(round));
+        List<AssistedFactoryModel> assistedFactories = gatherAssistedFactories(round, assistedRecipes);
         return new Gathered(
                 beans,
                 provides,
@@ -163,13 +157,13 @@ final class GatherStage {
 
     @SuppressWarnings("checkstyle:CyclomaticComplexity")
     private List<AssistedFactoryModel> gatherAssistedFactories(
-            RoundEnvironment roundEnv, Map<String, List<AssistedRecipe>> recipes) {
+            AnnotatedElements round, Map<String, List<AssistedRecipe>> recipes) {
         Map<TypeElement, List<ExecutableElement>> byInterface = new LinkedHashMap<>();
-        for (Element element : roundEnv.getElementsAnnotatedWith(AssistedFactory.class)) {
+        for (Element element : round.annotatedWith(AssistedFactory.class.getCanonicalName())) {
             ExecutableElement method = (ExecutableElement) element;
             Element enclosingElement = method.getEnclosingElement();
             if (!(enclosingElement instanceof TypeElement enclosing) || enclosing.getKind() != ElementKind.INTERFACE) {
-                diagnostics.error("The @AssistedFactory annotation belongs on an interface method.", method);
+                diagnostics.on(method).error("The @AssistedFactory annotation belongs on an interface method.");
                 continue;
             }
             byInterface.computeIfAbsent(enclosing, unused -> new ArrayList<>()).add(method);
@@ -184,8 +178,9 @@ final class GatherStage {
                 if (enclosed.getKind() == ElementKind.METHOD
                         && enclosed.getModifiers().contains(Modifier.ABSTRACT)
                         && !annotatedMethods.contains(enclosed)) {
-                    diagnostics.error(
-                            enclosed.getSimpleName() + " has no @AssistedFactory and cannot be implemented.", enclosed);
+                    diagnostics
+                            .on(enclosed)
+                            .error(enclosed.getSimpleName() + " has no @AssistedFactory and cannot be implemented.");
                     valid = false;
                 }
             }
@@ -194,12 +189,12 @@ final class GatherStage {
             }
             List<AssistedFactoryMethod> methods = new ArrayList<>();
             for (ExecutableElement method : entry.getValue()) {
-                AssistedFactory annotation = method.getAnnotation(AssistedFactory.class);
-                if (annotation == null) {
+                Optional<AnnotationReader> found = context.annotation(method, AssistedFactory.class.getCanonicalName());
+                if (found.isEmpty()) {
                     continue;
                 }
-                Map<String, List<AssistedRecipe>> withFallback =
-                        withCrossModuleFallback(method, annotation, recipes, roundEnv);
+                AnnotationReader annotation = found.get();
+                Map<String, List<AssistedRecipe>> withFallback = withCrossModuleFallback(method, annotation, recipes);
                 Optional<AssistedFactoryMethod> resolved = matcher.resolve(method, annotation, withFallback);
                 if (resolved.isEmpty()) {
                     valid = false;
@@ -216,19 +211,16 @@ final class GatherStage {
 
     /**
      * Cross-module recipes: when {@code method}'s link key is absent from {@code recipes} because the implementation
-     * class was compiled in a previous module (not part of the current round), builds its {@link AssistedRecipe}
-     * directly from the class's members and merges it in. In-round misses are left alone: a genuinely missing recipe is
-     * an error, not a fallback.
+     * class was compiled in a previous module (not from a source of this compilation), builds its
+     * {@link AssistedRecipe} directly from the class's members and merges it in. Misses on a source of this compilation
+     * are left alone: a genuinely missing recipe is an error, not a fallback.
      */
     private Map<String, List<AssistedRecipe>> withCrossModuleFallback(
-            ExecutableElement method,
-            AssistedFactory annotation,
-            Map<String, List<AssistedRecipe>> recipes,
-            RoundEnvironment roundEnv) {
+            ExecutableElement method, AnnotationReader annotation, Map<String, List<AssistedRecipe>> recipes) {
         Optional<AssistedMatcher.Link> link = AssistedMatcher.link(method, annotation);
         if (link.isEmpty()
                 || recipes.containsKey(link.get().key())
-                || isInRound(link.get().implementationElement(), roundEnv)) {
+                || context.isFromSource(link.get().implementationElement())) {
             return recipes;
         }
         List<AssistedRecipe> fallback =
@@ -261,23 +253,14 @@ final class GatherStage {
         return result;
     }
 
-    /** {@return whether {@code type} is one of the sources in the current compilation round} */
-    private static boolean isInRound(TypeElement type, RoundEnvironment roundEnv) {
-        Element top = type;
-        while (top.getEnclosingElement() instanceof TypeElement enclosing) {
-            top = enclosing;
-        }
-        return roundEnv.getRootElements().contains(top);
-    }
-
     private List<ProvidesModel> gatherProvides(
-            RoundEnvironment roundEnv,
+            AnnotatedElements round,
             Map<String, List<AssistedRecipe>> assistedRecipes,
             List<TypeElement> seeds,
             List<AssistedReference> assistedReferences) {
         Map<String, Integer> indices = new HashMap<>();
         List<ProvidesModel> result = new ArrayList<>();
-        for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
+        for (Element element : round.annotatedWith(Provides.class.getCanonicalName())) {
             if (element.getKind() != ElementKind.METHOD) {
                 continue;
             }
@@ -308,9 +291,9 @@ final class GatherStage {
         return result;
     }
 
-    private List<TypeElement> providesDependencies(RoundEnvironment roundEnv) {
+    private List<TypeElement> providesDependencies(AnnotatedElements round) {
         List<TypeElement> dependencies = new ArrayList<>();
-        for (Element element : roundEnv.getElementsAnnotatedWith(Provides.class)) {
+        for (Element element : round.annotatedWith(Provides.class.getCanonicalName())) {
             if (element.getKind() != ElementKind.METHOD) {
                 continue;
             }

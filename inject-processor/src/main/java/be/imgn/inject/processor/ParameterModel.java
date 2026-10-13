@@ -1,7 +1,7 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.TypeName;
 import org.jspecify.annotations.Nullable;
 
 /**

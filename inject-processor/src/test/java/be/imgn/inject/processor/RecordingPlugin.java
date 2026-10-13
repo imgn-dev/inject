@@ -1,8 +1,8 @@
 package be.imgn.inject.processor;
 
+import be.imgn.gaia.processing.source.CodeBlock;
 import be.imgn.inject.processor.spi.InjectPlugin;
 import be.imgn.inject.processor.spi.InjectionSite;
-import com.palantir.javapoet.CodeBlock;
 import java.util.Optional;
 
 /** Test plugin that supplies a constant initializer for {@link Marker}-annotated fields. */

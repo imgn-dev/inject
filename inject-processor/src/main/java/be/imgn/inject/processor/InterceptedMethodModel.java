@@ -1,8 +1,8 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
-import com.palantir.javapoet.TypeVariableName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.TypeName;
+import be.imgn.gaia.processing.source.TypeVariableName;
 import java.util.List;
 import javax.lang.model.element.Modifier;
 import org.jspecify.annotations.Nullable;
@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * @param name the method name
  * @param fieldName the proxy's chain field name, unique across overloads ({@code name + "$" + index})
  * @param visibility the source method's visibility, mirrored by the override; {@code null} for package-private
- * @param returnType the declared return type; {@code TypeName.VOID} for a void method
+ * @param returnType the declared return type; {@code PrimitiveTypeName.VOID} for a void method
  * @param parameters the declared parameters, in order
  * @param thrownTypes the declared checked exception types eligible for their own catch clause, in declaration order,
  *     with unchecked types and duplicates within a hierarchy branch removed

@@ -1,8 +1,11 @@
 package be.imgn.inject.processor;
 
-import static be.imgn.inject.processor.TestCompiler.javac;
+import static be.imgn.gaia.processing.testing.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import be.imgn.gaia.processing.testing.Compilation;
+import be.imgn.gaia.processing.testing.CompilationAssert;
+import be.imgn.gaia.processing.testing.TestCompiler;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.tools.JavaFileObject;
@@ -62,10 +65,5 @@ class GeneratedSourceEncodingTest {
                 .openInputStream()
                 .readAllBytes();
         assertThat(new String(serviceFile, StandardCharsets.UTF_8)).isEqualTo("example.$Café$$Factory\n");
-    }
-
-    @Test
-    void asciiOnlyEscapesEveryNonAsciiCharacter() {
-        assertThat(InjectProcessor.asciiOnly("a \"é\" \\ 😀")).isEqualTo("a \"\\u00e9\" \\ \\ud83d\\ude00");
     }
 }

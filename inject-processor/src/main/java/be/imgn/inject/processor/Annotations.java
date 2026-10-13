@@ -1,13 +1,14 @@
 package be.imgn.inject.processor;
 
+import be.imgn.gaia.processing.MoreElements;
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.TypeName;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.InterceptingAnnotation;
 import be.imgn.inject.QualifyingAnnotation;
 import be.imgn.inject.ScopingAnnotation;
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,18 +29,18 @@ import javax.lang.model.util.Elements;
 /** Reads framework-related annotations off elements and renders them as generated expressions. */
 final class Annotations {
 
-    private static final ClassName NAMED = ClassName.get("be.imgn.inject", "Named");
-    private static final ClassName NAMES = ClassName.get("be.imgn.inject", "Names");
-    private static final ClassName ANNOTATION_METADATA = ClassName.get("be.imgn.inject.context", "AnnotationMetadata");
-    private static final ClassName ANNOTATION_VALUE = ClassName.get("be.imgn.inject.context", "AnnotationValue");
-    private static final ClassName QUALIFYING_ANNOTATION = ClassName.get("be.imgn.inject", "QualifyingAnnotation");
-    private static final ClassName SCOPING_ANNOTATION = ClassName.get("be.imgn.inject", "ScopingAnnotation");
-    private static final ClassName INJECTING_ANNOTATION = ClassName.get("be.imgn.inject", "InjectingAnnotation");
-    private static final ClassName CONDITIONING_ANNOTATION = ClassName.get("be.imgn.inject", "ConditioningAnnotation");
-    private static final ClassName INTERCEPTING_ANNOTATION = ClassName.get("be.imgn.inject", "InterceptingAnnotation");
-    private static final ClassName MAP = ClassName.get("java.util", "Map");
-    private static final ClassName SET = ClassName.get("java.util", "Set");
-    private static final ClassName LIST = ClassName.get("java.util", "List");
+    private static final ClassName NAMED = ClassName.of("be.imgn.inject", "Named");
+    private static final ClassName NAMES = ClassName.of("be.imgn.inject", "Names");
+    private static final ClassName ANNOTATION_METADATA = ClassName.of("be.imgn.inject.context", "AnnotationMetadata");
+    private static final ClassName ANNOTATION_VALUE = ClassName.of("be.imgn.inject.context", "AnnotationValue");
+    private static final ClassName QUALIFYING_ANNOTATION = ClassName.of("be.imgn.inject", "QualifyingAnnotation");
+    private static final ClassName SCOPING_ANNOTATION = ClassName.of("be.imgn.inject", "ScopingAnnotation");
+    private static final ClassName INJECTING_ANNOTATION = ClassName.of("be.imgn.inject", "InjectingAnnotation");
+    private static final ClassName CONDITIONING_ANNOTATION = ClassName.of("be.imgn.inject", "ConditioningAnnotation");
+    private static final ClassName INTERCEPTING_ANNOTATION = ClassName.of("be.imgn.inject", "InterceptingAnnotation");
+    private static final ClassName MAP = ClassName.of("java.util", "Map");
+    private static final ClassName SET = ClassName.of("java.util", "Set");
+    private static final ClassName LIST = ClassName.of("java.util", "List");
 
     private Annotations() {}
 
@@ -55,7 +56,7 @@ final class Annotations {
             TypeElement annotationType =
                     (TypeElement) mirror.getAnnotationType().asElement();
             if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
-                return Optional.of(render(annotationType, mirror, elements, targetPackage, implRequests));
+                return Optional.of(render(annotationType, mirror, elements, targetPackage, implRequests, element));
             }
         }
         return Optional.empty();
@@ -108,7 +109,7 @@ final class Annotations {
         return CodeBlock.of(
                 "$T.of($T.class, $L, $L)",
                 ANNOTATION_VALUE,
-                ClassName.get(annotationType),
+                ClassName.of(annotationType),
                 memberMap,
                 stereotypes(annotationType));
     }
@@ -144,7 +145,7 @@ final class Annotations {
         }
         if (raw instanceof AnnotationMirror nested) {
             // Nested annotations carry no binding or inspection meaning here; record the type only.
-            return CodeBlock.of("$T.class", ClassName.get((TypeElement)
+            return CodeBlock.of("$T.class", ClassName.of((TypeElement)
                     nested.getAnnotationType().asElement()));
         }
         return value(annotationValue);
@@ -156,13 +157,14 @@ final class Annotations {
             AnnotationMirror mirror,
             Elements utils,
             String targetPackage,
-            Set<AnnotationImplRequest> implRequests) {
+            Set<AnnotationImplRequest> implRequests,
+            Element origin) {
         List<ExecutableElement> members = ElementFilter.methodsIn(annotationType.getEnclosedElements());
         Map<String, AnnotationValue> values = valuesByName(mirror, utils);
         if (annotationType.getQualifiedName().contentEquals(NAMED.canonicalName())) {
             return CodeBlock.of("$T.named($L)", NAMES, value(Objects.requireNonNull(values.get("value"))));
         }
-        implRequests.add(new AnnotationImplRequest(annotationType, targetPackage));
+        implRequests.add(new AnnotationImplRequest(annotationType, targetPackage, origin));
         CodeBlock arguments = members.stream()
                 .map(member -> value(
                         Objects.requireNonNull(values.get(member.getSimpleName().toString()))))
@@ -184,7 +186,7 @@ final class Annotations {
             TypeElement annotationType =
                     (TypeElement) mirror.getAnnotationType().asElement();
             if (annotationType.getAnnotation(ScopingAnnotation.class) != null) {
-                return Optional.of(ClassName.get(annotationType));
+                return Optional.of(ClassName.of(annotationType));
             }
         }
         return Optional.empty();
@@ -195,11 +197,13 @@ final class Annotations {
             AnnotationMirror mirror,
             Elements elements,
             String targetPackage,
-            Set<AnnotationImplRequest> implRequests) {
+            Set<AnnotationImplRequest> implRequests,
+            Element origin) {
         if (ElementFilter.methodsIn(annotationType.getEnclosedElements()).isEmpty()) {
-            return new RenderedQualifier(CodeBlock.of("$T.class", ClassName.get(annotationType)), true);
+            return new RenderedQualifier(CodeBlock.of("$T.class", ClassName.of(annotationType)), true);
         }
-        return new RenderedQualifier(instance(annotationType, mirror, elements, targetPackage, implRequests), false);
+        return new RenderedQualifier(
+                instance(annotationType, mirror, elements, targetPackage, implRequests, origin), false);
     }
 
     @SuppressWarnings("checkstyle:ReturnCount")
@@ -209,12 +213,12 @@ final class Annotations {
             return CodeBlock.of("$S", string);
         }
         if (raw instanceof TypeMirror type) {
-            return CodeBlock.of("$T.class", TypeName.get(type));
+            return CodeBlock.of("$T.class", TypeName.of(type));
         }
         if (raw instanceof VariableElement enumConstant) {
             return CodeBlock.of(
                     "$T.$L",
-                    ClassName.get((TypeElement) enumConstant.getEnclosingElement()),
+                    ClassName.of(MoreElements.enclosingType(enumConstant).orElseThrow()),
                     enumConstant.getSimpleName().toString());
         }
         if (raw instanceof Character character) {

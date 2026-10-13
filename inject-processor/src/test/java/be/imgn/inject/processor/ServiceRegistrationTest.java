@@ -1,8 +1,11 @@
 package be.imgn.inject.processor;
 
-import static be.imgn.inject.processor.TestCompiler.javac;
+import static be.imgn.gaia.processing.testing.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import be.imgn.gaia.processing.testing.Compilation;
+import be.imgn.gaia.processing.testing.CompilationAssert;
+import be.imgn.gaia.processing.testing.TestCompiler;
 import java.util.Optional;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;

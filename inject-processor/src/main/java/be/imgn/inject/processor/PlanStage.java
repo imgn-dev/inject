@@ -1,8 +1,10 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeName;
+import be.imgn.gaia.processing.Diagnostics;
+import be.imgn.gaia.processing.ProcessingContext;
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.ParameterizedTypeName;
+import be.imgn.gaia.processing.source.TypeName;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -11,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -21,22 +22,26 @@ import org.jspecify.annotations.Nullable;
 final class PlanStage {
 
     private final ModelFactory models;
+    private final ProcessingContext context;
     private final Diagnostics diagnostics;
+    // Types bound in this round or an earlier one, by @Provides methods, exposed types or default factories.
+    private final Set<TypeName> bound = new HashSet<>();
 
-    PlanStage(ModelFactory models, Diagnostics diagnostics) {
+    PlanStage(ProcessingContext context, ModelFactory models, Diagnostics diagnostics) {
+        this.context = context;
         this.models = models;
         this.diagnostics = diagnostics;
     }
 
     /** {@return {@code true} if the graph is valid; {@code false} if a cycle was reported} */
-    boolean plan(Gathered gathered, RoundEnvironment roundEnv) {
-        planDefaultFactories(gathered, roundEnv);
+    boolean plan(Gathered gathered) {
+        planDefaultFactories(gathered);
         List<TypeElement> cycle = findCycle(gathered.beans().keySet(), gathered.edges());
         if (cycle != null) {
             String path = cycle.stream()
                     .map(type -> type.getQualifiedName().toString())
                     .collect(Collectors.joining(" -> "));
-            diagnostics.error("Dependency cycle detected: " + path, cycle.get(0));
+            diagnostics.on(cycle.get(0)).error("Dependency cycle detected: " + path);
             return false;
         }
         if (!checkNoDirectAssistedInjection(gathered)) {
@@ -60,10 +65,10 @@ final class PlanStage {
             }
             String slot = slot(contribution);
             if (!seenSlots.add(slot)) {
-                diagnostics.error(
-                        "Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for " + contribution.elementType()
-                                + ".",
-                        entry.getKey());
+                diagnostics
+                        .on(entry.getKey())
+                        .error("Duplicate @IntoMap key \"" + contribution.mapKey() + "\" for "
+                                + contribution.elementType() + ".");
                 return false;
             }
         }
@@ -95,20 +100,20 @@ final class PlanStage {
             for (TypeElement dependency : entry.getValue()) {
                 if (gathered.assistedBeanNames()
                         .contains(dependency.getQualifiedName().toString())) {
-                    diagnostics.error(
-                            dependency.getSimpleName()
-                                    + " has assisted parameters and is only available through an @AssistedFactory.",
-                            entry.getKey());
+                    diagnostics
+                            .on(entry.getKey())
+                            .error(dependency.getSimpleName()
+                                    + " has assisted parameters and is only available through an @AssistedFactory.");
                     return false;
                 }
             }
         }
         for (AssistedReference reference : gathered.assistedReferences()) {
             if (gathered.assistedBeanNames().contains(reference.typeName())) {
-                diagnostics.error(
-                        simpleName(reference.typeName())
-                                + " has assisted parameters and is only available through an @AssistedFactory.",
-                        reference.site());
+                diagnostics
+                        .on(reference.site())
+                        .error(simpleName(reference.typeName())
+                                + " has assisted parameters and is only available through an @AssistedFactory.");
                 return false;
             }
         }
@@ -126,10 +131,10 @@ final class PlanStage {
         return contribution.elementType() + "#" + contribution.mapKey();
     }
 
-    private void planDefaultFactories(Gathered gathered, RoundEnvironment roundEnv) {
+    private void planDefaultFactories(Gathered gathered) {
         Map<TypeElement, BeanModel> beans = gathered.beans();
         Map<TypeElement, List<TypeElement>> edges = gathered.edges();
-        Set<TypeName> supplied = suppliedTypes(gathered);
+        bound.addAll(suppliedTypes(gathered));
         Deque<TypeElement> queue = new ArrayDeque<>(gathered.seeds());
         Set<TypeElement> seen = new HashSet<>();
         while (!queue.isEmpty()) {
@@ -139,11 +144,11 @@ final class PlanStage {
                     || gathered.interceptionRejected().contains(dependency)) {
                 continue;
             }
-            if (!roundEnv.getRootElements().contains(dependency)) {
+            if (!context.isFromSource(dependency)) {
                 // Library / cross-module type: satisfied elsewhere, checked at runtime
                 continue;
             }
-            if (supplied.contains(ClassName.get(dependency))) {
+            if (bound.contains(ClassName.of(dependency))) {
                 // Bound by a @Provides method or exposed by a bean: a default factory would shadow or duplicate it
                 continue;
             }
@@ -156,6 +161,7 @@ final class PlanStage {
                 continue;
             }
             if (models.hasAccessibleNoArgConstructor(dependency)) {
+                bound.add(ClassName.of(dependency));
                 beans.put(dependency, models.defaultModel(dependency));
                 edges.put(dependency, List.of());
             }

@@ -1,16 +1,17 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.AnnotationSpec;
-import com.palantir.javapoet.ArrayTypeName;
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.FieldSpec;
-import com.palantir.javapoet.JavaFile;
-import com.palantir.javapoet.MethodSpec;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeName;
-import com.palantir.javapoet.TypeSpec;
-import com.palantir.javapoet.TypeVariableName;
+import be.imgn.gaia.processing.source.Annotation;
+import be.imgn.gaia.processing.source.ArrayTypeName;
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.Field;
+import be.imgn.gaia.processing.source.JavaFile;
+import be.imgn.gaia.processing.source.Method;
+import be.imgn.gaia.processing.source.ParameterizedTypeName;
+import be.imgn.gaia.processing.source.PrimitiveTypeName;
+import be.imgn.gaia.processing.source.Type;
+import be.imgn.gaia.processing.source.TypeName;
+import be.imgn.gaia.processing.source.TypeVariableName;
 import java.util.Locale;
 import java.util.stream.IntStream;
 import javax.lang.model.element.Modifier;
@@ -25,16 +26,16 @@ import javax.lang.model.element.Modifier;
  */
 final class InterceptedProxyGenerator {
 
-    private static final ClassName CONTEXT = ClassName.get("be.imgn.inject.context", "Context");
-    private static final ClassName INTERCEPTED_METHOD = ClassName.get("be.imgn.inject.context", "InterceptedMethod");
-    private static final ClassName METHOD_INTERCEPTION = ClassName.get("be.imgn.inject.context", "MethodInterception");
-    private static final ClassName JOINPOINT = ClassName.get("be.imgn.inject.context", "Joinpoint");
-    private static final ClassName INTERCEPTION_EXCEPTION = ClassName.get("be.imgn.inject", "InterceptionException");
-    private static final ClassName LIST = ClassName.get("java.util", "List");
-    private static final ClassName OBJECT = ClassName.get("java.lang", "Object");
-    private static final ClassName THROWABLE = ClassName.get("java.lang", "Throwable");
-    private static final ClassName RUNTIME_EXCEPTION = ClassName.get("java.lang", "RuntimeException");
-    private static final ClassName ERROR = ClassName.get("java.lang", "Error");
+    private static final ClassName CONTEXT = ClassName.of("be.imgn.inject.context", "Context");
+    private static final ClassName INTERCEPTED_METHOD = ClassName.of("be.imgn.inject.context", "InterceptedMethod");
+    private static final ClassName METHOD_INTERCEPTION = ClassName.of("be.imgn.inject.context", "MethodInterception");
+    private static final ClassName JOINPOINT = ClassName.of("be.imgn.inject.context", "Joinpoint");
+    private static final ClassName INTERCEPTION_EXCEPTION = ClassName.of("be.imgn.inject", "InterceptionException");
+    private static final ClassName LIST = ClassName.of("java.util", "List");
+    private static final ClassName OBJECT = ClassName.of("java.lang", "Object");
+    private static final ClassName THROWABLE = ClassName.of("java.lang", "Throwable");
+    private static final ClassName RUNTIME_EXCEPTION = ClassName.of("java.lang", "RuntimeException");
+    private static final ClassName ERROR = ClassName.of("java.lang", "Error");
 
     private InterceptedProxyGenerator() {}
 
@@ -48,7 +49,7 @@ final class InterceptedProxyGenerator {
         if (interception == null) {
             throw new IllegalArgumentException("No interception model for " + model.beanType());
         }
-        TypeSpec.Builder type = TypeSpec.classBuilder(interception.proxySimpleName())
+        Type.Builder type = Type.newClassBuilder(interception.proxySimpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(model.beanType());
         for (InterceptedMethodModel method : interception.methods()) {
@@ -60,16 +61,16 @@ final class InterceptedProxyGenerator {
             type.addMethod(override(model, method));
         }
         type.addMethod(constructor(interception));
-        return JavaFile.builder(model.packageName(), type.build()).build();
+        return JavaFile.newBuilder(model.packageName(), type.build()).build();
     }
 
     /** {@return the {@code private static final InterceptedMethod} describing one call site} */
-    private static FieldSpec descriptor(BeanModel model, InterceptedMethodModel method) {
+    private static Field descriptor(BeanModel model, InterceptedMethodModel method) {
         CodeBlock parameterTypes = method.parameters().stream()
                 .map(parameter -> CodeBlock.of("$T.class", rawType(parameter.type())))
                 .collect(CodeBlock.joining(", "));
         CodeBlock bindings = method.bindings().stream().collect(CodeBlock.joining(", "));
-        return FieldSpec.builder(
+        return Field.newBuilder(
                         INTERCEPTED_METHOD, descriptorName(method), Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
                 .initializer(
                         "$T.of($T.class, $S, $L, $T.of($L), $T.of($L))",
@@ -85,8 +86,8 @@ final class InterceptedProxyGenerator {
     }
 
     /** {@return the chain field, assigned once per proxy instance from the constructor} */
-    private static FieldSpec chainField(InterceptedMethodModel method) {
-        return FieldSpec.builder(METHOD_INTERCEPTION, method.fieldName(), Modifier.PRIVATE, Modifier.FINAL)
+    private static Field chainField(InterceptedMethodModel method) {
+        return Field.newBuilder(METHOD_INTERCEPTION, method.fieldName(), Modifier.PRIVATE, Modifier.FINAL)
                 .build();
     }
 
@@ -98,11 +99,11 @@ final class InterceptedProxyGenerator {
      * cast per parameter; when one of those casts is unchecked, {@code @SuppressWarnings("unchecked")} goes on the
      * field declaration since the override's own suppression (if any) does not reach a field initializer.
      */
-    private static FieldSpec joinpointField(InterceptedMethodModel method) {
-        FieldSpec.Builder field = FieldSpec.builder(JOINPOINT, joinpointName(method), Modifier.PRIVATE, Modifier.FINAL)
+    private static Field joinpointField(InterceptedMethodModel method) {
+        Field.Builder field = Field.newBuilder(JOINPOINT, joinpointName(method), Modifier.PRIVATE, Modifier.FINAL)
                 .initializer(joinpointLambda(method));
         if (method.parametersUncheckedCast()) {
-            field.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+            field.addAnnotation(Annotation.newBuilder(SuppressWarnings.class)
                     .addMember("value", "$S", "unchecked")
                     .build());
         }
@@ -111,7 +112,7 @@ final class InterceptedProxyGenerator {
 
     /** {@return the lambda calling the bean's own implementation with the arguments unpacked from the array} */
     private static CodeBlock joinpointLambda(InterceptedMethodModel method) {
-        return method.returnType().equals(TypeName.VOID)
+        return method.returnType().equals(PrimitiveTypeName.VOID)
                 ? CodeBlock.of("$$arguments -> {\n$>super.$L($L);\nreturn null;\n$<}", method.name(), unpack(method))
                 : CodeBlock.of("$$arguments -> super.$L($L)", method.name(), unpack(method));
     }
@@ -125,9 +126,9 @@ final class InterceptedProxyGenerator {
     }
 
     /** {@return the proxy constructor: {@code Context} first, then the bean's own constructor parameters} */
-    private static MethodSpec constructor(InterceptionModel interception) {
-        MethodSpec.Builder builder =
-                MethodSpec.constructorBuilder().addModifiers(Modifier.PUBLIC).addParameter(CONTEXT, "$context");
+    private static Method constructor(InterceptionModel interception) {
+        Method.Builder builder =
+                Method.newConstructorBuilder().addModifiers(Modifier.PUBLIC).addParameter(CONTEXT, "$context");
         for (ProxyParameter parameter : interception.constructorParameters()) {
             builder.addParameter(parameter.type(), parameter.name());
         }
@@ -143,8 +144,8 @@ final class InterceptedProxyGenerator {
 
     /** {@return the override that runs the chain, falling through to {@code super} before the chain is assigned} */
     @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
-    private static MethodSpec override(BeanModel model, InterceptedMethodModel method) {
-        MethodSpec.Builder builder = MethodSpec.methodBuilder(method.name())
+    private static Method override(BeanModel model, InterceptedMethodModel method) {
+        Method.Builder builder = Method.newBuilder(method.name())
                 .addAnnotation(Override.class)
                 .returns(method.returnType())
                 .varargs(method.varargs())
@@ -167,7 +168,7 @@ final class InterceptedProxyGenerator {
         // initializer instead and are covered by joinpointField's own suppression.
         boolean localJoinpointUncheckedCast = !method.typeVariables().isEmpty() && method.parametersUncheckedCast();
         if (method.uncheckedCast() || localJoinpointUncheckedCast) {
-            builder.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+            builder.addAnnotation(Annotation.newBuilder(SuppressWarnings.class)
                     .addMember("value", "$S", "unchecked")
                     .build());
         }
@@ -176,7 +177,7 @@ final class InterceptedProxyGenerator {
                 .collect(CodeBlock.joining(", "));
         builder.addStatement("$T $$interception = this.$L", METHOD_INTERCEPTION, method.fieldName());
         builder.beginControlFlow("if ($$interception == null)");
-        if (method.returnType().equals(TypeName.VOID)) {
+        if (method.returnType().equals(PrimitiveTypeName.VOID)) {
             builder.addStatement("super.$L($L)", method.name(), arguments);
             builder.addStatement("return");
         } else {
@@ -193,7 +194,7 @@ final class InterceptedProxyGenerator {
         }
         builder.beginControlFlow("try");
         CodeBlock call = CodeBlock.of("$$interception.invoke(this, new $T[] {$L}, $L)", OBJECT, arguments, joinpoint);
-        if (method.returnType().equals(TypeName.VOID)) {
+        if (method.returnType().equals(PrimitiveTypeName.VOID)) {
             builder.addStatement("$L", call);
         } else if (method.returnType().isPrimitive()) {
             builder.addStatement("$T $$result = $L", OBJECT, call);
@@ -254,7 +255,7 @@ final class InterceptedProxyGenerator {
 
     /** {@return the class literal expression for a return type, using {@code void.class} for void} */
     private static CodeBlock returnTypeLiteral(TypeName returnType) {
-        return returnType.equals(TypeName.VOID)
+        return returnType.equals(PrimitiveTypeName.VOID)
                 ? CodeBlock.of("void.class")
                 : CodeBlock.of("$T.class", rawType(returnType));
     }

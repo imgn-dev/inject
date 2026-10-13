@@ -1,8 +1,11 @@
 package be.imgn.inject.processor;
 
-import static be.imgn.inject.processor.CompilationAssert.assertThat;
-import static be.imgn.inject.processor.TestCompiler.javac;
+import static be.imgn.gaia.processing.testing.CompilationAssert.assertThat;
+import static be.imgn.gaia.processing.testing.ProcessorAssert.assertThat;
+import static be.imgn.gaia.processing.testing.TestCompiler.javac;
 
+import be.imgn.gaia.processing.testing.Compilation;
+import be.imgn.gaia.processing.testing.TestCompiler;
 import org.junit.jupiter.api.Test;
 
 class InjectProcessorSmokeTest {
@@ -27,5 +30,10 @@ class InjectProcessorSmokeTest {
                         """));
 
         assertThat(compilation).succeeded().hadNoWarnings();
+    }
+
+    @Test
+    void processorIsRegisteredForTheCompiler() {
+        assertThat(InjectProcessor.class).isRegistered();
     }
 }

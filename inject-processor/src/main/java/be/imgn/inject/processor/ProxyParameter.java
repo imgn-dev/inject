@@ -1,6 +1,6 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.TypeName;
+import be.imgn.gaia.processing.source.TypeName;
 
 /**
  * One parameter of a generated proxy signature.

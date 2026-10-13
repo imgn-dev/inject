@@ -51,6 +51,7 @@
         <maven-plugin-tools.version>3.15.2</maven-plugin-tools.version>
         <asm.version>9.10.1</asm.version>
         <groovy.version>5.0.6</groovy.version>
+        <gaia.version>0.1.0</gaia.version>
     </properties>
 
     <dependencyManagement>
@@ -59,6 +60,13 @@
                 <groupId>be.imgn.parent</groupId>
                 <artifactId>bom</artifactId>
                 <version>2026-10-07</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>be.imgn.gaia</groupId>
+                <artifactId>gaia-bom</artifactId>
+                <version>${gaia.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

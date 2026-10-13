@@ -1,8 +1,10 @@
 package be.imgn.inject.processor;
 
-import static be.imgn.inject.processor.CompilationAssert.assertThat;
-import static be.imgn.inject.processor.TestCompiler.javac;
+import static be.imgn.gaia.processing.testing.CompilationAssert.assertThat;
+import static be.imgn.gaia.processing.testing.TestCompiler.javac;
 
+import be.imgn.gaia.processing.testing.Compilation;
+import be.imgn.gaia.processing.testing.TestCompiler;
 import javax.tools.JavaFileObject;
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package be.imgn.inject.processor.spi;
 
-import com.palantir.javapoet.CodeBlock;
+import be.imgn.gaia.processing.source.CodeBlock;
 import java.util.Optional;
 
 /**

@@ -1,6 +1,6 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.CodeBlock;
+import be.imgn.gaia.processing.source.CodeBlock;
 
 /**
  * A field initialized by a plugin (via an {@code @InjectingAnnotation}) rather than resolved from the context.

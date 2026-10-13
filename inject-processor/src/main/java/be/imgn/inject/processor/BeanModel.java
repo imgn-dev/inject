@@ -1,9 +1,10 @@
 package be.imgn.inject.processor;
 
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.TypeName;
+import be.imgn.gaia.processing.source.ClassName;
+import be.imgn.gaia.processing.source.CodeBlock;
+import be.imgn.gaia.processing.source.TypeName;
 import java.util.List;
+import javax.lang.model.element.TypeElement;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,6 +29,7 @@ import org.jspecify.annotations.Nullable;
  * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}
  * @param interceptsAnnotation the annotation this bean intercepts (from {@code @Intercepts}), or {@code null}
  * @param interception the intercepted-proxy model, or {@code null} when the bean has no intercepted method
+ * @param origin the bean type, which the factory is generated from
  */
 record BeanModel(
         String packageName,
@@ -46,4 +48,5 @@ record BeanModel(
         @Nullable String postConstruct,
         @Nullable String preDestroy,
         @Nullable ClassName interceptsAnnotation,
-        @Nullable InterceptionModel interception) {}
+        @Nullable InterceptionModel interception,
+        TypeElement origin) {}
