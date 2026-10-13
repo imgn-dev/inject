@@ -7,7 +7,7 @@
     <parent>
         <groupId>be.imgn.inject</groupId>
         <artifactId>inject-parent</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.1.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>inject-examples-module</artifactId>
