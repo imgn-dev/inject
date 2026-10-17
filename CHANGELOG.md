@@ -55,6 +55,9 @@ the order the changes landed, each referencing its commits.
   unchecked: a cast to a type whose arguments are all unbounded wildcards, such
   as `List<?>`, no longer gets it.
   ([9354e7e](https://github.com/imgn-dev/inject/commit/9354e7e))
+- **Gaia 0.1.1.** `inject-processor` depends on `gaia-processing` 0.1.1;
+  processor plugins build against that version.
+  ([8fd5b19](https://github.com/imgn-dev/inject/commit/8fd5b19))
 
 ## 0.1.0 — 2026-10-12
 
