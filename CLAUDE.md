@@ -5,7 +5,9 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
 
 ## Build
 
-- Build command is **`./mvnw clean verify`**. Never `install`.
+- Build command is **`./mvnw clean verify`**. Never use `install` to build.
+  Use `./mvnw clean install` only to put this project's artifacts into `~/.m2`
+  when a project that depends on it updates to them.
 - Use the Maven wrapper (`./mvnw`) everywhere — never a globally-installed `mvn`.
 - The root POM inherits `be.imgn.parent:parent` and imports `be.imgn.parent:bom`;
   versions and quality gates come from there. Override only what this project
