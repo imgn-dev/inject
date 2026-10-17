@@ -1191,8 +1191,7 @@ final class ModelFactory {
         return switch (type.getKind()) {
             case TYPEVAR -> true;
             case DECLARED ->
-                MoreTypes.asDeclared(type).orElseThrow().getTypeArguments().stream()
-                        .anyMatch(ModelFactory::mentionsTypeVariable);
+                MoreTypes.asDeclared(type).getTypeArguments().stream().anyMatch(ModelFactory::mentionsTypeVariable);
             case ARRAY -> mentionsTypeVariable(MoreTypes.asArray(type).getComponentType());
             case WILDCARD -> {
                 WildcardType wildcard = MoreTypes.asWildcard(type);
@@ -1207,9 +1206,8 @@ final class ModelFactory {
 
     /** {@return the runtime type expression for a dependency: a class literal, or a Types factory call} */
     private CodeBlock typeExpression(TypeMirror type, Types types, Element site) {
-        Optional<DeclaredType> declaredType = MoreTypes.asDeclared(type);
-        if (declaredType.isPresent()) {
-            DeclaredType declared = declaredType.get();
+        if (type.getKind() == TypeKind.DECLARED) {
+            DeclaredType declared = MoreTypes.asDeclared(type);
             String name =
                     MoreElements.asType(declared.asElement()).getQualifiedName().toString();
             if (name.equals(CONTEXT)) {
@@ -1256,11 +1254,10 @@ final class ModelFactory {
      */
     @SuppressWarnings("checkstyle:ReturnCount")
     private @Nullable CodeBlock collectionKeyExpression(TypeMirror type, Types types) {
-        Optional<DeclaredType> declaredType = MoreTypes.asDeclared(type);
-        if (declaredType.isEmpty()) {
+        if (type.getKind() != TypeKind.DECLARED) {
             return null;
         }
-        DeclaredType declared = declaredType.get();
+        DeclaredType declared = MoreTypes.asDeclared(type);
         String name =
                 MoreElements.asType(declared.asElement()).getQualifiedName().toString();
         if (name.equals(SET) && declared.getTypeArguments().size() == 1) {
@@ -1283,12 +1280,15 @@ final class ModelFactory {
     }
 
     private static Optional<TypeMirror> providerInner(TypeMirror type) {
-        return MoreTypes.asDeclared(type)
-                .filter(declared -> declared.getTypeArguments().size() == 1
-                        && MoreElements.asType(declared.asElement())
-                                .getQualifiedName()
-                                .contentEquals(PROVIDER))
-                .map(declared -> declared.getTypeArguments().get(0));
+        if (type.getKind() != TypeKind.DECLARED) {
+            return Optional.empty();
+        }
+        DeclaredType declared = MoreTypes.asDeclared(type);
+        if (declared.getTypeArguments().size() == 1
+                && MoreElements.asType(declared.asElement()).getQualifiedName().contentEquals(PROVIDER)) {
+            return Optional.of(declared.getTypeArguments().get(0));
+        }
+        return Optional.empty();
     }
 
     static List<String> enclosingChain(TypeElement bean) {
