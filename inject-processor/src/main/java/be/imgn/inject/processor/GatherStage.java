@@ -3,6 +3,7 @@ package be.imgn.inject.processor;
 import be.imgn.gaia.processing.AnnotatedElements;
 import be.imgn.gaia.processing.AnnotationReader;
 import be.imgn.gaia.processing.Diagnostics;
+import be.imgn.gaia.processing.MoreElements;
 import be.imgn.gaia.processing.ProcessingContext;
 import be.imgn.inject.AssistedFactory;
 import be.imgn.inject.Default;
@@ -45,30 +46,25 @@ final class GatherStage {
     Gathered gather(AnnotatedElements round) {
         Set<TypeElement> beanTypes = new LinkedHashSet<>();
         for (Element element : round.annotatedWith(Inject.class.getCanonicalName())) {
-            if (element.getEnclosingElement() instanceof TypeElement bean) {
-                beanTypes.add(bean);
-            }
+            MoreElements.enclosingType(element).ifPresent(beanTypes::add);
         }
         for (Element element : round.annotatedWith(Intercepts.class.getCanonicalName())) {
-            if (element instanceof TypeElement interceptor) {
-                beanTypes.add(interceptor);
-            }
+            MoreElements.asTypeElement(element).ifPresent(beanTypes::add);
         }
         for (Element element : round.withAnnotationsAnnotatedWith(InjectingAnnotation.class.getCanonicalName())) {
-            if (element.getKind() == ElementKind.FIELD && element.getEnclosingElement() instanceof TypeElement bean) {
-                beanTypes.add(bean);
+            if (element.getKind() == ElementKind.FIELD) {
+                MoreElements.enclosingType(element).ifPresent(beanTypes::add);
             }
         }
         for (Element element : round.withAnnotationsAnnotatedWith(InterceptingAnnotation.class.getCanonicalName())) {
-            if (element instanceof TypeElement bean) {
-                beanTypes.add(bean);
-            } else if (element.getKind() == ElementKind.METHOD
-                    && element.getEnclosingElement() instanceof TypeElement bean) {
-                beanTypes.add(bean);
+            if (element.getKind().isDeclaredType()) {
+                beanTypes.add(MoreElements.asType(element));
+            } else if (element.getKind() == ElementKind.METHOD) {
+                MoreElements.enclosingType(element).ifPresent(beanTypes::add);
             }
         }
         for (Element element : round.annotatedWith(ExposeAs.class.getCanonicalName())) {
-            if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
+            if (element.getKind() == ElementKind.METHOD && !MoreElements.isAnnotatedWith(element, Provides.class)) {
                 diagnostics.on(element).error("@ExposeAs on a method is only allowed together with @Provides.");
             }
         }
@@ -76,17 +72,19 @@ final class GatherStage {
         markerElements.addAll(round.annotatedWith(IntoSet.class.getCanonicalName()));
         markerElements.addAll(round.annotatedWith(IntoMap.class.getCanonicalName()));
         for (Element element : markerElements) {
-            if (element.getKind() == ElementKind.METHOD && element.getAnnotation(Provides.class) == null) {
+            if (element.getKind() == ElementKind.METHOD && !MoreElements.isAnnotatedWith(element, Provides.class)) {
                 diagnostics.on(element).error("@IntoSet/@IntoMap on a method requires @Provides.");
             }
         }
 
         for (Element element : round.annotatedWith(Default.class.getCanonicalName())) {
-            if (element.getAnnotation(Provides.class) == null) {
+            if (!MoreElements.isAnnotatedWith(element, Provides.class)) {
                 diagnostics.on(element).error("@Default requires @Provides.");
-            } else if (element.getAnnotation(IntoSet.class) != null || element.getAnnotation(IntoMap.class) != null) {
+            } else if (MoreElements.isAnnotatedWith(element, IntoSet.class)
+                    || MoreElements.isAnnotatedWith(element, IntoMap.class)) {
                 diagnostics.on(element).error("@Default cannot join a collection contribution (@IntoSet/@IntoMap).");
-            } else if (element instanceof ExecutableElement method && ModelFactory.isAssisted(method)) {
+            } else if (element.getKind().isExecutable()
+                    && ModelFactory.isAssisted(MoreElements.asExecutable(element))) {
                 diagnostics.on(element).error("@Default cannot mark an assisted recipe.");
             }
         }
@@ -160,13 +158,15 @@ final class GatherStage {
             AnnotatedElements round, Map<String, List<AssistedRecipe>> recipes) {
         Map<TypeElement, List<ExecutableElement>> byInterface = new LinkedHashMap<>();
         for (Element element : round.annotatedWith(AssistedFactory.class.getCanonicalName())) {
-            ExecutableElement method = (ExecutableElement) element;
-            Element enclosingElement = method.getEnclosingElement();
-            if (!(enclosingElement instanceof TypeElement enclosing) || enclosing.getKind() != ElementKind.INTERFACE) {
+            ExecutableElement method = MoreElements.asExecutable(element);
+            Optional<TypeElement> enclosing = MoreElements.enclosingType(method);
+            if (enclosing.isEmpty() || enclosing.get().getKind() != ElementKind.INTERFACE) {
                 diagnostics.on(method).error("The @AssistedFactory annotation belongs on an interface method.");
                 continue;
             }
-            byInterface.computeIfAbsent(enclosing, unused -> new ArrayList<>()).add(method);
+            byInterface
+                    .computeIfAbsent(enclosing.get(), unused -> new ArrayList<>())
+                    .add(method);
         }
         AssistedMatcher matcher = new AssistedMatcher(models.types(), diagnostics);
         List<AssistedFactoryModel> factories = new ArrayList<>();
@@ -238,16 +238,18 @@ final class GatherStage {
         for (Element enclosed : implementationElement.getEnclosedElements()) {
             if (recipeMethod.isEmpty()) {
                 if (enclosed.getKind() == ElementKind.CONSTRUCTOR
-                        && enclosed.getAnnotation(Inject.class) != null
-                        && ModelFactory.isAssisted((ExecutableElement) enclosed)) {
-                    result.add(new AssistedRecipe(implementationElement, null, (ExecutableElement) enclosed));
+                        && MoreElements.isAnnotatedWith(enclosed, Inject.class)
+                        && ModelFactory.isAssisted(MoreElements.asExecutable(enclosed))) {
+                    result.add(new AssistedRecipe(implementationElement, null, MoreElements.asExecutable(enclosed)));
                 }
             } else if (enclosed.getKind() == ElementKind.METHOD
                     && enclosed.getSimpleName().contentEquals(recipeMethod)
-                    && enclosed.getAnnotation(Provides.class) != null
-                    && ModelFactory.isAssisted((ExecutableElement) enclosed)) {
+                    && MoreElements.isAnnotatedWith(enclosed, Provides.class)
+                    && ModelFactory.isAssisted(MoreElements.asExecutable(enclosed))) {
                 result.add(new AssistedRecipe(
-                        implementationElement, (ExecutableElement) enclosed, (ExecutableElement) enclosed));
+                        implementationElement,
+                        MoreElements.asExecutable(enclosed),
+                        MoreElements.asExecutable(enclosed)));
             }
         }
         return result;
@@ -264,10 +266,12 @@ final class GatherStage {
             if (element.getKind() != ElementKind.METHOD) {
                 continue;
             }
-            ExecutableElement method = (ExecutableElement) element;
-            if (!(method.getEnclosingElement() instanceof TypeElement host)) {
+            ExecutableElement method = MoreElements.asExecutable(element);
+            Optional<TypeElement> enclosingType = MoreElements.enclosingType(method);
+            if (enclosingType.isEmpty()) {
                 continue;
             }
+            TypeElement host = enclosingType.get();
             String key = host.getQualifiedName().toString() + "#" + method.getSimpleName();
             if (ModelFactory.isAssisted(method)) {
                 // An assisted @Provides method has no binding of its own: skip factory generation, keep the
@@ -297,14 +301,13 @@ final class GatherStage {
             if (element.getKind() != ElementKind.METHOD) {
                 continue;
             }
-            ExecutableElement method = (ExecutableElement) element;
+            ExecutableElement method = MoreElements.asExecutable(element);
             if (ModelFactory.isAssisted(method)) {
                 // No generated factory calls it, so it needs no resolved dependencies
                 continue;
             }
-            if (!method.getModifiers().contains(Modifier.STATIC)
-                    && method.getEnclosingElement() instanceof TypeElement host) {
-                dependencies.add(host);
+            if (!method.getModifiers().contains(Modifier.STATIC)) {
+                MoreElements.enclosingType(method).ifPresent(dependencies::add);
             }
             models.addParameterDependencies(method, dependencies);
         }

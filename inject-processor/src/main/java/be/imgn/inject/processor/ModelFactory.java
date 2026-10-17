@@ -5,10 +5,8 @@ import be.imgn.gaia.processing.Diagnostics;
 import be.imgn.gaia.processing.MoreElements;
 import be.imgn.gaia.processing.MoreTypes;
 import be.imgn.gaia.processing.ProcessingContext;
-import be.imgn.gaia.processing.source.ArrayTypeName;
 import be.imgn.gaia.processing.source.ClassName;
 import be.imgn.gaia.processing.source.CodeBlock;
-import be.imgn.gaia.processing.source.ParameterizedTypeName;
 import be.imgn.gaia.processing.source.TypeName;
 import be.imgn.gaia.processing.source.TypeVariableName;
 import be.imgn.inject.Assisted;
@@ -52,11 +50,9 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -175,7 +171,7 @@ final class ModelFactory {
         Map<Integer, ParameterModel> result = new LinkedHashMap<>();
         for (int index = 0; index < recipeParameters.size(); index++) {
             VariableElement parameter = recipeParameters.get(index);
-            if (parameter.getAnnotation(Assisted.class) != null) {
+            if (MoreElements.isAnnotatedWith(parameter, Assisted.class)) {
                 continue;
             }
             result.put(index, parameterModel(parameter, owner, types, elements, targetPackage));
@@ -192,13 +188,13 @@ final class ModelFactory {
         List<FieldModel> fields = new ArrayList<>();
         List<MethodModel> methods = new ArrayList<>();
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getAnnotation(Inject.class) == null) {
+            if (!MoreElements.isAnnotatedWith(enclosed, Inject.class)) {
                 continue;
             }
             if (enclosed.getKind() == ElementKind.FIELD) {
-                fields.add(field((VariableElement) enclosed, types, elements, packageOf(bean)));
+                fields.add(field(MoreElements.asVariable(enclosed), types, elements, packageOf(bean)));
             } else if (enclosed.getKind() == ElementKind.METHOD) {
-                ExecutableElement method = (ExecutableElement) enclosed;
+                ExecutableElement method = MoreElements.asExecutable(enclosed);
                 methods.add(new MethodModel(
                         method.getSimpleName().toString(),
                         parameters(method, bean, types, elements, packageOf(bean)),
@@ -239,10 +235,12 @@ final class ModelFactory {
     ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
         Types types = context.types();
         Elements elements = context.elements();
-        if (method.getReturnType() instanceof DeclaredType declaredReturn
-                && declaredReturn.asElement() instanceof TypeElement returnElement
-                && isFrameworkType(returnElement)) {
-            diagnostics.on(method).error(returnElement.getSimpleName() + " is a framework type and cannot be bound.");
+        Optional<TypeElement> frameworkReturn =
+                MoreTypes.asTypeElement(method.getReturnType()).filter(ModelFactory::isFrameworkType);
+        if (frameworkReturn.isPresent()) {
+            diagnostics
+                    .on(method)
+                    .error(frameworkReturn.get().getSimpleName() + " is a framework type and cannot be bound.");
         }
         String name = method.getSimpleName().toString();
         if (!interceptingAnnotations(method).isEmpty()) {
@@ -277,7 +275,7 @@ final class ModelFactory {
                 exposedTypes,
                 contribution,
                 producedKeyType,
-                method.getAnnotation(Default.class) != null,
+                MoreElements.isAnnotatedWith(method, Default.class),
                 method);
     }
 
@@ -299,7 +297,7 @@ final class ModelFactory {
             valid = false;
         }
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getAnnotation(Inject.class) == null) {
+            if (!MoreElements.isAnnotatedWith(enclosed, Inject.class)) {
                 continue;
             }
             boolean member = enclosed.getKind() == ElementKind.FIELD || enclosed.getKind() == ElementKind.METHOD;
@@ -322,14 +320,14 @@ final class ModelFactory {
         injectConstructor(bean)
                 .ifPresent(constructor -> addParameterDependencies(constructor, types, result, includeProviderTargets));
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getAnnotation(Inject.class) == null) {
+            if (!MoreElements.isAnnotatedWith(enclosed, Inject.class)) {
                 continue;
             }
             if (enclosed.getKind() == ElementKind.FIELD) {
                 dependencyElement(enclosed.asType(), types, includeProviderTargets)
                         .ifPresent(result::add);
             } else if (enclosed.getKind() == ElementKind.METHOD) {
-                addParameterDependencies((ExecutableElement) enclosed, types, result, includeProviderTargets);
+                addParameterDependencies(MoreElements.asExecutable(enclosed), types, result, includeProviderTargets);
             }
         }
         return result;
@@ -352,8 +350,8 @@ final class ModelFactory {
 
     Optional<ExecutableElement> injectConstructor(TypeElement bean) {
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getKind() == ElementKind.CONSTRUCTOR && enclosed.getAnnotation(Inject.class) != null) {
-                return Optional.of((ExecutableElement) enclosed);
+            if (enclosed.getKind() == ElementKind.CONSTRUCTOR && MoreElements.isAnnotatedWith(enclosed, Inject.class)) {
+                return Optional.of(MoreElements.asExecutable(enclosed));
             }
         }
         return Optional.empty();
@@ -362,7 +360,7 @@ final class ModelFactory {
     /** {@return whether {@code executable} has at least one @Assisted parameter} */
     static boolean isAssisted(ExecutableElement executable) {
         return executable.getParameters().stream()
-                .anyMatch(parameter -> parameter.getAnnotation(Assisted.class) != null);
+                .anyMatch(parameter -> MoreElements.isAnnotatedWith(parameter, Assisted.class));
     }
 
     /** Reports every annotation that contradicts a recipe having no binding of its own. */
@@ -375,10 +373,11 @@ final class ModelFactory {
         if (hasQualifier(annotated)) {
             diagnostics.on(annotated).error("An assisted recipe cannot be qualified; it has no binding key.");
         }
-        if (annotated.getAnnotation(ExposeAs.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotated, ExposeAs.class)) {
             diagnostics.on(annotated).error("An assisted recipe cannot use @ExposeAs; it has no binding key.");
         }
-        if (annotated.getAnnotation(IntoSet.class) != null || annotated.getAnnotation(IntoMap.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotated, IntoSet.class)
+                || MoreElements.isAnnotatedWith(annotated, IntoMap.class)) {
             diagnostics
                     .on(annotated)
                     .error("An assisted recipe cannot contribute to a collection; it has no binding key.");
@@ -430,10 +429,10 @@ final class ModelFactory {
     private @Nullable ExecutableElement singleCallback(TypeElement bean, Class<? extends Annotation> annotation) {
         ExecutableElement found = null;
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getKind() != ElementKind.METHOD || enclosed.getAnnotation(annotation) == null) {
+            if (enclosed.getKind() != ElementKind.METHOD || !MoreElements.isAnnotatedWith(enclosed, annotation)) {
                 continue;
             }
-            ExecutableElement method = (ExecutableElement) enclosed;
+            ExecutableElement method = MoreElements.asExecutable(enclosed);
             if (found != null) {
                 diagnostics
                         .on(method)
@@ -453,8 +452,8 @@ final class ModelFactory {
 
     private static @Nullable ExecutableElement firstCallback(TypeElement bean, Class<? extends Annotation> annotation) {
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getKind() == ElementKind.METHOD && enclosed.getAnnotation(annotation) != null) {
-                return (ExecutableElement) enclosed;
+            if (enclosed.getKind() == ElementKind.METHOD && MoreElements.isAnnotatedWith(enclosed, annotation)) {
+                return MoreElements.asExecutable(enclosed);
             }
         }
         return null;
@@ -475,8 +474,8 @@ final class ModelFactory {
     private static boolean hasConditioningAnnotation(Element element) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
-                    (TypeElement) mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(ConditioningAnnotation.class) != null) {
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (MoreElements.isAnnotatedWith(annotationType, ConditioningAnnotation.class)) {
                 return true;
             }
         }
@@ -486,9 +485,10 @@ final class ModelFactory {
     /** Reports @Assisted parameters on the bean's @Inject methods; they belong only on recipes. */
     void validateNoMisplacedAssisted(TypeElement bean) {
         for (Element enclosed : bean.getEnclosedElements()) {
-            if (enclosed.getKind() == ElementKind.METHOD && enclosed.getAnnotation(Inject.class) != null) {
-                for (VariableElement parameter : ((ExecutableElement) enclosed).getParameters()) {
-                    if (parameter.getAnnotation(Assisted.class) != null) {
+            if (enclosed.getKind() == ElementKind.METHOD && MoreElements.isAnnotatedWith(enclosed, Inject.class)) {
+                for (VariableElement parameter :
+                        MoreElements.asExecutable(enclosed).getParameters()) {
+                    if (MoreElements.isAnnotatedWith(parameter, Assisted.class)) {
                         diagnostics
                                 .on(parameter)
                                 .error("@Assisted is misplaced: only @Inject constructors and @Provides methods take"
@@ -503,15 +503,13 @@ final class ModelFactory {
     List<TypeElement> containerDependencies(ExecutableElement executable) {
         List<TypeElement> dependencies = new ArrayList<>();
         for (VariableElement parameter : executable.getParameters()) {
-            if (parameter.getAnnotation(Assisted.class) != null) {
+            if (MoreElements.isAnnotatedWith(parameter, Assisted.class)) {
                 continue;
             }
             TypeMirror type = parameter.asType();
             Optional<TypeMirror> inner = providerInner(type);
             TypeMirror resolved = inner.orElse(type);
-            if (resolved instanceof DeclaredType declared && declared.asElement() instanceof TypeElement element) {
-                dependencies.add(element);
-            }
+            MoreTypes.asTypeElement(resolved).ifPresent(dependencies::add);
         }
         return List.copyOf(dependencies);
     }
@@ -606,7 +604,7 @@ final class ModelFactory {
         for (Element enclosed : bean.getEnclosedElements()) {
             if (enclosed.getKind() == ElementKind.METHOD
                     && !interceptingAnnotations(enclosed).isEmpty()) {
-                annotatedMethods.add((ExecutableElement) enclosed);
+                annotatedMethods.add(MoreElements.asExecutable(enclosed));
             }
         }
         if (classLevel.isEmpty() && annotatedMethods.isEmpty()) {
@@ -627,11 +625,11 @@ final class ModelFactory {
             if (enclosed.getKind() != ElementKind.METHOD) {
                 continue;
             }
-            ExecutableElement method = (ExecutableElement) enclosed;
+            ExecutableElement method = MoreElements.asExecutable(enclosed);
             List<AnnotationMirror> own = interceptingAnnotations(method);
             boolean eligible = isInterceptable(method);
             if (!own.isEmpty() && !eligible) {
-                if (method.getAnnotation(Provides.class) != null) {
+                if (MoreElements.isAnnotatedWith(method, Provides.class)) {
                     providesSkipped++;
                     // Skip @Provides methods silently; diagnostic reported in providesModel
                     continue;
@@ -674,8 +672,8 @@ final class ModelFactory {
         List<AnnotationMirror> result = new ArrayList<>();
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
-                    (TypeElement) mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(InterceptingAnnotation.class) != null) {
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (MoreElements.isAnnotatedWith(annotationType, InterceptingAnnotation.class)) {
                 result.add(mirror);
             }
         }
@@ -729,10 +727,10 @@ final class ModelFactory {
                 && !modifiers.contains(Modifier.STATIC)
                 && !modifiers.contains(Modifier.FINAL)
                 && !hasTypeVariableThrows(method)
-                && method.getAnnotation(Inject.class) == null
-                && method.getAnnotation(PostConstruct.class) == null
-                && method.getAnnotation(PreDestroy.class) == null
-                && method.getAnnotation(Provides.class) == null
+                && !MoreElements.isAnnotatedWith(method, Inject.class)
+                && !MoreElements.isAnnotatedWith(method, PostConstruct.class)
+                && !MoreElements.isAnnotatedWith(method, PreDestroy.class)
+                && !MoreElements.isAnnotatedWith(method, Provides.class)
                 && !isObjectMethod(method);
     }
 
@@ -796,14 +794,14 @@ final class ModelFactory {
         List<CodeBlock> rendered = new ArrayList<>();
         for (AnnotationMirror mirror : bindings) {
             rendered.add(Annotations.annotationValue(
-                    (TypeElement) mirror.getAnnotationType().asElement(), mirror, elements));
+                    MoreElements.asType(mirror.getAnnotationType().asElement()), mirror, elements));
         }
         TypeName returnType = TypeName.of(method.getReturnType());
         List<TypeVariableName> typeVariables =
                 method.getTypeParameters().stream().map(TypeVariableName::of).toList();
         List<ProxyParameter> parameters = proxyParameters(method);
-        boolean parametersUncheckedCast =
-                parameters.stream().anyMatch(parameter -> isUncheckedCastType(parameter.type()));
+        boolean parametersUncheckedCast = method.getParameters().stream()
+                .anyMatch(parameter -> MoreTypes.isCastFromObjectUnchecked(parameter.asType()));
         return new InterceptedMethodModel(
                 method.getSimpleName().toString(),
                 method.getSimpleName() + "$" + index,
@@ -813,21 +811,10 @@ final class ModelFactory {
                 thrownTypes(method),
                 declaresThrowable(method),
                 method.isVarArgs(),
-                isUncheckedCastType(returnType),
+                MoreTypes.isCastFromObjectUnchecked(method.getReturnType()),
                 parametersUncheckedCast,
                 typeVariables,
                 List.copyOf(rendered));
-    }
-
-    /**
-     * {@return whether casting a value to {@code type} is an unchecked cast: a parameterized type or a type variable,
-     * including one nested inside an array type such as {@code T[]}}
-     */
-    private static boolean isUncheckedCastType(TypeName type) {
-        if (type instanceof ArrayTypeName array) {
-            return isUncheckedCastType(array.componentType());
-        }
-        return type instanceof ParameterizedTypeName || type instanceof TypeVariableName;
     }
 
     /**
@@ -908,12 +895,12 @@ final class ModelFactory {
             }
             List<TypeName> result = new ArrayList<>();
             for (TypeMirror exposed : declared) {
-                if (exposed instanceof DeclaredType declaredExposed
-                        && declaredExposed.asElement() instanceof TypeElement exposedElement
-                        && isFrameworkType(exposedElement)) {
+                Optional<TypeElement> frameworkType =
+                        MoreTypes.asTypeElement(exposed).filter(ModelFactory::isFrameworkType);
+                if (frameworkType.isPresent()) {
                     diagnostics
                             .on(bean)
-                            .error(exposedElement.getSimpleName() + " is a framework type and cannot be bound.");
+                            .error(frameworkType.get().getSimpleName() + " is a framework type and cannot be bound.");
                 } else if (types.isAssignable(bean.asType(), exposed)) {
                     result.add(TypeName.of(types.erasure(exposed)));
                 } else {
@@ -946,12 +933,12 @@ final class ModelFactory {
             }
             List<TypeName> result = new ArrayList<>();
             for (TypeMirror exposed : declared) {
-                if (exposed instanceof DeclaredType declaredExposed
-                        && declaredExposed.asElement() instanceof TypeElement exposedElement
-                        && isFrameworkType(exposedElement)) {
+                Optional<TypeElement> frameworkType =
+                        MoreTypes.asTypeElement(exposed).filter(ModelFactory::isFrameworkType);
+                if (frameworkType.isPresent()) {
                     diagnostics
                             .on(method)
-                            .error(exposedElement.getSimpleName() + " is a framework type and cannot be bound.");
+                            .error(frameworkType.get().getSimpleName() + " is a framework type and cannot be bound.");
                 } else if (types.isAssignable(producedType, exposed)) {
                     result.add(TypeName.of(types.erasure(exposed)));
                 } else {
@@ -981,7 +968,7 @@ final class ModelFactory {
             diagnostics.on(element).error("Use only one collection marker (@IntoSet or @IntoMap).");
             return null;
         }
-        if (element.getAnnotation(ExposeAs.class) != null) {
+        if (MoreElements.isAnnotatedWith(element, ExposeAs.class)) {
             diagnostics.on(element).error("A collection contribution cannot also use @ExposeAs.");
             return null;
         }
@@ -993,12 +980,12 @@ final class ModelFactory {
                         element, (intoSet != null ? IntoSet.class : IntoMap.class).getCanonicalName())
                 .orElseThrow()
                 .type("value");
-        if (elementType instanceof DeclaredType declaredElementType
-                && declaredElementType.asElement() instanceof TypeElement elementTypeElement
-                && isFrameworkType(elementTypeElement)) {
+        Optional<TypeElement> frameworkType =
+                MoreTypes.asTypeElement(elementType).filter(ModelFactory::isFrameworkType);
+        if (frameworkType.isPresent()) {
             diagnostics
                     .on(element)
-                    .error(elementTypeElement.getSimpleName() + " is a framework type and cannot be bound.");
+                    .error(frameworkType.get().getSimpleName() + " is a framework type and cannot be bound.");
             return null;
         }
         if (!types.isAssignable(types.erasure(contributedType), types.erasure(elementType))) {
@@ -1026,8 +1013,8 @@ final class ModelFactory {
     private static boolean hasQualifier(Element element) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
-                    (TypeElement) mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (MoreElements.isAnnotatedWith(annotationType, QualifyingAnnotation.class)) {
                 return true;
             }
         }
@@ -1040,7 +1027,7 @@ final class ModelFactory {
             if (enclosed.getKind() != ElementKind.FIELD || !hasInjectingAnnotation(enclosed)) {
                 continue;
             }
-            VariableElement field = (VariableElement) enclosed;
+            VariableElement field = MoreElements.asVariable(enclosed);
             if (field.getModifiers().contains(Modifier.PRIVATE)
                     || field.getModifiers().contains(Modifier.STATIC)
                     || field.getModifiers().contains(Modifier.FINAL)) {
@@ -1133,14 +1120,14 @@ final class ModelFactory {
         queue.add(bean.asType());
         while (!queue.isEmpty()) {
             TypeMirror current = queue.poll();
-            if (current instanceof DeclaredType declared && declared.asElement() instanceof TypeElement typeElement) {
-                if (EXCLUDED_DEFAULT_EXPOSURES.contains(
-                        typeElement.getQualifiedName().toString())) {
-                    continue;
-                }
-                if (collected.add(typeElement)) {
-                    queue.addAll(types.directSupertypes(current));
-                }
+            Optional<TypeElement> typeElement = MoreTypes.asTypeElement(current);
+            if (typeElement.isEmpty()
+                    || EXCLUDED_DEFAULT_EXPOSURES.contains(
+                            typeElement.get().getQualifiedName().toString())) {
+                continue;
+            }
+            if (collected.add(typeElement.get())) {
+                queue.addAll(types.directSupertypes(current));
             }
         }
         return List.copyOf(collected);
@@ -1148,8 +1135,7 @@ final class ModelFactory {
 
     private static boolean hasInjectingAnnotation(Element element) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
-            if (((TypeElement) mirror.getAnnotationType().asElement()).getAnnotation(InjectingAnnotation.class)
-                    != null) {
+            if (MoreElements.isAnnotatedWith(mirror.getAnnotationType().asElement(), InjectingAnnotation.class)) {
                 return true;
             }
         }
@@ -1162,12 +1148,7 @@ final class ModelFactory {
         if (inner.isPresent() && !includeProviderTargets) {
             return Optional.empty();
         }
-        TypeMirror effective = inner.orElse(type);
-        if (types.erasure(effective) instanceof DeclaredType declared
-                && declared.asElement() instanceof TypeElement typeElement) {
-            return Optional.of(typeElement);
-        }
-        return Optional.empty();
+        return MoreTypes.asTypeElement(types.erasure(inner.orElse(type)));
     }
 
     private FieldModel field(VariableElement fieldElement, Types types, Elements elements, String targetPackage) {
@@ -1207,12 +1188,14 @@ final class ModelFactory {
 
     /** {@return whether {@code type} is, or has among its type arguments or components, a type variable} */
     private static boolean mentionsTypeVariable(TypeMirror type) {
-        return switch (type) {
-            case TypeVariable ignored -> true;
-            case DeclaredType declared ->
-                declared.getTypeArguments().stream().anyMatch(ModelFactory::mentionsTypeVariable);
-            case ArrayType array -> mentionsTypeVariable(array.getComponentType());
-            case WildcardType wildcard -> {
+        return switch (type.getKind()) {
+            case TYPEVAR -> true;
+            case DECLARED ->
+                MoreTypes.asDeclared(type).orElseThrow().getTypeArguments().stream()
+                        .anyMatch(ModelFactory::mentionsTypeVariable);
+            case ARRAY -> mentionsTypeVariable(MoreTypes.asArray(type).getComponentType());
+            case WILDCARD -> {
+                WildcardType wildcard = MoreTypes.asWildcard(type);
                 TypeMirror extendsBound = wildcard.getExtendsBound();
                 TypeMirror superBound = wildcard.getSuperBound();
                 yield (extendsBound != null && mentionsTypeVariable(extendsBound))
@@ -1224,8 +1207,11 @@ final class ModelFactory {
 
     /** {@return the runtime type expression for a dependency: a class literal, or a Types factory call} */
     private CodeBlock typeExpression(TypeMirror type, Types types, Element site) {
-        if (type instanceof DeclaredType declared && declared.asElement() instanceof TypeElement element) {
-            String name = element.getQualifiedName().toString();
+        Optional<DeclaredType> declaredType = MoreTypes.asDeclared(type);
+        if (declaredType.isPresent()) {
+            DeclaredType declared = declaredType.get();
+            String name =
+                    MoreElements.asType(declared.asElement()).getQualifiedName().toString();
             if (name.equals(CONTEXT)) {
                 diagnostics.on(site).error("Context cannot be injected; inject Injector instead.");
             } else if (name.equals(FACTORY)) {
@@ -1270,10 +1256,13 @@ final class ModelFactory {
      */
     @SuppressWarnings("checkstyle:ReturnCount")
     private @Nullable CodeBlock collectionKeyExpression(TypeMirror type, Types types) {
-        if (!(type instanceof DeclaredType declared) || !(declared.asElement() instanceof TypeElement element)) {
+        Optional<DeclaredType> declaredType = MoreTypes.asDeclared(type);
+        if (declaredType.isEmpty()) {
             return null;
         }
-        String name = element.getQualifiedName().toString();
+        DeclaredType declared = declaredType.get();
+        String name =
+                MoreElements.asType(declared.asElement()).getQualifiedName().toString();
         if (name.equals(SET) && declared.getTypeArguments().size() == 1) {
             TypeMirror elementType = declared.getTypeArguments().get(0);
             if (providerInner(elementType).isPresent()) {
@@ -1294,13 +1283,12 @@ final class ModelFactory {
     }
 
     private static Optional<TypeMirror> providerInner(TypeMirror type) {
-        if (type instanceof DeclaredType declared
-                && declared.asElement() instanceof TypeElement typeElement
-                && typeElement.getQualifiedName().contentEquals(PROVIDER)
-                && declared.getTypeArguments().size() == 1) {
-            return Optional.of(declared.getTypeArguments().get(0));
-        }
-        return Optional.empty();
+        return MoreTypes.asDeclared(type)
+                .filter(declared -> declared.getTypeArguments().size() == 1
+                        && MoreElements.asType(declared.asElement())
+                                .getQualifiedName()
+                                .contentEquals(PROVIDER))
+                .map(declared -> declared.getTypeArguments().get(0));
     }
 
     static List<String> enclosingChain(TypeElement bean) {

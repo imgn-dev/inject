@@ -54,8 +54,8 @@ final class Annotations {
             Element element, Elements elements, String targetPackage, Set<AnnotationImplRequest> implRequests) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
-                    (TypeElement) mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (MoreElements.isAnnotatedWith(annotationType, QualifyingAnnotation.class)) {
                 return Optional.of(render(annotationType, mirror, elements, targetPackage, implRequests, element));
             }
         }
@@ -75,7 +75,7 @@ final class Annotations {
         for (Element element : elements) {
             for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
                 TypeElement annotationType =
-                        (TypeElement) mirror.getAnnotationType().asElement();
+                        MoreElements.asType(mirror.getAnnotationType().asElement());
                 if (!isFrameworkRelated(annotationType)) {
                     continue;
                 }
@@ -91,11 +91,11 @@ final class Annotations {
     }
 
     private static boolean isFrameworkRelated(TypeElement annotationType) {
-        return annotationType.getAnnotation(QualifyingAnnotation.class) != null
-                || annotationType.getAnnotation(ScopingAnnotation.class) != null
-                || annotationType.getAnnotation(InjectingAnnotation.class) != null
-                || annotationType.getAnnotation(ConditioningAnnotation.class) != null
-                || annotationType.getAnnotation(InterceptingAnnotation.class) != null;
+        return MoreElements.isAnnotatedWith(annotationType, QualifyingAnnotation.class)
+                || MoreElements.isAnnotatedWith(annotationType, ScopingAnnotation.class)
+                || MoreElements.isAnnotatedWith(annotationType, InjectingAnnotation.class)
+                || MoreElements.isAnnotatedWith(annotationType, ConditioningAnnotation.class)
+                || MoreElements.isAnnotatedWith(annotationType, InterceptingAnnotation.class);
     }
 
     /** {@return an {@code AnnotationValue.of(...)} expression describing the annotation} */
@@ -116,19 +116,19 @@ final class Annotations {
 
     private static CodeBlock stereotypes(TypeElement annotationType) {
         List<CodeBlock> present = new ArrayList<>();
-        if (annotationType.getAnnotation(QualifyingAnnotation.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotationType, QualifyingAnnotation.class)) {
             present.add(CodeBlock.of("$T.class", QUALIFYING_ANNOTATION));
         }
-        if (annotationType.getAnnotation(ScopingAnnotation.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotationType, ScopingAnnotation.class)) {
             present.add(CodeBlock.of("$T.class", SCOPING_ANNOTATION));
         }
-        if (annotationType.getAnnotation(InjectingAnnotation.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotationType, InjectingAnnotation.class)) {
             present.add(CodeBlock.of("$T.class", INJECTING_ANNOTATION));
         }
-        if (annotationType.getAnnotation(ConditioningAnnotation.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotationType, ConditioningAnnotation.class)) {
             present.add(CodeBlock.of("$T.class", CONDITIONING_ANNOTATION));
         }
-        if (annotationType.getAnnotation(InterceptingAnnotation.class) != null) {
+        if (MoreElements.isAnnotatedWith(annotationType, InterceptingAnnotation.class)) {
             present.add(CodeBlock.of("$T.class", INTERCEPTING_ANNOTATION));
         }
         return CodeBlock.of("$T.of($L)", SET, present.stream().collect(CodeBlock.joining(", ")));
@@ -145,8 +145,9 @@ final class Annotations {
         }
         if (raw instanceof AnnotationMirror nested) {
             // Nested annotations carry no binding or inspection meaning here; record the type only.
-            return CodeBlock.of("$T.class", ClassName.of((TypeElement)
-                    nested.getAnnotationType().asElement()));
+            return CodeBlock.of(
+                    "$T.class",
+                    ClassName.of(MoreElements.asType(nested.getAnnotationType().asElement())));
         }
         return value(annotationValue);
     }
@@ -184,8 +185,8 @@ final class Annotations {
     static Optional<ClassName> scope(Element element) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
-                    (TypeElement) mirror.getAnnotationType().asElement();
-            if (annotationType.getAnnotation(ScopingAnnotation.class) != null) {
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (MoreElements.isAnnotatedWith(annotationType, ScopingAnnotation.class)) {
                 return Optional.of(ClassName.of(annotationType));
             }
         }

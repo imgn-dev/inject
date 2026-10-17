@@ -394,6 +394,34 @@ class InterceptedProxyGenerationTest {
     }
 
     @Test
+    void doesNotSuppressUncheckedForAWildcardOnlyParameter() {
+        JavaFileObject bean = TestCompiler.source("example.Counter", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import java.util.List;
+
+                @Timed
+                public class Counter {
+                    @Inject
+                    public Counter() {}
+
+                    public int count(List<?> values) {
+                        return values.size();
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(TIMED, bean);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Counter$$Intercepted")
+                .contains("(List<?>) $arguments[0]")
+                .doesNotContain("@SuppressWarnings(\"unchecked\")");
+    }
+
+    @Test
     void classLevelSweepInterceptsAnOverloadedEqualsButSkipsTheRealOne() {
         JavaFileObject bean = TestCompiler.source("example.Money", """
                 package example;

@@ -1,5 +1,6 @@
 package be.imgn.inject.processor;
 
+import be.imgn.gaia.processing.MoreElements;
 import be.imgn.gaia.processing.source.ClassName;
 import be.imgn.gaia.processing.source.CodeBlock;
 import be.imgn.gaia.processing.source.JavaFile;
@@ -196,7 +197,7 @@ final class AssistedFactoryGenerator {
         List<CodeBlock> arguments = new ArrayList<>();
         int assistedIndex = 0;
         for (int index = 0; index < recipeElements.size(); index++) {
-            if (recipeElements.get(index).getAnnotation(Assisted.class) != null) {
+            if (MoreElements.isAnnotatedWith(recipeElements.get(index), Assisted.class)) {
                 int factoryIndex = assistedArgumentOrder.get(assistedIndex++);
                 arguments.add(CodeBlock.of(
                         "$L",

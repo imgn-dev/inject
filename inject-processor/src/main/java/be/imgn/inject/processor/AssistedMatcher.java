@@ -2,6 +2,8 @@ package be.imgn.inject.processor;
 
 import be.imgn.gaia.processing.AnnotationReader;
 import be.imgn.gaia.processing.Diagnostics;
+import be.imgn.gaia.processing.MoreElements;
+import be.imgn.gaia.processing.MoreTypes;
 import be.imgn.inject.Assisted;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,7 +13,6 @@ import java.util.Optional;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
 
@@ -34,10 +35,11 @@ final class AssistedMatcher {
             return Optional.empty();
         }
         TypeMirror implementation = hasValue ? linked : method.getReturnType();
-        if (!(implementation instanceof DeclaredType declared
-                && declared.asElement() instanceof TypeElement implementationElement)) {
+        Optional<TypeElement> implementationType = MoreTypes.asTypeElement(implementation);
+        if (implementationType.isEmpty()) {
             return Optional.empty();
         }
+        TypeElement implementationElement = implementationType.get();
         String key = recipeMethod.isEmpty()
                 ? implementationElement.getQualifiedName().toString()
                 : implementationElement.getQualifiedName() + "#" + recipeMethod;
@@ -104,7 +106,7 @@ final class AssistedMatcher {
         }
         List<Integer> order = new ArrayList<>();
         for (VariableElement parameter : recipe.executable().getParameters()) {
-            if (parameter.getAnnotation(Assisted.class) == null) {
+            if (!MoreElements.isAnnotatedWith(parameter, Assisted.class)) {
                 continue;
             }
             Integer index = factorySlots.remove(slot(parameter));

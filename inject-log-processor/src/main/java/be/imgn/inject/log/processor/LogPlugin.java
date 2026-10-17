@@ -1,5 +1,6 @@
 package be.imgn.inject.log.processor;
 
+import be.imgn.gaia.processing.MoreElements;
 import be.imgn.gaia.processing.source.ClassName;
 import be.imgn.gaia.processing.source.CodeBlock;
 import be.imgn.inject.log.Log;
@@ -19,7 +20,7 @@ public final class LogPlugin implements InjectPlugin {
 
     @Override
     public Optional<CodeBlock> initializer(InjectionSite site) {
-        if (site.element().getAnnotation(Log.class) == null) {
+        if (!MoreElements.isAnnotatedWith(site.element(), Log.class)) {
             return Optional.empty();
         }
         return Optional.of(CodeBlock.of("$T.getLogger($T.class.getName())", LOGGER, ClassName.of(site.beanType())));
