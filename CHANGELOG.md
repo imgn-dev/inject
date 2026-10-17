@@ -50,6 +50,11 @@ the order the changes landed, each referencing its commits.
     `Optional<be.imgn.gaia.processing.source.CodeBlock>`; processor plugins
     must move from JavaPoet to `gaia-processing`.
   ([04004a5](https://github.com/imgn-dev/inject/commit/04004a5))
+- **Fewer unchecked-cast suppressions in interception proxies.** A proxy method
+  carries `@SuppressWarnings("unchecked")` only when one of its casts is
+  unchecked: a cast to a type whose arguments are all unbounded wildcards, such
+  as `List<?>`, no longer gets it.
+  ([9354e7e](https://github.com/imgn-dev/inject/commit/9354e7e))
 
 ## 0.1.0 — 2026-10-12
 
