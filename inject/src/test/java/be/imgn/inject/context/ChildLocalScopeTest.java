@@ -104,7 +104,7 @@ class ChildLocalScopeTest {
 
         assertThatExceptionOfType(ScopeResolutionException.class)
                 .isThrownBy(provider::get)
-                .withMessage("Cannot resolve " + Selection.class.getName() + ": it is @ViewScoped, and no injector in"
+                .withMessage("Cannot resolve " + Key.of(Selection.class) + ": it is @ViewScoped, and no injector in"
                         + " this chain hosts @ViewScoped. Resolve it through an injector created with"
                         + " scopedChildBuilder(ViewScoped.class), or one of its descendants. No Scope service is"
                         + " registered for @ViewScoped either; if it is not meant to live in a child injector,"
@@ -119,7 +119,7 @@ class ChildLocalScopeTest {
 
         assertThatExceptionOfType(ScopeResolutionException.class)
                 .isThrownBy(provider::get)
-                .withMessage("Cannot resolve " + Selection.class.getName() + ": it is @ViewScoped, and no injector in"
+                .withMessage("Cannot resolve " + Key.of(Selection.class) + ": it is @ViewScoped, and no injector in"
                         + " this chain hosts @ViewScoped. Resolve it through an injector created with"
                         + " scopedChildBuilder(ViewScoped.class), or one of its descendants.");
     }

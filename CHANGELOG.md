@@ -125,6 +125,11 @@ the order the changes landed, each referencing its commits.
   dependencies resolve through the injector that caches it, even when the
   factory was resolved through one of its descendants. `Context.createScoped`
   takes a `Function<Context, T>`, called with the host's context.
+  ([c53fa78](https://github.com/imgn-dev/inject/commit/c53fa78))
+- **Consistent errors for assisted types.** Resolving a scoped product before
+  it is created throws an `UnsatisfiedDependencyException`, as resolving an
+  unscoped assisted type does. Errors about child-local beans name them by key,
+  as `Key[...]`, like products and every other error.
 
 ## 0.1.0 — 2026-10-12
 

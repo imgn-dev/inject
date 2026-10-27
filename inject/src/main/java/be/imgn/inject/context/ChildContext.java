@@ -194,7 +194,7 @@ public final class ChildContext implements Context {
     private Object created(ScopedProduct product) {
         Object instance = created.get(product.key());
         if (instance == null) {
-            throw new IllegalStateException(product.key() + " has not been created in this @"
+            throw new UnsatisfiedDependencyException(product.key() + " has not been created in this @"
                     + product.scope().getSimpleName() + " injector yet: it is created by " + product.creator()
                     + "(...).");
         }

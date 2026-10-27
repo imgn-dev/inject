@@ -579,7 +579,7 @@ public final class DefaultContext implements Context {
 
     /** {@return the error for resolving {@code factory}'s child-local bean where no injector hosts its scope} */
     ScopeResolutionException noHost(Factory<?> factory, Class<? extends Annotation> scope) {
-        return noHost(factory.type().getName(), scope);
+        return noHost(factory.key().toString(), scope);
     }
 
     /** {@return the error for resolving the child-local {@code bean} where no injector hosts its scope} */

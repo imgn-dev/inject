@@ -3,7 +3,6 @@ package be.imgn.inject.processor;
 import static be.imgn.gaia.processing.testing.TestCompiler.javac;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import be.imgn.gaia.processing.testing.Compilation;
 import be.imgn.gaia.processing.testing.CompilationAssert;
@@ -11,6 +10,7 @@ import be.imgn.gaia.processing.testing.TestCompiler;
 import be.imgn.inject.Injector;
 import be.imgn.inject.Provider;
 import be.imgn.inject.ScopeResolutionException;
+import be.imgn.inject.UnsatisfiedDependencyException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
@@ -208,7 +208,7 @@ class ScopedAssistedEndToEndTest {
         Injector view = dialogView();
         Provider<?> dialog = view.getProvider(type("example.RenameDialog"));
 
-        assertThatIllegalStateException()
+        assertThatExceptionOfType(UnsatisfiedDependencyException.class)
                 .isThrownBy(dialog::get)
                 .withMessage("Key[example.RenameDialog] has not been created in this @ViewScoped injector yet: it is"
                         + " created by example.RenameDialogFactory.create(...).");
