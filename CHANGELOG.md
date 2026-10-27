@@ -117,6 +117,7 @@ the order the changes landed, each referencing its commits.
   to; the root resolves the listeners when it is created. `Context` has the
   new default method `constructed`, which `Factory.build` and generated
   assisted factories call.
+  ([fb8cb15](https://github.com/imgn-dev/inject/commit/fb8cb15))
 
 ## 0.1.0 — 2026-10-12
 
