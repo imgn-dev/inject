@@ -143,6 +143,7 @@ the order the changes landed, each referencing its commits.
 - **Qualified keys stay explicit.** A qualified bean's keys, its supertypes'
   included, are all explicit: two beans with the same qualifier on a shared
   supertype are a `DuplicateBindingException`, not an ambiguous key.
+  ([ee8583b](https://github.com/imgn-dev/inject/commit/ee8583b))
 
 ## 0.1.0 — 2026-10-12
 
