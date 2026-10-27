@@ -67,6 +67,11 @@ the order the changes landed, each referencing its commits.
 - **Gaia 0.1.2.** `inject-processor` depends on `gaia-processing` 0.1.2;
   processor plugins build against that version.
   ([97d804f](https://github.com/imgn-dev/inject/commit/97d804f))
+- **Inherited scopes.** A bean class that declares no scope inherits the one
+  its superclasses and superinterfaces declare, at any depth, also from class
+  files; the nearest declaration wins along each path. Different scopes
+  inherited along different paths are a compile error. A bean whose supertype
+  another processor has yet to generate waits for a later round.
 
 ## 0.1.0 — 2026-10-12
 

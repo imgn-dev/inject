@@ -141,7 +141,8 @@ final class PlanStage {
             TypeElement dependency = queue.poll();
             if (!seen.add(dependency)
                     || beans.containsKey(dependency)
-                    || gathered.interceptionRejected().contains(dependency)) {
+                    || gathered.interceptionRejected().contains(dependency)
+                    || gathered.deferred().containsKey(dependency)) {
                 continue;
             }
             if (!context.isFromSource(dependency)) {

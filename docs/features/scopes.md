@@ -31,6 +31,29 @@ assert injector.getInstance(Registry.class) == injector.getInstance(Registry.cla
 
 `@Provides` methods scope the same way — put `@Singleton` on the method.
 
+### Inherited scopes
+
+A bean class that declares no scope inherits the one its supertypes declare,
+through the superclass chain and every superinterface, at any depth. A
+framework can then scope every implementation of one of its interfaces:
+
+```java
+@ViewScoped
+public interface View {}
+
+public final class Editor implements View { // @ViewScoped
+    @Inject
+    public Editor() {}
+}
+```
+
+Along each path, the nearest declaration wins: an interface that declares its
+own scope hides the scopes of the interfaces it extends. A scope declared on
+the bean itself always wins. Different scopes inherited along different paths
+are a compile error, which asks to declare one on the bean. Supertypes compiled
+elsewhere count too: the processor reads their scope from the class file, so
+the scoping annotation needs `CLASS` or `RUNTIME` retention.
+
 ### Custom scopes
 
 A scope is a pair: an annotation meta-annotated with `@ScopingAnnotation`, and
@@ -74,6 +97,8 @@ resolution goes through the returned wrapper.
   concern, handled by [lifecycle callbacks](lifecycle-callbacks.md): a
   `@PreDestroy` method runs when the owning injector closes.
 - A bean carries at most one scoping annotation.
+- A `@Provides` method's scope is never inherited from its return type: only
+  the method's own annotation counts.
 - A scoping annotation has exactly one `Scope`: two discovered implementations
   for the same annotation are an error at injector creation
   (`ScopeResolutionException`), so a jar cannot silently replace a scope,

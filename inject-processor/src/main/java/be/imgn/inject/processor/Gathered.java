@@ -3,6 +3,7 @@ package be.imgn.inject.processor;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 
 /**
@@ -22,6 +23,8 @@ import javax.lang.model.element.TypeElement;
  *     assisted recipe's container parameter) whose declared type may be an assisted bean, checked by the plan stage
  * @param interceptionRejected bean types rejected at the interception shape gate, so the plan stage does not resurrect
  *     them as default factories and re-report the same shape error
+ * @param deferred bean types whose scope depends on a supertype javac has not resolved yet, each with the elements of
+ *     the round to give back for a later round
  */
 record Gathered(
         Map<TypeElement, BeanModel> beans,
@@ -32,4 +35,5 @@ record Gathered(
         Set<String> assistedBeanNames,
         List<AssistedFactoryModel> assistedFactories,
         List<AssistedReference> assistedReferences,
-        Set<TypeElement> interceptionRejected) {}
+        Set<TypeElement> interceptionRejected,
+        Map<TypeElement, Set<Element>> deferred) {}

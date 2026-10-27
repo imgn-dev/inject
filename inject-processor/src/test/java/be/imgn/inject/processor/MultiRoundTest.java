@@ -91,6 +91,36 @@ class MultiRoundTest {
                 .noneMatch(file -> file.getName().contains("$Config$$Factory"));
     }
 
+    @Test
+    void beanWaitsForTheSupertypeItInheritsItsScopeFrom() {
+        JavaFile view = new JavaFile("example.View", """
+                package example;
+
+                import be.imgn.inject.Singleton;
+
+                @Singleton
+                public interface View {}
+                """);
+        JavaFileObject editor = TestCompiler.source("example.Editor", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Editor implements View {
+                    @Inject
+                    public Editor() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new GeneratingProcessor(view), new InjectProcessor())
+                .compile(editor);
+
+        assertThat(compilation).succeeded().hadNoWarnings();
+        assertThat(compilation)
+                .generatedSourceFile("example.$Editor$$Factory")
+                .contains("return Optional.of(Singleton.class)");
+    }
+
     /** A source file for {@link GeneratingProcessor} to generate. */
     private record JavaFile(String qualifiedName, String text) {}
 

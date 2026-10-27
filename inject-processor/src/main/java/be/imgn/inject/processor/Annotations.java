@@ -71,17 +71,26 @@ final class Annotations {
      * Later elements win for a repeated annotation type, so callers pass enclosing elements first and the site last.
      */
     static CodeBlock metadata(List<? extends Element> elements, Elements utils) {
+        return metadata(List.of(), elements, utils);
+    }
+
+    /**
+     * {@return an {@code AnnotationMetadata} expression holding the {@code inherited} annotations, then every
+     * framework-related annotation on the elements}
+     *
+     * @see #metadata(List, Elements)
+     */
+    static CodeBlock metadata(List<AnnotationMirror> inherited, List<? extends Element> elements, Elements utils) {
+        List<AnnotationMirror> mirrors = new ArrayList<>(inherited);
+        elements.forEach(element -> mirrors.addAll(element.getAnnotationMirrors()));
         Map<String, CodeBlock> byType = new LinkedHashMap<>();
-        for (Element element : elements) {
-            for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
-                TypeElement annotationType =
-                        MoreElements.asType(mirror.getAnnotationType().asElement());
-                if (!isFrameworkRelated(annotationType)) {
-                    continue;
-                }
-                byType.put(
-                        annotationType.getQualifiedName().toString(), annotationValue(annotationType, mirror, utils));
+        for (AnnotationMirror mirror : mirrors) {
+            TypeElement annotationType =
+                    MoreElements.asType(mirror.getAnnotationType().asElement());
+            if (!isFrameworkRelated(annotationType)) {
+                continue;
             }
+            byType.put(annotationType.getQualifiedName().toString(), annotationValue(annotationType, mirror, utils));
         }
         if (byType.isEmpty()) {
             return CodeBlock.of("$T.empty()", ANNOTATION_METADATA);
@@ -183,11 +192,18 @@ final class Annotations {
 
     /** {@return the element's scoping annotation type, if any} */
     static Optional<ClassName> scope(Element element) {
+        return scopeAnnotation(element)
+                .map(mirror -> ClassName.of(
+                        MoreElements.asType(mirror.getAnnotationType().asElement())));
+    }
+
+    /** {@return the scoping annotation declared on the element, if any} */
+    static Optional<AnnotationMirror> scopeAnnotation(Element element) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             TypeElement annotationType =
                     MoreElements.asType(mirror.getAnnotationType().asElement());
             if (MoreElements.isAnnotatedWith(annotationType, ScopingAnnotation.class)) {
-                return Optional.of(ClassName.of(annotationType));
+                return Optional.of(mirror);
             }
         }
         return Optional.empty();

@@ -67,8 +67,10 @@ final class InjectStep implements Step {
     @Override
     public Set<? extends Element> process(AnnotatedElements elements) {
         Gathered gathered = gatherStage.gather(elements);
+        Set<Element> deferred =
+                gathered.deferred().values().stream().flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
         if (!planStage.plan(gathered)) {
-            return Set.of();
+            return deferred;
         }
         for (BeanModel model : gathered.beans().values()) {
             if (model.interception() != null) {
@@ -95,7 +97,7 @@ final class InjectStep implements Step {
                     AnnotationImplGenerator.generate(request.annotationType(), request.targetPackage()),
                     request.origin());
         }
-        return Set.of();
+        return deferred;
     }
 
     @Override

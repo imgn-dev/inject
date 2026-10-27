@@ -44,23 +44,24 @@ final class GatherStage {
 
     @SuppressWarnings({"checkstyle:CyclomaticComplexity", "checkstyle:MethodLength"})
     Gathered gather(AnnotatedElements round) {
-        Set<TypeElement> beanTypes = new LinkedHashSet<>();
+        // Each bean type, with the elements of the round that make it one: given back if the bean is deferred.
+        Map<TypeElement, Set<Element>> beanTypes = new LinkedHashMap<>();
         for (Element element : round.annotatedWith(Inject.class.getCanonicalName())) {
-            MoreElements.enclosingType(element).ifPresent(beanTypes::add);
+            MoreElements.enclosingType(element).ifPresent(bean -> addBean(beanTypes, bean, element));
         }
         for (Element element : round.annotatedWith(Intercepts.class.getCanonicalName())) {
-            MoreElements.asTypeElement(element).ifPresent(beanTypes::add);
+            MoreElements.asTypeElement(element).ifPresent(bean -> addBean(beanTypes, bean, element));
         }
         for (Element element : round.withAnnotationsAnnotatedWith(InjectingAnnotation.class.getCanonicalName())) {
             if (element.getKind() == ElementKind.FIELD) {
-                MoreElements.enclosingType(element).ifPresent(beanTypes::add);
+                MoreElements.enclosingType(element).ifPresent(bean -> addBean(beanTypes, bean, element));
             }
         }
         for (Element element : round.withAnnotationsAnnotatedWith(InterceptingAnnotation.class.getCanonicalName())) {
             if (element.getKind().isDeclaredType()) {
-                beanTypes.add(MoreElements.asType(element));
+                addBean(beanTypes, MoreElements.asType(element), element);
             } else if (element.getKind() == ElementKind.METHOD) {
-                MoreElements.enclosingType(element).ifPresent(beanTypes::add);
+                MoreElements.enclosingType(element).ifPresent(bean -> addBean(beanTypes, bean, element));
             }
         }
         for (Element element : round.annotatedWith(ExposeAs.class.getCanonicalName())) {
@@ -96,7 +97,13 @@ final class GatherStage {
         Set<String> assistedBeanNames = new LinkedHashSet<>();
         List<AssistedReference> assistedReferences = new ArrayList<>();
         Set<TypeElement> interceptionRejected = new LinkedHashSet<>();
-        for (TypeElement bean : beanTypes) {
+        Map<TypeElement, Set<Element>> deferred = new LinkedHashMap<>();
+        for (TypeElement bean : beanTypes.keySet()) {
+            if (ModelFactory.hasUnresolvedScope(bean)) {
+                // The scope may come from a supertype another processor has yet to generate.
+                deferred.put(bean, beanTypes.get(bean));
+                continue;
+            }
             if (!models.validateInterceptionShape(bean)) {
                 interceptionRejected.add(bean);
                 continue;
@@ -141,7 +148,12 @@ final class GatherStage {
                 assistedBeanNames,
                 assistedFactories,
                 assistedReferences,
-                interceptionRejected);
+                interceptionRejected,
+                deferred);
+    }
+
+    private static void addBean(Map<TypeElement, Set<Element>> beanTypes, TypeElement bean, Element element) {
+        beanTypes.computeIfAbsent(bean, unused -> new LinkedHashSet<>()).add(element);
     }
 
     /**

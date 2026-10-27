@@ -120,8 +120,9 @@ final class ModelFactory {
                 .map(constructor -> parameters(constructor, bean, types, elements, packageOf(bean)))
                 .orElse(List.of());
         MemberInjection members = members(bean);
-        LifecycleCallbacks callbacks =
-                lifecycleCallbacks(bean, Annotations.scope(bean).isPresent(), false);
+        Optional<ScopeDeclaration> scope = scope(bean);
+        List<AnnotationMirror> inheritedScope = inheritedScope(bean, scope.orElse(null));
+        LifecycleCallbacks callbacks = lifecycleCallbacks(bean, scope.isPresent(), false);
         ContributionModel contribution = contribution(bean, bean.asType(), types);
         RenderedQualifier beanQualifier = contribution != null
                 ? null
@@ -138,12 +139,12 @@ final class ModelFactory {
                 GeneratedNames.factoryName(enclosingChain(bean)),
                 ClassName.of(bean),
                 constructorParameters,
-                Annotations.metadata(constructorSites, elements),
-                Annotations.metadata(List.of(bean), elements),
+                Annotations.metadata(inheritedScope, constructorSites, elements),
+                Annotations.metadata(inheritedScope, List.of(bean), elements),
                 members.fields(),
                 members.methods(),
                 members.pluginFields(),
-                Annotations.scope(bean).orElse(null),
+                scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
                 exposedTypes,
                 contribution,
@@ -208,20 +209,21 @@ final class ModelFactory {
         Elements elements = context.elements();
         RenderedQualifier beanQualifier = Annotations.qualifier(type, elements, packageOf(type), annotationImplRequests)
                 .orElse(null);
-        LifecycleCallbacks callbacks =
-                lifecycleCallbacks(type, Annotations.scope(type).isPresent(), false);
+        Optional<ScopeDeclaration> scope = scope(type);
+        List<AnnotationMirror> inheritedScope = inheritedScope(type, scope.orElse(null));
+        LifecycleCallbacks callbacks = lifecycleCallbacks(type, scope.isPresent(), false);
         ClassName interceptsAnnotation = interceptsAnnotation(type);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
                 ClassName.of(type),
                 List.of(),
-                Annotations.metadata(List.of(type), elements),
-                Annotations.metadata(List.of(type), elements),
+                Annotations.metadata(inheritedScope, List.of(type), elements),
+                Annotations.metadata(inheritedScope, List.of(type), elements),
                 List.of(),
                 List.of(),
                 List.of(),
-                Annotations.scope(type).orElse(null),
+                scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
                 exposedTypes(type, beanQualifier != null),
                 null,
@@ -357,6 +359,77 @@ final class ModelFactory {
         return Optional.empty();
     }
 
+    /**
+     * {@return the bean type's scope: the scoping annotation declared on it, or else the one its supertypes declare}
+     *
+     * <p>Each supertype counts with its own scope, so the nearest declaration wins along each path, through the
+     * superclass chain and all superinterfaces. Reports different scopes inherited along different paths.
+     */
+    Optional<ScopeDeclaration> scope(TypeElement bean) {
+        Map<String, ScopeDeclaration> byType = new LinkedHashMap<>();
+        for (ScopeDeclaration declaration : scopes(bean)) {
+            byType.putIfAbsent(declaration.type().canonicalName(), declaration);
+        }
+        if (byType.size() > 1) {
+            List<String> found = byType.values().stream()
+                    .map(declaration -> "@" + declaration.annotationType().getSimpleName() + " from "
+                            + declaration.declaringType().getSimpleName())
+                    .toList();
+            diagnostics
+                    .on(bean)
+                    .error(bean.getSimpleName() + " inherits " + (found.size() == 2 ? "two" : found.size())
+                            + " scopes: " + String.join(", ", found.subList(0, found.size() - 1)) + " and "
+                            + found.getLast() + ". Declare one on " + bean.getSimpleName() + ".");
+            return Optional.empty();
+        }
+        return byType.values().stream().findFirst();
+    }
+
+    private static List<ScopeDeclaration> scopes(TypeElement type) {
+        Optional<AnnotationMirror> declared = Annotations.scopeAnnotation(type);
+        if (declared.isPresent()) {
+            return List.of(new ScopeDeclaration(declared.get(), type));
+        }
+        List<ScopeDeclaration> inherited = new ArrayList<>();
+        for (TypeMirror supertype : supertypes(type)) {
+            MoreTypes.asTypeElement(supertype).ifPresent(declaring -> inherited.addAll(scopes(declaring)));
+        }
+        return inherited;
+    }
+
+    /**
+     * {@return whether the bean type's scope depends on a supertype javac has not resolved yet} A type that declares
+     * its own scope inherits none, so its supertypes do not matter.
+     */
+    static boolean hasUnresolvedScope(TypeElement type) {
+        if (Annotations.scopeAnnotation(type).isPresent()) {
+            return false;
+        }
+        for (TypeMirror supertype : supertypes(type)) {
+            if (supertype.getKind() == TypeKind.ERROR
+                    || MoreTypes.asTypeElement(supertype)
+                            .map(ModelFactory::hasUnresolvedScope)
+                            .orElse(false)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<TypeMirror> supertypes(TypeElement type) {
+        List<TypeMirror> supertypes = new ArrayList<>();
+        if (type.getSuperclass().getKind() != TypeKind.NONE) {
+            supertypes.add(type.getSuperclass());
+        }
+        supertypes.addAll(type.getInterfaces());
+        return supertypes;
+    }
+
+    /** {@return the scoping annotation {@code bean} inherits, as a list for its metadata; empty if declared on it} */
+    private static List<AnnotationMirror> inheritedScope(TypeElement bean, @Nullable ScopeDeclaration scope) {
+        return scope == null || scope.declaringType().equals(bean) ? List.of() : List.of(scope.annotation());
+    }
+
     /** {@return whether {@code executable} has at least one @Assisted parameter} */
     static boolean isAssisted(ExecutableElement executable) {
         return executable.getParameters().stream()
@@ -365,10 +438,19 @@ final class ModelFactory {
 
     /** Reports every annotation that contradicts a recipe having no binding of its own. */
     void validateAssistedRecipe(Element annotated) {
-        if (Annotations.scope(annotated).isPresent()) {
-            diagnostics
-                    .on(annotated)
-                    .error("An assisted recipe cannot be scoped; every factory call builds a fresh instance.");
+        String scoped = "An assisted recipe cannot be scoped; every factory call builds a fresh instance.";
+        if (annotated.getKind().isDeclaredType()) {
+            scope(MoreElements.asType(annotated))
+                    .ifPresent(scope -> diagnostics
+                            .on(annotated)
+                            .error(
+                                    scope.declaringType().equals(annotated)
+                                            ? scoped
+                                            : scoped + " " + annotated.getSimpleName() + " inherits @"
+                                                    + scope.annotationType().getSimpleName() + " from "
+                                                    + scope.declaringType().getSimpleName() + "."));
+        } else if (Annotations.scope(annotated).isPresent()) {
+            diagnostics.on(annotated).error(scoped);
         }
         if (hasQualifier(annotated)) {
             diagnostics.on(annotated).error("An assisted recipe cannot be qualified; it has no binding key.");
