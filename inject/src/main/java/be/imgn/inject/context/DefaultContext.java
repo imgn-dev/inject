@@ -47,6 +47,7 @@ public final class DefaultContext implements Context {
     private final Map<Class<? extends Annotation>, InterceptorEntry> interceptors;
     private final Map<Class<? extends Annotation>, Scope> scopes;
     private final Map<Class<? extends Annotation>, List<HostRequirement>> hostRequirements;
+    private final Map<Class<? extends Annotation>, List<HostScopeRequirement>> hostScopeRequirements;
     // The child-local scopes some child of this context has hosted, to tell a missing host from a missing Scope
     // service.
     private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
@@ -195,6 +196,7 @@ public final class DefaultContext implements Context {
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
         this.hostRequirements = Map.copyOf(requireSatisfied(definitionList, built.keySet()));
+        this.hostScopeRequirements = Map.copyOf(requireNoWidening(definitionList, definitionsByKey));
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
@@ -235,6 +237,57 @@ public final class DefaultContext implements Context {
                     + String.join(System.lineSeparator(), missing));
         }
         return byScope;
+    }
+
+    /**
+     * Fails fast when a bean of a scope with a {@code Scope} service depends directly, not through a {@code Provider},
+     * on a child-local bean, listing every such dependency at once: such a bean is built here, where no child-local
+     * instance exists. A child-local bean's direct dependency on a bean of another child-local scope needs a host of
+     * that scope above its own host: it is returned, by scope, for the hosts to check when they are built.
+     */
+    private Map<Class<? extends Annotation>, List<HostScopeRequirement>> requireNoWidening(
+            List<BeanDefinition> beans, Map<Key<?>, BeanDefinition> definitions) {
+        List<String> widening = new ArrayList<>();
+        Map<Class<? extends Annotation>, List<HostScopeRequirement>> byScope = new HashMap<>();
+        for (BeanDefinition bean : beans) {
+            if (!(bean instanceof Factory<?> factory) || factory.scope().isEmpty()) {
+                continue;
+            }
+            Class<? extends Annotation> scope = factory.scope().get();
+            for (Dependency dependency : Dependency.of(bean)) {
+                Optional<Class<? extends Annotation>> target =
+                        dependency.isProvider() ? Optional.empty() : childLocalScope(definitions.get(dependency.key()));
+                if (target.isEmpty() || target.get().equals(scope)) {
+                    continue;
+                }
+                String narrower = target.get().getSimpleName();
+                if (!isChildLocal(scope)) {
+                    widening.add("  " + bean.key() + " is @" + scope.getSimpleName() + " and depends directly on "
+                            + dependency.key() + " (" + dependency.site() + "), which is @" + narrower + ". A @"
+                            + scope.getSimpleName() + " bean is built in the root injector, where no @" + narrower
+                            + " instance exists. Make it @" + narrower + " or unscoped.");
+                } else {
+                    byScope.computeIfAbsent(scope, unused -> new ArrayList<>())
+                            .add(new HostScopeRequirement(
+                                    target.get(),
+                                    "  " + bean.key() + " (@" + scope.getSimpleName() + ") depends directly on "
+                                            + dependency.key() + " (" + dependency.site() + "), which is @" + narrower
+                                            + ", and no injector above this one hosts @" + narrower + ". Build this"
+                                            + " injector below one that hosts @" + narrower + ", or make the bean @"
+                                            + narrower + "."));
+                }
+            }
+        }
+        if (!widening.isEmpty()) {
+            throw new ScopeResolutionException("Dependencies on narrower scopes:" + System.lineSeparator()
+                    + String.join(System.lineSeparator(), widening));
+        }
+        return byScope;
+    }
+
+    /** {@return the child-local scope of {@code definition}'s bean, if it has one} */
+    private Optional<Class<? extends Annotation>> childLocalScope(@Nullable BeanDefinition definition) {
+        return definition instanceof Factory<?> factory ? factory.scope().filter(this::isChildLocal) : Optional.empty();
     }
 
     private static String describe(BeanDefinition bean, String site, Key<?> key) {
@@ -435,6 +488,14 @@ public final class DefaultContext implements Context {
      */
     List<HostRequirement> hostRequirements(Class<? extends Annotation> scope) {
         return hostRequirements.getOrDefault(scope, List.of());
+    }
+
+    /**
+     * {@return the child-local scopes {@code scope}'s beans depend on directly, which a child hosting {@code scope}
+     * needs a host of above it}
+     */
+    List<HostScopeRequirement> hostScopeRequirements(Class<? extends Annotation> scope) {
+        return hostScopeRequirements.getOrDefault(scope, List.of());
     }
 
     /** {@return the error for resolving {@code factory}'s child-local bean where no injector hosts its scope} */

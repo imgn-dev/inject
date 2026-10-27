@@ -94,6 +94,13 @@ the order the changes landed, each referencing its commits.
   building a child that hosts the scope checks them against the child and its
   parents, and throws an `UnsatisfiedDependencyException` naming each bean,
   key and injection point it lacks.
+  ([f6f8916](https://github.com/imgn-dev/inject/commit/f6f8916))
+- **Scope widening checks.** A bean whose scope has a `Scope` service, such as
+  `@Singleton`, that depends directly on a child-local bean is a
+  `ScopeResolutionException` at injector creation. A child-local bean that
+  depends directly on a bean of another child-local scope makes building its
+  host fail unless a host of that scope is above it. `Provider` dependencies
+  are not checked.
 
 ## 0.1.0 — 2026-10-12
 

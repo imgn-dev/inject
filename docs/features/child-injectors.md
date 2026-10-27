@@ -95,6 +95,18 @@ message names each bean, key and injection point. A key bound by several hosts
 of the chain, such as a `Scope` object each window and each view binds,
 resolves to the nearest one.
 
+A bean must not depend directly on one that lives shorter than itself. A
+`@Singleton` (or any bean whose scope has a `Scope` service) is built in the
+root, where no child-local instance exists, so its direct dependency on a
+child-local bean is an error at injector creation. A child-local bean's direct
+dependency on a bean of another child-local scope needs a host of that scope
+above its own host: building a host without one fails with a
+`ScopeResolutionException` naming the bean and the injection point. A
+`@WindowScoped` bean may thus depend on a `@ViewScoped` one only in windows
+opened below a view, like dialogs. Dependencies through a `Provider` are never
+checked, and unscoped beans are rebuilt where they are resolved, so they may
+depend on any scope.
+
 Closing a child closes its live children first, then runs `@PreDestroy` on the
 instances it hosts, in reverse creation order (see
 [lifecycle callbacks](lifecycle-callbacks.md)). Closing the root closes its live
