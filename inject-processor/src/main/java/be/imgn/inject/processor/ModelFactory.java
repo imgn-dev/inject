@@ -147,6 +147,7 @@ final class ModelFactory {
                 scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
                 exposedTypes,
+                supertypeTypes(bean, exposedTypes),
                 contribution,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
@@ -213,6 +214,7 @@ final class ModelFactory {
         List<AnnotationMirror> inheritedScope = inheritedScope(type, scope.orElse(null));
         LifecycleCallbacks callbacks = lifecycleCallbacks(type, scope.isPresent(), false);
         ClassName interceptsAnnotation = interceptsAnnotation(type);
+        List<TypeName> defaultExposed = exposedTypes(type, beanQualifier != null);
         return new BeanModel(
                 packageOf(type),
                 GeneratedNames.factoryName(enclosingChain(type)),
@@ -225,7 +227,8 @@ final class ModelFactory {
                 List.of(),
                 scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
-                exposedTypes(type, beanQualifier != null),
+                defaultExposed,
+                supertypeTypes(type, defaultExposed),
                 null,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
@@ -1013,6 +1016,18 @@ final class ModelFactory {
             return List.of();
         }
         return hierarchy.stream().map(type -> (TypeName) ClassName.of(type)).toList();
+    }
+
+    /**
+     * {@return the types among {@code exposedTypes} that {@code bean} has only through its supertypes: all but its own
+     * class when they come from its supertype closure, none when {@code @ExposeAs} chose them}
+     */
+    private List<TypeName> supertypeTypes(TypeElement bean, List<TypeName> exposedTypes) {
+        if (exposeAsMirrors(bean) != null) {
+            return List.of();
+        }
+        ClassName own = ClassName.of(bean);
+        return exposedTypes.stream().filter(type -> !type.equals(own)).toList();
     }
 
     private List<TypeName> exposedTypesForProvides(

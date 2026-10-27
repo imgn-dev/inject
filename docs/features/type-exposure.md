@@ -32,6 +32,23 @@ accidental binding keys: `Object`, `Serializable`, `Cloneable`, `Comparable`,
 `Runnable`, `AutoCloseable`, `Closeable`, `Iterable`, `EventListener`,
 `MethodInterceptor`, and the framework's own types.
 
+Several beans may share a supertype: two views implementing `View` are both
+valid beans. A key a bean has only through its supertypes binds it when no
+other binding claims that key. When several beans have it this way, it is left
+unbound rather than being an error:
+
+```java
+injector.getInstance(Editor.class);  // works
+injector.getInstance(View.class);    // UnsatisfiedDependencyException:
+// No unique binding for Key[View]: implemented by Key[Editor], Key[Preview]. ...
+```
+
+Injecting such a key is an error when the injector is created, naming the
+injection point and every bean that has the key. A bean's own class, the types
+`@ExposeAs` lists, and any other explicit binding always win over a key a bean
+has through its supertypes; two explicit bindings of one key are still a
+`DuplicateBindingException`.
+
 `@ExposeAs` replaces the default with an explicit allowlist. The bean is then
 injectable **only** as the listed types — its concrete class included only if
 listed:
@@ -55,10 +72,9 @@ injector enforces: the implementation type is not a key at all.
 
 ## Limitations
 
-- Default exposure means two beans implementing the same interface collide on
-  that interface's key (`DuplicateBindingException`) even if nothing injects
-  it. Disambiguate with [qualifiers](qualifiers.md), `@ExposeAs` allowlists, or
-  a [collection binding](multibindings.md).
+- An interface several beans implement cannot be injected until one of them
+  is chosen: with [qualifiers](qualifiers.md), an `@ExposeAs` allowlist, or a
+  [collection binding](multibindings.md) for all of them.
 - The excluded-contracts list is fixed; the only way to change what a bean
   exposes is `@ExposeAs`.
 - A [collection contribution](multibindings.md) (`@IntoSet`/`@IntoMap`) cannot

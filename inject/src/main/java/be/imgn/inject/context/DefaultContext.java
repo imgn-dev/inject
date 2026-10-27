@@ -54,6 +54,8 @@ public final class DefaultContext implements Context {
     private final Map<Class<? extends Annotation>, List<HostRequirement>> hostRequirements;
     private final Map<Class<? extends Annotation>, List<HostScopeRequirement>> hostScopeRequirements;
     private final Map<Key<?>, ScopedProduct> products;
+    // The keys several beans have only through their supertypes, left unbound, with those beans' keys.
+    private final Map<Key<?>, List<String>> ambiguous;
     // The child-local scopes some child of this context has hosted, to tell a missing host from a missing Scope
     // service.
     private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
@@ -112,6 +114,7 @@ public final class DefaultContext implements Context {
         Map<Key<?>, List<Contributor>> contributions = new LinkedHashMap<>();
         List<PendingDefault> defaults = new ArrayList<>();
         List<ScopedProduct> products = new ArrayList<>();
+        Map<Key<?>, List<Claim>> supertypeClaims = new LinkedHashMap<>();
         Map<Class<? extends Annotation>, InterceptorEntry> interceptorIndex = new HashMap<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
@@ -152,11 +155,17 @@ public final class DefaultContext implements Context {
                 defaults.add(new PendingDefault(factory, provider));
                 continue;
             }
+            List<Key<?>> supertypeKeys = factory.supertypeKeys();
             for (Key<?> key : factory.exposedKeys()) {
-                if (built.putIfAbsent(key, provider) != null) {
+                if (supertypeKeys.contains(key)) {
+                    supertypeClaims
+                            .computeIfAbsent(key, unused -> new ArrayList<>())
+                            .add(new Claim(factory, provider));
+                } else if (built.putIfAbsent(key, provider) != null) {
                     throw new DuplicateBindingException("Duplicate binding for " + key);
+                } else {
+                    definitionsByKey.put(key, factory);
                 }
-                definitionsByKey.put(key, factory);
             }
             definitionList.add(factory);
         }
@@ -169,6 +178,24 @@ public final class DefaultContext implements Context {
         for (ScopedProduct product : products) {
             registerProduct(product, productsByKey, built);
         }
+        // A key a bean has only through its supertypes binds it when no other binding claims that key. Several such
+        // claims leave it unbound: it is ambiguous, and an error only where something depends on it.
+        Map<Key<?>, List<String>> ambiguousKeys = new HashMap<>();
+        supertypeClaims.forEach((key, claims) -> {
+            if (built.containsKey(key)) {
+                return;
+            }
+            if (claims.size() == 1) {
+                built.put(key, claims.get(0).provider());
+                definitionsByKey.put(key, claims.get(0).factory());
+            } else {
+                ambiguousKeys.put(
+                        key,
+                        claims.stream()
+                                .map(claim -> claim.factory().key().toString())
+                                .toList());
+            }
+        });
         // Defaults join last: a default claims only keys no live binding took. Two live defaults for one key are
         // a configuration error even when a real binding wins that key.
         Set<Key<?>> defaultClaims = new HashSet<>();
@@ -209,6 +236,8 @@ public final class DefaultContext implements Context {
         // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
+        ambiguousKeys.keySet().removeAll(built.keySet());
+        this.ambiguous = Map.copyOf(ambiguousKeys);
         this.hostRequirements = Map.copyOf(requireSatisfied(definitionList, built.keySet()));
         this.hostScopeRequirements = Map.copyOf(requireNoWidening(definitionList, definitionsByKey, productsByKey));
         this.products = Map.copyOf(productsByKey);
@@ -240,8 +269,13 @@ public final class DefaultContext implements Context {
                             .add(new HostRequirement(
                                     dependency.key(),
                                     "  " + bean.key() + " (@" + childLocal.get().getSimpleName() + ") depends on "
-                                            + dependency.key() + " (" + dependency.site() + "), which neither this"
-                                            + " injector nor its parents bind."));
+                                            + dependency.key() + " (" + dependency.site() + "), which "
+                                            + (ambiguous.containsKey(dependency.key())
+                                                    ? "several beans implement ("
+                                                            + String.join(", ", ambiguous.get(dependency.key()))
+                                                            + ") and "
+                                                    : "")
+                                            + "neither this injector nor its parents bind."));
                 } else {
                     missing.add(describe(bean, dependency.site(), dependency.key()));
                 }
@@ -342,7 +376,22 @@ public final class DefaultContext implements Context {
         return definition instanceof Factory<?> factory ? factory.scope().filter(this::isChildLocal) : Optional.empty();
     }
 
-    private static String describe(BeanDefinition bean, String site, Key<?> key) {
+    private String describe(BeanDefinition bean, String site, Key<?> key) {
+        List<String> implementations = ambiguous.get(key);
+        if (implementations != null) {
+            return "  No unique binding for " + key + " (required by " + bean.key() + " " + site + "): "
+                    + ambiguity(implementations);
+        }
+        return describeMissing(bean, site, key);
+    }
+
+    /** {@return the explanation of an ambiguous key, naming the beans that implement it} */
+    private static String ambiguity(List<String> implementations) {
+        return "implemented by " + String.join(", ", implementations)
+                + ". Use @ExposeAs, or a qualifier, to choose which one it binds.";
+    }
+
+    private static String describeMissing(BeanDefinition bean, String site, Key<?> key) {
         return "  No binding for " + key + " (required by " + bean.key() + " " + site + ")";
     }
 
@@ -463,7 +512,12 @@ public final class DefaultContext implements Context {
         }
         Provider<?> provider = registry.get(key);
         if (provider == null) {
-            throw new UnsatisfiedDependencyException("No binding for " + key + stack.requiredBySuffix());
+            List<String> implementations = ambiguous.get(key);
+            throw new UnsatisfiedDependencyException(
+                    implementations == null
+                            ? "No binding for " + key + stack.requiredBySuffix()
+                            : "No unique binding for " + key + stack.requiredBySuffix() + ": "
+                                    + ambiguity(implementations));
         }
         return (Provider<T>) provider;
     }
@@ -692,6 +746,9 @@ public final class DefaultContext implements Context {
 
     /** One collection member: its contribution and its fully wrapped (scoped, cycle-guarded) provider. */
     private record Contributor(Contribution contribution, Provider<?> provider) {}
+
+    /** One bean's claim on a key it has through its supertypes: its factory and its fully wrapped provider. */
+    private record Claim(Factory<?> factory, Provider<?> provider) {}
 
     /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
     private record PendingDefault(Factory<?> factory, Provider<?> provider) {}

@@ -12,6 +12,7 @@ import be.imgn.gaia.processing.source.WildcardTypeName;
 import java.util.List;
 import java.util.stream.IntStream;
 import javax.lang.model.element.Modifier;
+import org.jspecify.annotations.Nullable;
 
 /** Emits a {@code Factory} subclass with constructor, field, and method injection, qualifiers, and scope. */
 final class BeanFactoryGenerator {
@@ -65,12 +66,21 @@ final class BeanFactoryGenerator {
         if (model.interceptsAnnotation() != null) {
             type.addMethod(intercepts(model.interceptsAnnotation()));
         }
-        if (model.contribution() != null) {
-            type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(model.contribution()));
-        } else if (!model.exposedTypes().isEmpty()) {
-            type.addMethod(exposedKeys(model));
-        }
+        addKeys(type, model);
         return JavaFile.newBuilder(model.packageName(), type.build()).build();
+    }
+
+    /** Adds the methods naming the keys the bean binds, or the collection it contributes to instead. */
+    private static void addKeys(Type.Builder type, BeanModel model) {
+        ContributionModel contribution = model.contribution();
+        if (contribution != null) {
+            type.addMethod(emptyExposedKeys()).addMethod(contributionMethod(contribution));
+        } else if (!model.exposedTypes().isEmpty()) {
+            type.addMethod(keysMethod("exposedKeys", model.exposedTypes(), model.beanQualifier()));
+            if (!model.supertypeTypes().isEmpty()) {
+                type.addMethod(keysMethod("supertypeKeys", model.supertypeTypes(), model.beanQualifier()));
+            }
+        }
     }
 
     private static Method constructor(BeanModel model) {
@@ -214,16 +224,15 @@ final class BeanFactoryGenerator {
                 .build();
     }
 
-    private static Method exposedKeys(BeanModel model) {
-        RenderedQualifier qualifier = model.beanQualifier();
-        CodeBlock keys = model.exposedTypes().stream()
+    private static Method keysMethod(String name, List<TypeName> types, @Nullable RenderedQualifier qualifier) {
+        CodeBlock keys = types.stream()
                 .map(type -> qualifier == null
                         ? CodeBlock.of("$T.of($T.class)", KEY, type)
                         : CodeBlock.of("$T.of($T.class, $L)", KEY, type, qualifier.expression()))
                 .collect(CodeBlock.joining(", "));
         TypeName returnType =
                 ParameterizedTypeName.of(LIST, ParameterizedTypeName.of(KEY, WildcardTypeName.unbounded()));
-        return Method.newBuilder("exposedKeys")
+        return Method.newBuilder(name)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)

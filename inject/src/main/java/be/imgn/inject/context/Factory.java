@@ -153,6 +153,16 @@ public abstract class Factory<T> implements BeanDefinition {
     }
 
     /**
+     * {@return the keys among {@link #exposedKeys()} the bean has only through its supertypes; none by default}
+     *
+     * <p>Such a key binds the bean when no other binding claims it. When several beans have it this way and nothing
+     * else binds it, it is left unbound: an injection point depending on it is an error, naming those beans.
+     */
+    protected List<Key<?>> supertypeKeys() {
+        return List.of();
+    }
+
+    /**
      * {@return this factory's collection contribution, or empty when the bean binds under its own keys}
      *
      * <p>A contributing factory exposes no keys of its own; its bean is reachable only through the collection.
