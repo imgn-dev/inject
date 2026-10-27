@@ -329,6 +329,7 @@ public interface Injector extends AutoCloseable {
          * Returns the child injector applying these bindings over the parent.
          *
          * @return the child injector applying these bindings over the parent
+         * @throws IllegalStateException if the parent injector is closed
          * @throws IllegalArgumentException if the child hosts a scope that a {@link be.imgn.inject.context.Scope}
          *     service handles, so it is not child-local
          * @throws UnsatisfiedDependencyException if the child hosts a scope one of whose beans depends on a key that

@@ -46,6 +46,7 @@ public final class ChildContext implements Context {
      *
      * @param parent the parent context resolutions fall back to
      * @param bindings the child's own bindings, by key
+     * @throws IllegalStateException if {@code parent} is closed
      */
     public ChildContext(Context parent, Map<Key<?>, Provider<?>> bindings) {
         this.parent = Objects.requireNonNull(parent, "parent");
@@ -63,6 +64,7 @@ public final class ChildContext implements Context {
      * @param scope the child-local scope this context hosts
      * @throws IllegalArgumentException if {@code scope} is handled by a {@code Scope} service, or if the root of the
      *     chain is not a {@link DefaultContext}
+     * @throws IllegalStateException if {@code parent} is closed
      * @throws ScopeResolutionException if a bean of {@code scope} depends directly on a bean of another child-local
      *     scope that no context of the chain hosts; the message lists every such dependency
      * @throws UnsatisfiedDependencyException if a bean of {@code scope} depends on a key that neither the root, nor
@@ -97,7 +99,11 @@ public final class ChildContext implements Context {
         register();
     }
 
-    /** Registers this context with its parent, which closes it when it closes. */
+    /**
+     * Registers this context with its parent, which closes it when it closes.
+     *
+     * @throws IllegalStateException if the parent is closed
+     */
     private void register() {
         if (parent instanceof ChildContext child) {
             child.addChild(this);
@@ -241,6 +247,7 @@ public final class ChildContext implements Context {
      * destroyed when it closes}
      */
     private Provider<?> hosted(Factory<?> factory) {
+        requireOpen(factory.key());
         return hosted.computeIfAbsent(factory, unused -> new SingletonProvider<>(hostedBuilder(factory)));
     }
 
@@ -340,6 +347,11 @@ public final class ChildContext implements Context {
 
     private void addChild(ChildContext child) {
         synchronized (children) {
+            if (closed) {
+                throw new IllegalStateException("This "
+                        + (hostedScope == null ? "" : "@" + hostedScope.getSimpleName() + " ")
+                        + "injector is closed: no child injector can be built under it.");
+            }
             children.add(child);
         }
     }

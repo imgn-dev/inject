@@ -118,6 +118,10 @@ the order the changes landed, each referencing its commits.
   new default method `constructed`, which `Factory.build` and generated
   assisted factories call.
   ([fb8cb15](https://github.com/imgn-dev/inject/commit/fb8cb15))
+- **No child under a closed injector.** Building a child injector under a
+  closed one throws an `IllegalStateException`. Before, the child was built,
+  could return instances its closed host had destroyed, and never destroyed its
+  own.
 
 ## 0.1.0 — 2026-10-12
 

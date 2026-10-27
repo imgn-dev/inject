@@ -647,9 +647,16 @@ public final class DefaultContext implements Context {
         Destroyables.runAll(actions);
     }
 
-    /** Registers a child context created over this one, to close when this one closes. */
+    /**
+     * Registers a child context created over this one, to close when this one closes.
+     *
+     * @throws IllegalStateException if this context is closed
+     */
     void addChild(ChildContext child) {
         synchronized (children) {
+            if (closed) {
+                throw new IllegalStateException("This injector is closed: no child injector can be built under it.");
+            }
             children.add(child);
         }
     }

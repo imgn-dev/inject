@@ -67,7 +67,8 @@ is the child that hosts it. Closing a child closes its live children first,
 newest first, then destroys its own instances, in reverse creation order, with
 the same handling of failures; closing the root closes its live children the
 same way. After closing, resolving through the child fails fast, and so does
-`get()` on any `Provider` obtained through it.
+`get()` on any `Provider` obtained through it; building a child under a closed
+injector fails too.
 
 ## Limitations
 

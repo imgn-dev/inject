@@ -152,6 +152,32 @@ class ChildCloseTest {
                         "This injector is closed: " + Key.of(String.class) + " can no longer be resolved through it.");
     }
 
+    @Test
+    void noChildCanBeBuiltUnderAClosedHost() {
+        DefaultContext root = root(part("window", WindowScoped.class, false));
+        ChildContext window = new ChildContext(root, Map.of(), WindowScoped.class);
+        resolve(window, "window");
+        window.close();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> new ChildContext(window, Map.of(), ViewScoped.class))
+                .withMessage("This @WindowScoped injector is closed: no child injector can be built under it.");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> new ChildContext(window, Map.of()))
+                .withMessage("This @WindowScoped injector is closed: no child injector can be built under it.");
+        assertThat(destroyed).containsExactly("window");
+    }
+
+    @Test
+    void noChildCanBeBuiltUnderAClosedRoot() {
+        DefaultContext root = root();
+        root.close();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> new ChildContext(root, Map.of(), ViewScoped.class))
+                .withMessage("This injector is closed: no child injector can be built under it.");
+    }
+
     private DefaultContext root(Factory<?>... factories) {
         return new DefaultContext(List.of(factories), List.of(new SingletonScope()));
     }
