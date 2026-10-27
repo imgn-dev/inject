@@ -113,7 +113,7 @@ class AssistedGenerationTest {
                 .contains("Report instance = new Report(")
                 .contains("instance.tag = ")
                 .contains("instance.configure(")
-                .contains("return instance");
+                .contains("return this.context.constructed(instance);");
 
         String source = compilation
                 .generatedSourceFile("example.$ReportFactory$$Impl")
@@ -286,7 +286,7 @@ class AssistedGenerationTest {
                 .contains("this.context.getProvider(Key.of(Dep.class)).get()")
                 .doesNotContainPattern("[^.]context\\.getProvider")
                 .contains("Widget instance_ = new Widget(")
-                .contains("return instance_;");
+                .contains("return this.context.constructed(instance_);");
     }
 
     private static String contents(Compilation compilation, String qualifiedName) throws IOException {

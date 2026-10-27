@@ -211,7 +211,7 @@ public final class ChildContext implements Context {
         if (created.containsKey(product.key())) {
             throw alreadyCreated(product);
         }
-        T value = Objects.requireNonNull(instance.get(), "instance.get()");
+        T value = constructed(Objects.requireNonNull(instance.get(), "instance.get()"));
         if (created.putIfAbsent(product.key(), value) != null) {
             throw alreadyCreated(product);
         }
@@ -289,6 +289,16 @@ public final class ChildContext implements Context {
             throw new IllegalStateException("This Injector has been closed.");
         }
         return parent.interceptor(annotationType);
+    }
+
+    @Override
+    public <T> T constructed(T instance) {
+        Objects.requireNonNull(instance, "instance");
+        Injector attached = injector;
+        if (attached != null && root() instanceof DefaultContext root) {
+            root.report(instance, attached);
+        }
+        return instance;
     }
 
     private Injector requireInjector() {

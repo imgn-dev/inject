@@ -2,12 +2,14 @@ package be.imgn.inject.context;
 
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
+import be.imgn.inject.ConstructionListener;
 import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.Injector;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 import be.imgn.inject.ScopeResolutionException;
+import be.imgn.inject.Types;
 import be.imgn.inject.UnsatisfiedDependencyException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class DefaultContext implements Context {
     private static final Key<?> INJECTOR_KEY = Key.of(Injector.class);
+    private static final Key<?> LISTENERS_KEY = Key.of(Types.setOf(ConstructionListener.class));
 
     private final Map<Key<?>, Provider<?>> registry;
     private final Map<Key<?>, BeanDefinition> definitions;
@@ -58,6 +61,8 @@ public final class DefaultContext implements Context {
     private final Destroyables destroyables = new Destroyables();
     private final List<ChildContext> children = new ArrayList<>();
     private @Nullable Injector injector;
+    // Null until the listeners are resolved, so instances built meanwhile are not reported.
+    private volatile @Nullable List<ConstructionListener> listeners;
     private volatile boolean closed;
 
     /** Creates a context loaded from all registered {@code Factory}, {@code Scope}, and {@code Condition} services. */
@@ -492,8 +497,9 @@ public final class DefaultContext implements Context {
     }
 
     /**
-     * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to. Called once by the
-     * injector that owns this context, immediately after construction.
+     * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to, then resolves the
+     * {@link ConstructionListener}s. Called once by the injector that owns this context, immediately after
+     * construction.
      *
      * @param injector the owning injector
      * @throws IllegalStateException if an injector is already attached
@@ -504,6 +510,32 @@ public final class DefaultContext implements Context {
             throw new IllegalStateException("An Injector is already attached to this Context.");
         }
         this.injector = injector;
+        Provider<?> contributed = registry.get(LISTENERS_KEY);
+        // The listeners and their dependencies, built here, are not reported: no listener exists yet.
+        this.listeners = contributed == null
+                ? List.of()
+                : ((Set<?>) contributed.get())
+                        .stream().map(ConstructionListener.class::cast).toList();
+    }
+
+    @Override
+    public <T> T constructed(T instance) {
+        Objects.requireNonNull(instance, "instance");
+        Injector attached = injector;
+        if (attached != null) {
+            report(instance, attached);
+        }
+        return instance;
+    }
+
+    /** Reports {@code instance}, which belongs to {@code owner}, to the listeners, once they are resolved. */
+    void report(Object instance, Injector owner) {
+        List<ConstructionListener> current = listeners;
+        if (current != null) {
+            for (ConstructionListener listener : current) {
+                listener.constructed(instance, owner);
+            }
+        }
     }
 
     /**

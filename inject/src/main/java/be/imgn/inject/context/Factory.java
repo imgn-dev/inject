@@ -68,7 +68,7 @@ public abstract class Factory<T> implements BeanDefinition {
     }
 
     /**
-     * Builds and fully injects an instance.
+     * Builds and fully injects an instance, then reports it through {@link Context#constructed(Object)}.
      *
      * @param context the resolution context
      * @return the built instance
@@ -79,7 +79,7 @@ public abstract class Factory<T> implements BeanDefinition {
         injectMethods(instance, context);
         injectFields(instance, context);
         postConstruct(instance);
-        return instance;
+        return context.constructed(instance);
     }
 
     /**

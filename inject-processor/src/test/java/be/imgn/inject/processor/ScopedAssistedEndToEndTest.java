@@ -18,6 +18,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import javax.tools.JavaFileObject;
 import org.junit.jupiter.api.AfterEach;
@@ -91,6 +92,33 @@ class ScopedAssistedEndToEndTest {
 
                         public Provider<RenameDialog> dialog() {
                             return dialog;
+                        }
+                    }
+                    """),
+            TestCompiler.source("example.Recorder", """
+                    package example;
+
+                    import be.imgn.inject.ConstructionListener;
+                    import be.imgn.inject.Inject;
+                    import be.imgn.inject.Injector;
+                    import be.imgn.inject.IntoSet;
+                    import be.imgn.inject.Singleton;
+                    import java.util.ArrayList;
+                    import java.util.List;
+
+                    @Singleton
+                    @IntoSet(ConstructionListener.class)
+                    public class Recorder implements ConstructionListener {
+                        public static final List<Object> INSTANCES = new ArrayList<>();
+                        public static final List<Injector> INJECTORS = new ArrayList<>();
+
+                        @Inject
+                        public Recorder() {}
+
+                        @Override
+                        public void constructed(Object instance, Injector injector) {
+                            INSTANCES.add(instance);
+                            INJECTORS.add(injector);
                         }
                     }
                     """),
@@ -184,6 +212,20 @@ class ScopedAssistedEndToEndTest {
         view.close();
 
         assertThat(closed).containsExactly("closed");
+    }
+
+    @Test
+    void theProductIsReportedWithItsHost() throws Exception {
+        Injector view = dialogView();
+        Object dialog = create(view, "reported");
+        List<Object> instances = new ArrayList<>(
+                (List<?>) type("example.Recorder").getField("INSTANCES").get(null));
+        List<?> injectors =
+                (List<?>) type("example.Recorder").getField("INJECTORS").get(null);
+
+        assertThat(instances).contains(dialog, call(dialog, "commands"));
+        assertThat(injectors.get(instances.indexOf(dialog))).isSameAs(view);
+        assertThat(injectors.get(instances.indexOf(call(dialog, "commands")))).isSameAs(view);
     }
 
     @Test

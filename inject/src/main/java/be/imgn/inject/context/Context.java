@@ -65,6 +65,18 @@ public interface Context {
     }
 
     /**
+     * Reports a fully built instance to the {@link be.imgn.inject.ConstructionListener}s, with the injector of this
+     * context. Generated factories call this for every instance they build. The default reports nothing.
+     *
+     * @param instance the fully built instance
+     * @param <T> the instance type
+     * @return {@code instance}
+     */
+    default <T> T constructed(T instance) {
+        return Objects.requireNonNull(instance, "instance");
+    }
+
+    /**
      * Creates the instance of a child-local assisted product, and caches it in the nearest context of the chain that
      * hosts its scope, by its key. Generated assisted factories call this for a recipe with a child-local scope.
      *

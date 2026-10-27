@@ -144,6 +144,9 @@ final class AssistedFactoryGenerator {
                 .map(parameter -> parameter.getSimpleName().toString())
                 .collect(Collectors.toSet());
         ExecutableElement providesMethod = recipe.providesMethod();
+        Optional<CodeBlock> product = scopedProduct(factoryMethod, factoryInterface, models);
+        // An unscoped product is reported to the construction listeners here; createScoped reports a scoped one.
+        String returned = product.isEmpty() ? "return this.context.constructed($L)" : "return $L";
         CodeBlock.Builder body = CodeBlock.newBuilder();
         if (providesMethod == null) {
             constructorBody(
@@ -152,11 +155,11 @@ final class AssistedFactoryGenerator {
                     arguments,
                     models.members(recipe.owner()),
                     models,
-                    unusedName("instance", parameterNames));
+                    unusedName("instance", parameterNames),
+                    returned);
         } else {
-            providesBody(body, recipe, providesMethod, arguments, unusedName("host", parameterNames));
+            providesBody(body, recipe, providesMethod, arguments, unusedName("host", parameterNames), returned);
         }
-        Optional<CodeBlock> product = scopedProduct(factoryMethod, factoryInterface, models);
         if (product.isEmpty()) {
             return method.addCode(body.build()).build();
         }
@@ -189,7 +192,8 @@ final class AssistedFactoryGenerator {
             CodeBlock arguments,
             MemberInjection members,
             ModelFactory models,
-            String instance) {
+            String instance,
+            String returned) {
         ClassName beanType = ClassName.of(recipe.owner());
         method.addStatement("$T $N = new $T($L)", beanType, instance, beanType, arguments);
         // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
@@ -214,7 +218,7 @@ final class AssistedFactoryGenerator {
         if (postConstruct != null) {
             method.addStatement("$N.$L()", instance, postConstruct);
         }
-        method.addStatement("return $N", instance);
+        method.addStatement(returned, CodeBlock.of("$N", instance));
     }
 
     private static void providesBody(
@@ -222,15 +226,16 @@ final class AssistedFactoryGenerator {
             AssistedRecipe recipe,
             ExecutableElement providesMethod,
             CodeBlock arguments,
-            String host) {
+            String host,
+            String returned) {
         String methodName = providesMethod.getSimpleName().toString();
         ClassName hostType = ClassName.of(recipe.owner());
         if (providesMethod.getModifiers().contains(Modifier.STATIC)) {
-            method.addStatement("return $T.$L($L)", hostType, methodName, arguments);
+            method.addStatement(returned, CodeBlock.of("$T.$L($L)", hostType, methodName, arguments));
         } else {
             method.addStatement(
                     "$T $N = this.context.getProvider($T.of($T.class)).get()", hostType, host, KEY, hostType);
-            method.addStatement("return $N.$L($L)", host, methodName, arguments);
+            method.addStatement(returned, CodeBlock.of("$N.$L($L)", host, methodName, arguments));
         }
     }
 

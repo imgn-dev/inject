@@ -110,6 +110,13 @@ the order the changes landed, each referencing its commits.
   A product whose scope has a `Scope` service is an error at injector
   creation. `Context` has the new default method `createScoped`, and `Factory`
   the new method `scopedProducts`.
+  ([76ac1db](https://github.com/imgn-dev/inject/commit/76ac1db))
+- **Construction listeners.** A `ConstructionListener` contributed with
+  `@IntoSet(ConstructionListener.class)` is called with every instance the
+  container builds, assisted products included, and the injector it belongs
+  to; the root resolves the listeners when it is created. `Context` has the
+  new default method `constructed`, which `Factory.build` and generated
+  assisted factories call.
 
 ## 0.1.0 — 2026-10-12
 
