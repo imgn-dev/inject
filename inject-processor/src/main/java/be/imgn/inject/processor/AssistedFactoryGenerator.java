@@ -137,28 +137,26 @@ final class AssistedFactoryGenerator {
             AssistedFactoryMethod factoryMethod, TypeElement factoryInterface, ModelFactory models) {
         Method.Builder method = Method.overriding(factoryMethod.method());
         AssistedRecipe recipe = factoryMethod.recipe();
-        CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe));
         // The body's locals must not collide with the factory-method parameters it copies; the context is always
-        // reached through this.context, so a parameter named "context" cannot stand in for it.
+        // reached through this.context or the lambda's own parameter, so a parameter named "context" cannot stand in
+        // for it.
         Set<String> parameterNames = factoryMethod.method().getParameters().stream()
                 .map(parameter -> parameter.getSimpleName().toString())
                 .collect(Collectors.toSet());
         ExecutableElement providesMethod = recipe.providesMethod();
         Optional<CodeBlock> product = scopedProduct(factoryMethod, factoryInterface, models);
+        // A scoped product is built through the context of the host that caches it, which createScoped passes in.
+        String hostContext = unusedName("hostContext", parameterNames);
+        CodeBlock context = product.isEmpty() ? CodeBlock.of("this.context") : CodeBlock.of("$N", hostContext);
+        CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe), context);
         // An unscoped product is reported to the construction listeners here; createScoped reports a scoped one.
         String returned = product.isEmpty() ? "return this.context.constructed($L)" : "return $L";
         CodeBlock.Builder body = CodeBlock.newBuilder();
         if (providesMethod == null) {
-            constructorBody(
-                    body,
-                    recipe,
-                    arguments,
-                    models.members(recipe.owner()),
-                    models,
-                    unusedName("instance", parameterNames),
-                    returned);
+            constructorBody(body, recipe, arguments, models, unusedName("instance", parameterNames), returned, context);
         } else {
-            providesBody(body, recipe, providesMethod, arguments, unusedName("host", parameterNames), returned);
+            providesBody(
+                    body, recipe, providesMethod, arguments, unusedName("host", parameterNames), returned, context);
         }
         if (product.isEmpty()) {
             return method.addCode(body.build()).build();
@@ -170,9 +168,10 @@ final class AssistedFactoryGenerator {
                 ? CodeBlock.of("null")
                 : CodeBlock.of("$N -> $N.$L()", destroyed, destroyed, preDestroyName);
         return method.addStatement(
-                        "return this.context.createScoped($L, $L, () -> {\n$>$L$<})",
+                        "return this.context.createScoped($L, $L, $N -> {\n$>$L$<})",
                         product.get(),
                         preDestroy,
+                        hostContext,
                         body.build())
                 .build();
     }
@@ -190,17 +189,18 @@ final class AssistedFactoryGenerator {
             CodeBlock.Builder method,
             AssistedRecipe recipe,
             CodeBlock arguments,
-            MemberInjection members,
             ModelFactory models,
             String instance,
-            String returned) {
+            String returned,
+            CodeBlock context) {
         ClassName beanType = ClassName.of(recipe.owner());
+        MemberInjection members = models.members(recipe.owner());
         method.addStatement("$T $N = new $T($L)", beanType, instance, beanType, arguments);
         // Mirrors Factory.build(): construct, @Inject methods, then fields (@Inject fields before plugin fields, as
         // injectFields emits them).
         for (MethodModel injected : members.methods()) {
             CodeBlock args = injected.parameters().stream()
-                    .map(AssistedFactoryGenerator::resolve)
+                    .map(parameter -> resolve(parameter, context))
                     .collect(CodeBlock.joining(", "));
             method.addStatement("$N.$L($L)", instance, injected.name(), args);
         }
@@ -209,7 +209,7 @@ final class AssistedFactoryGenerator {
                     "$N.$L = $L",
                     instance,
                     field.name(),
-                    resolve(field.type(), field.qualifier(), field.isProvider(), null));
+                    resolve(field.type(), field.qualifier(), field.isProvider(), null, context));
         }
         for (PluginField pluginField : members.pluginFields()) {
             method.addStatement("$N.$L = $L", instance, pluginField.name(), pluginField.initializer());
@@ -227,14 +227,15 @@ final class AssistedFactoryGenerator {
             ExecutableElement providesMethod,
             CodeBlock arguments,
             String host,
-            String returned) {
+            String returned,
+            CodeBlock context) {
         String methodName = providesMethod.getSimpleName().toString();
         ClassName hostType = ClassName.of(recipe.owner());
         if (providesMethod.getModifiers().contains(Modifier.STATIC)) {
             method.addStatement(returned, CodeBlock.of("$T.$L($L)", hostType, methodName, arguments));
         } else {
             method.addStatement(
-                    "$T $N = this.context.getProvider($T.of($T.class)).get()", hostType, host, KEY, hostType);
+                    "$T $N = $L.getProvider($T.of($T.class)).get()", hostType, host, context, KEY, hostType);
             method.addStatement(returned, CodeBlock.of("$N.$L($L)", host, methodName, arguments));
         }
     }
@@ -244,7 +245,7 @@ final class AssistedFactoryGenerator {
      * through by the factory-method parameter name at the matched index}
      */
     private static CodeBlock callArguments(
-            AssistedFactoryMethod factoryMethod, Map<Integer, ParameterModel> recipeParameters) {
+            AssistedFactoryMethod factoryMethod, Map<Integer, ParameterModel> recipeParameters, CodeBlock context) {
         List<? extends VariableElement> recipeElements =
                 factoryMethod.recipe().executable().getParameters();
         List<? extends VariableElement> factoryParameters =
@@ -259,28 +260,35 @@ final class AssistedFactoryGenerator {
                         "$L",
                         factoryParameters.get(factoryIndex).getSimpleName().toString()));
             } else {
-                arguments.add(resolve(Objects.requireNonNull(recipeParameters.get(index), "container parameter")));
+                arguments.add(
+                        resolve(Objects.requireNonNull(recipeParameters.get(index), "container parameter"), context));
             }
         }
         return arguments.stream().collect(CodeBlock.joining(", "));
     }
 
-    private static CodeBlock resolve(ParameterModel parameter) {
-        return resolve(parameter.type(), parameter.qualifier(), parameter.isProvider(), parameter.pluginInitializer());
+    private static CodeBlock resolve(ParameterModel parameter, CodeBlock context) {
+        return resolve(
+                parameter.type(),
+                parameter.qualifier(),
+                parameter.isProvider(),
+                parameter.pluginInitializer(),
+                context);
     }
 
     private static CodeBlock resolve(
             CodeBlock type,
             @Nullable RenderedQualifier qualifier,
             boolean isProvider,
-            @Nullable CodeBlock pluginInitializer) {
+            @Nullable CodeBlock pluginInitializer,
+            CodeBlock context) {
         if (pluginInitializer != null) {
             return pluginInitializer;
         }
         CodeBlock key = qualifier == null
                 ? CodeBlock.of("$T.of($L)", KEY, type)
                 : CodeBlock.of("$T.of($L, $L)", KEY, type, qualifier.expression());
-        CodeBlock provider = CodeBlock.of("this.context.getProvider($L)", key);
+        CodeBlock provider = CodeBlock.of("$L.getProvider($L)", context, key);
         return isProvider ? provider : CodeBlock.of("$L.get()", provider);
     }
 

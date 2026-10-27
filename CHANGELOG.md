@@ -119,9 +119,12 @@ the order the changes landed, each referencing its commits.
   assisted factories call.
   ([fb8cb15](https://github.com/imgn-dev/inject/commit/fb8cb15))
 - **No child under a closed injector.** Building a child injector under a
-  closed one throws an `IllegalStateException`. Before, the child was built,
-  could return instances its closed host had destroyed, and never destroyed its
-  own.
+  closed one throws an `IllegalStateException`.
+  ([560a8c1](https://github.com/imgn-dev/inject/commit/560a8c1))
+- **Scoped products built through their host.** A scoped assisted product's
+  dependencies resolve through the injector that caches it, even when the
+  factory was resolved through one of its descendants. `Context.createScoped`
+  takes a `Function<Context, T>`, called with the host's context.
 
 ## 0.1.0 — 2026-10-12
 

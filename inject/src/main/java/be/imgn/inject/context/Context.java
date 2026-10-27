@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -84,13 +84,17 @@ public interface Context {
      *
      * @param product the product to create
      * @param preDestroy the product's {@code @PreDestroy} callback, run when its host closes, or {@code null}
-     * @param instance builds the instance, through this context
+     * @param instance builds the instance through the context it is given: the host's, so the product's dependencies
+     *     resolve where it is cached
      * @param <T> the product type
      * @return the created instance
      * @throws ScopeResolutionException if no context of the chain hosts the product's scope
      * @throws IllegalStateException if the host already holds an instance of the product
      */
-    default <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+    default <T> T createScoped(
+            ScopedProduct product,
+            @Nullable Consumer<? super T> preDestroy,
+            Function<? super Context, ? extends T> instance) {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(instance, "instance");
         throw new ScopeResolutionException("Cannot create " + product.key() + " with " + product.creator() + "(...):"

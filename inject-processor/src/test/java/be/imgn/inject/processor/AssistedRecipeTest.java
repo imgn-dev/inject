@@ -159,7 +159,7 @@ class AssistedRecipeTest {
         assertThat(compilation)
                 .generatedSourceFile("example.$DialogFactory$$Impl")
                 .contains("return this.context.createScoped(new ScopedProduct(Key.of(Dialog.class), Singleton.class,"
-                        + " \"example.DialogFactory.create\"), null, () -> {");
+                        + " \"example.DialogFactory.create\"), null, hostContext -> {");
         assertThat(compilation)
                 .generatedSourceFile("example.$DialogFactory$$Factory")
                 .contains("protected List<ScopedProduct> scopedProducts()");

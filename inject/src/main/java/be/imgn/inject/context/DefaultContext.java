@@ -25,7 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
@@ -607,7 +607,10 @@ public final class DefaultContext implements Context {
      * @throws ScopeResolutionException always
      */
     @Override
-    public <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+    public <T> T createScoped(
+            ScopedProduct product,
+            @Nullable Consumer<? super T> preDestroy,
+            Function<? super Context, ? extends T> instance) {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(instance, "instance");
         if (closed) {

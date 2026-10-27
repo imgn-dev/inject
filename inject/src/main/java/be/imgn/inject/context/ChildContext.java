@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -202,7 +202,10 @@ public final class ChildContext implements Context {
     }
 
     @Override
-    public <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+    public <T> T createScoped(
+            ScopedProduct product,
+            @Nullable Consumer<? super T> preDestroy,
+            Function<? super Context, ? extends T> instance) {
         Objects.requireNonNull(product, "product");
         Objects.requireNonNull(instance, "instance");
         requireOpen(product.key());
@@ -213,11 +216,14 @@ public final class ChildContext implements Context {
         return host.create(product, preDestroy, instance);
     }
 
-    private <T> T create(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+    private <T> T create(
+            ScopedProduct product,
+            @Nullable Consumer<? super T> preDestroy,
+            Function<? super Context, ? extends T> instance) {
         if (created.containsKey(product.key())) {
             throw alreadyCreated(product);
         }
-        T value = constructed(Objects.requireNonNull(instance.get(), "instance.get()"));
+        T value = constructed(Objects.requireNonNull(instance.apply(this), "instance.apply(context)"));
         if (created.putIfAbsent(product.key(), value) != null) {
             throw alreadyCreated(product);
         }

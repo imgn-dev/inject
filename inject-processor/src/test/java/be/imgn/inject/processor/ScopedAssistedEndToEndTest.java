@@ -122,6 +122,41 @@ class ScopedAssistedEndToEndTest {
                         }
                     }
                     """),
+            TestCompiler.source("example.Tag", """
+                    package example;
+
+                    public record Tag(String name) {}
+                    """),
+            TestCompiler.source("example.Palette", """
+                    package example;
+
+                    import be.imgn.inject.Assisted;
+                    import be.imgn.inject.Inject;
+
+                    @WindowScoped
+                    public class Palette {
+                        private final Tag tag;
+
+                        @Inject
+                        public Palette(@Assisted String name, Tag tag) {
+                            this.tag = tag;
+                        }
+
+                        public Tag tag() {
+                            return tag;
+                        }
+                    }
+                    """),
+            TestCompiler.source("example.PaletteFactory", """
+                    package example;
+
+                    import be.imgn.inject.AssistedFactory;
+
+                    public interface PaletteFactory {
+                        @AssistedFactory
+                        Palette create(String name);
+                    }
+                    """),
             TestCompiler.source("example.RenameDialogFactory", """
                     package example;
 
@@ -229,6 +264,22 @@ class ScopedAssistedEndToEndTest {
     }
 
     @Test
+    void aProductIsBuiltThroughTheHostThatCachesIt() throws Exception {
+        Injector window = bind(
+                        root.scopedChildBuilder(annotation("example.WindowScoped")), type("example.Tag"), tag("window"))
+                .build();
+        Injector view = bind(
+                        window.scopedChildBuilder(annotation("example.ViewScoped")), type("example.Tag"), tag("view"))
+                .build();
+        Object factory = view.getInstance(type("example.PaletteFactory"));
+
+        Object palette = factory.getClass().getMethod("create", String.class).invoke(factory, "colors");
+
+        assertThat(call(palette, "tag")).isEqualTo(tag("window"));
+        assertThat(window.getInstance(type("example.Palette"))).isSameAs(palette);
+    }
+
+    @Test
     void creatingTheProductWithNoHostFails() throws Exception {
         Injector window =
                 root.scopedChildBuilder(annotation("example.WindowScoped")).build();
@@ -252,6 +303,14 @@ class ScopedAssistedEndToEndTest {
     private Object create(Injector injector, String current) throws Exception {
         Object factory = injector.getInstance(type("example.RenameDialogFactory"));
         return factory.getClass().getMethod("create", String.class).invoke(factory, current);
+    }
+
+    private Object tag(String name) throws Exception {
+        return type("example.Tag").getConstructor(String.class).newInstance(name);
+    }
+
+    private static <T> Injector.ChildBuilder bind(Injector.ChildBuilder builder, Class<T> type, Object instance) {
+        return builder.bind(type, type.cast(instance));
     }
 
     private Class<?> type(String name) throws ClassNotFoundException {
