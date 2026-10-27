@@ -85,8 +85,9 @@
                     <extraArtifacts>
                         <extraArtifact>be.imgn.inject:inject:${project.version}</extraArtifact>
                         <extraArtifact>be.imgn.inject:inject-processor:${project.version}</extraArtifact>
-                        <!-- inject-parent imports this BOM; an import is not a dependency, so nothing else installs it. -->
+                        <!-- inject-parent imports these BOMs; an import is not a dependency, so nothing else installs them. -->
                         <extraArtifact>be.imgn.gaia:gaia-bom:${gaia.version}:pom</extraArtifact>
+                        <extraArtifact>be.imgn.parent:bom:${imgn-parent.version}:pom</extraArtifact>
                     </extraArtifacts>
                 </configuration>
                 <dependencies>

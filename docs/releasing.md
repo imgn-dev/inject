@@ -108,9 +108,10 @@ it to the keyserver: Central accepts any key it can find there, so a new key
 does not affect the namespace. A Central token can likewise be regenerated at
 any time from the portal's account page.
 
-Stay on Maven 3.9.16, the wrapper's version. With Maven 3.10.0,
-`central-publishing-maven-plugin` 0.11.0 bundles local-repository metadata,
-and Central rejects the deployment.
+The wrapper uses Maven 3.10.0, the minimum the parent requires. Under it,
+`central-publishing-maven-plugin` must be 0.12.0 or newer, as the parent
+manages it: 0.11.0 bundles local-repository metadata, and Central rejects the
+deployment.
 
 ### Required repository secrets
 
