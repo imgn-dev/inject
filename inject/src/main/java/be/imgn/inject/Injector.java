@@ -130,9 +130,11 @@ public interface Injector extends AutoCloseable {
     ChildBuilder scopedChildBuilder(Class<? extends Annotation> scope);
 
     /**
-     * Closes this injector: invokes {@code @PreDestroy} on every scoped instance it created, in reverse creation order,
-     * then rejects further resolution. Idempotent. Child injectors own no scoped instances, so closing a child destroys
-     * nothing and does not close its parent.
+     * Closes this injector: rejects further resolution through it, including through the providers it returned, closes
+     * its live child injectors, newest first, then invokes {@code @PreDestroy} on every scoped instance it created, in
+     * reverse creation order. A child injector's scoped instances are those of the scope it hosts. When a callback or a
+     * child fails, the others still run, and the first failure is thrown with the later ones suppressed. Closing a
+     * child never closes its parent. Idempotent.
      */
     @Override
     void close();

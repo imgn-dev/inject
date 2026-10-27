@@ -62,6 +62,13 @@ Only instances that were created are destroyed: a singleton never resolved is
 never touched. The container tracks nothing beyond scoped beans that declare a
 `@PreDestroy`, so a prototype-heavy graph carries no bookkeeping.
 
+The owning injector of a bean of a [child-local scope](child-injectors.md#child-local-scopes)
+is the child that hosts it. Closing a child closes its live children first,
+newest first, then destroys its own instances, in reverse creation order, with
+the same handling of failures; closing the root closes its live children the
+same way. After closing, resolving through the child fails fast, and so does
+`get()` on any `Provider` obtained through it.
+
 ## Limitations
 
 - `@PreDestroy` requires a scoped bean. On a prototype or an
@@ -76,6 +83,7 @@ never touched. The container tracks nothing beyond scoped beans that declare a
 - At most one `@PostConstruct` and one `@PreDestroy` per class. Each must be a
   non-private, non-static, no-argument `void` method declared on the bean
   itself; inherited callbacks are not collected.
-- Closing a [child injector](child-injectors.md) destroys nothing (a child owns
-  no scoped instances) and never closes its parent. Scoped beans a child
-  resolves belong to the parent and are destroyed when the parent closes.
+- Closing a [child injector](child-injectors.md) never closes its parent. The
+  beans of other scopes that a child resolves belong to the injector that
+  declared them, and are destroyed when it closes; unscoped beans a child builds
+  are never tracked.

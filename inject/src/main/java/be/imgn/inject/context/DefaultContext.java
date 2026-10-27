@@ -11,9 +11,7 @@ import be.imgn.inject.Provider;
 import be.imgn.inject.ScopeResolutionException;
 import be.imgn.inject.UnsatisfiedDependencyException;
 import java.lang.annotation.Annotation;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -53,7 +51,8 @@ public final class DefaultContext implements Context {
     // service.
     private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
     private final ResolutionStack stack = new ResolutionStack();
-    private final Deque<TrackedInstance<?>> destroyables = new ArrayDeque<>();
+    private final Destroyables destroyables = new Destroyables();
+    private final List<ChildContext> children = new ArrayList<>();
     private @Nullable Injector injector;
     private volatile boolean closed;
 
@@ -353,9 +352,7 @@ public final class DefaultContext implements Context {
         return () -> {
             T instance = scoped.get();
             if (recorded.compareAndSet(false, true)) {
-                synchronized (destroyables) {
-                    destroyables.push(new TrackedInstance<>(factory, instance));
-                }
+                destroyables.track(factory, instance);
             }
             return instance;
         };
@@ -463,36 +460,36 @@ public final class DefaultContext implements Context {
     }
 
     /**
-     * Destroys every tracked scoped instance (invoking each factory's {@code @PreDestroy}) in reverse creation order,
-     * then rejects further resolution. Failures are collected as suppressed exceptions on the first one thrown, so
-     * every instance is still given a chance to destroy. Idempotent.
+     * Closes the live child contexts, newest first, then destroys every tracked scoped instance (invoking each
+     * factory's {@code @PreDestroy}) in reverse creation order, and rejects further resolution. Failures are collected
+     * as suppressed exceptions on the first one thrown, so every child and every instance is still given a chance to
+     * close or destroy. Idempotent.
      */
-    // One failing @PreDestroy must not keep the remaining instances from being destroyed.
     @Override
-    @SuppressWarnings("checkstyle:IllegalCatch")
     public void close() {
         if (closed) {
             return;
         }
         closed = true;
-        RuntimeException failure = null;
-        synchronized (destroyables) {
-            while (!destroyables.isEmpty()) {
-                // LIFO: last created destroyed first
-                TrackedInstance<?> tracked = destroyables.pop();
-                try {
-                    tracked.destroy();
-                } catch (RuntimeException e) {
-                    if (failure == null) {
-                        failure = e;
-                    } else {
-                        failure.addSuppressed(e);
-                    }
-                }
-            }
+        List<Runnable> actions = new ArrayList<>();
+        synchronized (children) {
+            children.reversed().forEach(child -> actions.add(child::close));
         }
-        if (failure != null) {
-            throw failure;
+        actions.addAll(destroyables.drain());
+        Destroyables.runAll(actions);
+    }
+
+    /** Registers a child context created over this one, to close when this one closes. */
+    void addChild(ChildContext child) {
+        synchronized (children) {
+            children.add(child);
+        }
+    }
+
+    /** Forgets a child context that closed. */
+    void removeChild(ChildContext child) {
+        synchronized (children) {
+            children.remove(child);
         }
     }
 
@@ -520,13 +517,6 @@ public final class DefaultContext implements Context {
 
     /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
     private record PendingDefault(Factory<?> factory, Provider<?> provider) {}
-
-    /** A created scoped instance paired with the factory that can destroy it. */
-    private record TrackedInstance<T>(Factory<T> factory, T instance) {
-        void destroy() {
-            factory.preDestroy(instance);
-        }
-    }
 
     /** One indexed interceptor: the factory that declared it and its fully wrapped provider. */
     private record InterceptorEntry(Factory<?> factory, Provider<MethodInterceptor> provider) {}

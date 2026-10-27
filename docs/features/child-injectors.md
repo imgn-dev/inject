@@ -86,6 +86,11 @@ injector that built the bean, so a `@ViewScoped` bean's `Provider<Owner>`
 returns the `Owner` of its own view, and cycles broken by a `Provider` work as
 for singletons.
 
+Closing a child closes its live children first, then runs `@PreDestroy` on the
+instances it hosts, in reverse creation order (see
+[lifecycle callbacks](lifecycle-callbacks.md)). Closing the root closes its live
+children the same way.
+
 Resolving a child-local bean through an injector with no host of its scope in
 its chain fails with a `ScopeResolutionException` naming the bean and the
 scope. When no child ever hosted the scope, the message also points out that a

@@ -4,6 +4,7 @@ import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,8 +30,10 @@ public final class ChildContext implements Context {
     // The instances of the hosted scope, one memoizing provider per factory, so a bean's exposed keys share it.
     private final Map<Factory<?>, Provider<?>> hosted = new ConcurrentHashMap<>();
     private final ResolutionStack stack = new ResolutionStack();
+    private final Destroyables destroyables = new Destroyables();
+    private final List<ChildContext> children = new ArrayList<>();
     private @Nullable Injector injector;
-    private boolean closed;
+    private volatile boolean closed;
 
     /**
      * Creates a child context over {@code parent}.
@@ -42,6 +45,7 @@ public final class ChildContext implements Context {
         this.parent = Objects.requireNonNull(parent, "parent");
         this.bindings = Map.copyOf(Objects.requireNonNull(bindings, "bindings"));
         this.hostedScope = null;
+        register();
     }
 
     /**
@@ -63,6 +67,16 @@ public final class ChildContext implements Context {
                     + " Injector.builder() can host a scope.");
         }
         root.host(scope);
+        register();
+    }
+
+    /** Registers this context with its parent, which closes it when it closes. */
+    private void register() {
+        if (parent instanceof ChildContext child) {
+            child.addChild(this);
+        } else if (parent instanceof DefaultContext root) {
+            root.addChild(this);
+        }
     }
 
     /**
@@ -84,18 +98,28 @@ public final class ChildContext implements Context {
     @SuppressWarnings("unchecked")
     public <T> Provider<T> getProvider(Key<T> key) {
         Objects.requireNonNull(key, "key");
-        if (closed) {
-            throw new IllegalStateException("This Injector has been closed.");
-        }
+        requireOpen(key);
+        Provider<?> provider;
         if (INJECTOR_KEY.equals(key)) {
-            return (Provider<T>) (Provider<Injector>) this::requireInjector;
+            provider = (Provider<Injector>) this::requireInjector;
+        } else {
+            Provider<?> layered = localLookup(key);
+            Provider<?> built = layered != null ? layered : buildingProvider(key);
+            provider = built != null ? built : parent.getProvider(key);
         }
-        Provider<?> layered = localLookup(key);
-        if (layered != null) {
-            return (Provider<T>) layered;
+        // A provider obtained through this context fails once it closes, wherever its instances come from.
+        return () -> {
+            requireOpen(key);
+            return (T) provider.get();
+        };
+    }
+
+    private void requireOpen(Key<?> key) {
+        if (closed) {
+            throw new IllegalStateException(
+                    "This " + (hostedScope == null ? "" : "@" + hostedScope.getSimpleName() + " ")
+                            + "injector is closed: " + key + " can no longer be resolved through it.");
         }
-        Provider<?> built = buildingProvider(key);
-        return built != null ? (Provider<T>) built : parent.getProvider(key);
     }
 
     /**
@@ -124,12 +148,25 @@ public final class ChildContext implements Context {
         return parent instanceof ChildContext child ? child.host(scope) : null;
     }
 
-    /** {@return the provider of this host's instance of {@code factory}'s bean, built through this context once} */
+    /**
+     * {@return the provider of this host's instance of {@code factory}'s bean, built through this context once and
+     * destroyed when it closes}
+     */
     private Provider<?> hosted(Factory<?> factory) {
-        return hosted.computeIfAbsent(
-                factory,
-                unused -> new SingletonProvider<>(
-                        new CycleGuardProvider<>(factory.key(), () -> factory.build(this), stack)));
+        return hosted.computeIfAbsent(factory, unused -> new SingletonProvider<>(hostedBuilder(factory)));
+    }
+
+    private <T> Provider<T> hostedBuilder(Factory<T> factory) {
+        return new CycleGuardProvider<>(
+                factory.key(),
+                () -> {
+                    T instance = factory.build(this);
+                    if (factory.hasPreDestroy()) {
+                        destroyables.track(factory, instance);
+                    }
+                    return instance;
+                },
+                stack);
     }
 
     /** {@return the context at the top of the chain: the first ancestor that is not a {@code ChildContext}} */
@@ -175,11 +212,43 @@ public final class ChildContext implements Context {
     }
 
     /**
-     * Marks this child context closed, rejecting further resolution. A child owns no scoped instances, so this never
-     * destroys anything and never closes the parent. Idempotent.
+     * Closes this child context: rejects further resolution through it, including through the providers it returned,
+     * closes its live child contexts, newest first, then destroys the instances of its hosted scope (invoking each
+     * factory's {@code @PreDestroy}) in reverse creation order. Failures are collected as suppressed exceptions on the
+     * first one thrown, so every child and every instance is still given a chance to close or destroy. Never closes the
+     * parent. Idempotent.
      */
     @Override
     public void close() {
+        if (closed) {
+            return;
+        }
         closed = true;
+        List<Runnable> actions = new ArrayList<>();
+        synchronized (children) {
+            children.reversed().forEach(child -> actions.add(child::close));
+        }
+        actions.addAll(destroyables.drain());
+        try {
+            Destroyables.runAll(actions);
+        } finally {
+            if (parent instanceof ChildContext child) {
+                child.removeChild(this);
+            } else if (parent instanceof DefaultContext root) {
+                root.removeChild(this);
+            }
+        }
+    }
+
+    private void addChild(ChildContext child) {
+        synchronized (children) {
+            children.add(child);
+        }
+    }
+
+    private void removeChild(ChildContext child) {
+        synchronized (children) {
+            children.remove(child);
+        }
     }
 }

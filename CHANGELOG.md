@@ -81,6 +81,13 @@ the order the changes landed, each referencing its commits.
   A scoping annotation with no `Scope` service is no longer an error at
   injector creation. **Breaking** for `Injector` implementations: the
   interface has the new method `scopedChildBuilder`.
+  ([974940e](https://github.com/imgn-dev/inject/commit/974940e))
+- **Closing child injectors.** Closing an injector closes its live child
+  injectors first, newest first, then runs `@PreDestroy` on its own instances
+  in reverse creation order; for a child, those of the scope it hosts. Failures
+  are handled as for the root: every instance is still destroyed, the first
+  failure is thrown and the others are suppressed. After closing, `get()` on a
+  `Provider` obtained through the injector fails too.
 
 ## 0.1.0 — 2026-10-12
 
