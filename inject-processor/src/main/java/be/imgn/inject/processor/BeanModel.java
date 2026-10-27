@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
  * @param beanQualifier the rendered qualifier applied to every exposed key, or {@code null}
  * @param exposedTypes the types the bean is exposed as; empty means "use the factory's default single key"
  * @param supertypeTypes the types among {@code exposedTypes} the bean has only through its supertypes: all but its own
- *     class, unless {@code @ExposeAs} chose them
+ *     class, unless {@code @ExposeAs} chose them or the bean is qualified
  * @param contribution the collection contribution, or {@code null} when the bean binds under its own keys
  * @param postConstruct the bean's {@code @PostConstruct} method name, or {@code null}
  * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}

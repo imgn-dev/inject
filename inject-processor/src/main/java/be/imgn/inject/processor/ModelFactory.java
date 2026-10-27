@@ -147,7 +147,7 @@ final class ModelFactory {
                 scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
                 exposedTypes,
-                supertypeTypes(bean, exposedTypes),
+                supertypeTypes(bean, exposedTypes, beanQualifier != null),
                 contribution,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
@@ -228,7 +228,7 @@ final class ModelFactory {
                 scope.map(ScopeDeclaration::type).orElse(null),
                 beanQualifier,
                 defaultExposed,
-                supertypeTypes(type, defaultExposed),
+                supertypeTypes(type, defaultExposed, beanQualifier != null),
                 null,
                 callbacks.postConstruct(),
                 callbacks.preDestroy(),
@@ -1020,10 +1020,11 @@ final class ModelFactory {
 
     /**
      * {@return the types among {@code exposedTypes} that {@code bean} has only through its supertypes: all but its own
-     * class when they come from its supertype closure, none when {@code @ExposeAs} chose them}
+     * class when they come from its supertype closure, none when {@code @ExposeAs} chose them or a qualifier makes
+     * every key explicit}
      */
-    private List<TypeName> supertypeTypes(TypeElement bean, List<TypeName> exposedTypes) {
-        if (exposeAsMirrors(bean) != null) {
+    private List<TypeName> supertypeTypes(TypeElement bean, List<TypeName> exposedTypes, boolean qualified) {
+        if (qualified || exposeAsMirrors(bean) != null) {
             return List.of();
         }
         ClassName own = ClassName.of(bean);

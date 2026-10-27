@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import be.imgn.gaia.processing.testing.Compilation;
 import be.imgn.gaia.processing.testing.TestCompiler;
+import be.imgn.inject.DuplicateBindingException;
 import be.imgn.inject.Injector;
 import be.imgn.inject.UnsatisfiedDependencyException;
 import java.io.InputStream;
@@ -95,6 +96,51 @@ class SupertypeKeysTest {
     }
 
     @Test
+    void aQualifiedBeanHasNoSupertypeKeys() {
+        JavaFileObject main = TestCompiler.source("example.MainView", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Named;
+
+                @Named("main")
+                public class MainView implements View {
+                    @Inject
+                    public MainView() {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(VIEWS.getFirst(), main);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$MainView$$Factory")
+                .contains("Key.of(View.class, Names.named(\"main\"))")
+                .doesNotContain("supertypeKeys");
+    }
+
+    @Test
+    void twoBeansWithTheSameQualifierOnASharedInterfaceAreADuplicate(@TempDir Path classes) throws Exception {
+        List<JavaFileObject> sources = List.of(VIEWS.getFirst(), qualifiedView("MainView"), qualifiedView("OtherView"));
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(sources);
+        assertThat(compilation).succeeded();
+        writeClasses(compilation, classes);
+
+        try (URLClassLoader loader = new URLClassLoader(
+                new URL[] {classes.toUri().toURL()}, getClass().getClassLoader())) {
+            ClassLoader previous = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(loader);
+            try {
+                assertThatExceptionOfType(DuplicateBindingException.class)
+                        .isThrownBy(Injector::create)
+                        .withMessage("Duplicate binding for Key[example.View @be.imgn.inject.Named(value=\"main\")]");
+            } finally {
+                Thread.currentThread().setContextClassLoader(previous);
+            }
+        }
+    }
+
+    @Test
     void severalViewsSharingTheirInterfacesMakeAValidInjector(@TempDir Path classes) throws Exception {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(VIEWS);
         assertThat(compilation).succeeded();
@@ -116,6 +162,21 @@ class SupertypeKeysTest {
                 Thread.currentThread().setContextClassLoader(previous);
             }
         }
+    }
+
+    private static JavaFileObject qualifiedView(String name) {
+        return TestCompiler.source("example." + name, """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Named;
+
+                @Named("main")
+                public class %s implements View {
+                    @Inject
+                    public %s() {}
+                }
+                """.formatted(name, name));
     }
 
     private static void writeClasses(Compilation compilation, Path directory) throws Exception {

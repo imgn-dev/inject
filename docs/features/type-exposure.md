@@ -47,7 +47,9 @@ Injecting such a key is an error when the injector is created, naming the
 injection point and every bean that has the key. A bean's own class, the types
 `@ExposeAs` lists, and any other explicit binding always win over a key a bean
 has through its supertypes; two explicit bindings of one key are still a
-`DuplicateBindingException`.
+`DuplicateBindingException`. A [qualifier](qualifiers.md) makes all of a bean's
+keys explicit: two beans with the same qualifier on a shared interface are a
+duplicate.
 
 `@ExposeAs` replaces the default with an explicit allowlist. The bean is then
 injectable **only** as the listed types — its concrete class included only if
