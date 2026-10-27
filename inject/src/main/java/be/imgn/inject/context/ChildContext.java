@@ -3,6 +3,7 @@ package be.imgn.inject.context;
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
+import be.imgn.inject.UnsatisfiedDependencyException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,8 @@ public final class ChildContext implements Context {
      * @param scope the child-local scope this context hosts
      * @throws IllegalArgumentException if {@code scope} is handled by a {@code Scope} service, or if the root of the
      *     chain is not a {@link DefaultContext}
+     * @throws UnsatisfiedDependencyException if a bean of {@code scope} depends on a key that neither the root, nor
+     *     this context, nor one of its parents binds; the message lists every such dependency
      */
     public ChildContext(Context parent, Map<Key<?>, Provider<?>> bindings, Class<? extends Annotation> scope) {
         this.parent = Objects.requireNonNull(parent, "parent");
@@ -67,6 +70,15 @@ public final class ChildContext implements Context {
                     + " Injector.builder() can host a scope.");
         }
         root.host(scope);
+        List<String> missing = root.hostRequirements(scope).stream()
+                .filter(requirement -> localLookup(requirement.key()) == null)
+                .map(HostRequirement::description)
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new UnsatisfiedDependencyException("Cannot build the @" + scope.getSimpleName() + " injector:"
+                    + System.lineSeparator() + String.join(System.lineSeparator(), missing) + System.lineSeparator()
+                    + "Bind each on this injector's builder, or on one of its parents.");
+        }
         register();
     }
 

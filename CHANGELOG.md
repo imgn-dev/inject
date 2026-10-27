@@ -88,6 +88,12 @@ the order the changes landed, each referencing its commits.
   are handled as for the root: every instance is still destroyed, the first
   failure is thrown and the others are suppressed. After closing, `get()` on a
   `Provider` obtained through the injector fails too.
+  ([b8f4574](https://github.com/imgn-dev/inject/commit/b8f4574))
+- **Bindings of a child-local scope.** Creating an injector no longer
+  requires the dependencies of child-local beans to be bound at the root:
+  building a child that hosts the scope checks them against the child and its
+  parents, and throws an `UnsatisfiedDependencyException` naming each bean,
+  key and injection point it lacks.
 
 ## 0.1.0 — 2026-10-12
 

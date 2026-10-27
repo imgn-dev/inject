@@ -3,7 +3,6 @@ package be.imgn.inject.context;
 import be.imgn.inject.ConditionResolutionException;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.DuplicateBindingException;
-import be.imgn.inject.InjectingAnnotation;
 import be.imgn.inject.Injector;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
@@ -47,6 +46,7 @@ public final class DefaultContext implements Context {
     private final List<BeanDefinition> allDefinitions;
     private final Map<Class<? extends Annotation>, InterceptorEntry> interceptors;
     private final Map<Class<? extends Annotation>, Scope> scopes;
+    private final Map<Class<? extends Annotation>, List<HostRequirement>> hostRequirements;
     // The child-local scopes some child of this context has hosted, to tell a missing host from a missing Scope
     // service.
     private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
@@ -194,7 +194,7 @@ public final class DefaultContext implements Context {
         // Built-in self-binding: resolves to the Injector attached via setInjector. Not a bean - it gets no
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
-        requireSatisfied(definitionList, built.keySet());
+        this.hostRequirements = Map.copyOf(requireSatisfied(definitionList, built.keySet()));
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
@@ -203,32 +203,30 @@ public final class DefaultContext implements Context {
 
     /**
      * Fails fast when a live bean depends on a key nothing binds, listing every such dependency at once. A bean's
-     * dependencies are those of its injection points, except the ones a processor plugin supplies.
+     * dependencies are those of its injection points, except the ones a processor plugin supplies. A child-local bean's
+     * dependency that nothing here binds must be bound by the children hosting its scope instead: it is returned, by
+     * scope, for them to check when they are built.
      */
-    private static void requireSatisfied(List<BeanDefinition> beans, Set<Key<?>> bound) {
+    private Map<Class<? extends Annotation>, List<HostRequirement>> requireSatisfied(
+            List<BeanDefinition> beans, Set<Key<?>> bound) {
         List<String> missing = new ArrayList<>();
+        Map<Class<? extends Annotation>, List<HostRequirement>> byScope = new HashMap<>();
         for (BeanDefinition bean : beans) {
-            for (InjectionPoint point : bean.injectionPoints()) {
-                switch (point) {
-                    case ConstructorInjectionPoint constructor ->
-                        constructor
-                                .parameters()
-                                .forEach(parameter -> checkBound(
-                                        bean, "constructor parameter " + parameter.name(), parameter, bound, missing));
-                    case MethodInjectionPoint method ->
-                        method.parameters()
-                                .forEach(parameter -> checkBound(
-                                        bean,
-                                        "parameter " + parameter.name() + " of method " + method.methodName(),
-                                        parameter,
-                                        bound,
-                                        missing));
-                    case FieldInjectionPoint field -> {
-                        if (!field.annotationMetadata().hasStereotype(InjectingAnnotation.class)
-                                && !bound.contains(field.key())) {
-                            missing.add(describe(bean, "field " + field.fieldName(), field.key()));
-                        }
-                    }
+            Optional<Class<? extends Annotation>> childLocal =
+                    bean instanceof Factory<?> factory ? factory.scope().filter(this::isChildLocal) : Optional.empty();
+            for (Dependency dependency : Dependency.of(bean)) {
+                if (bound.contains(dependency.key())) {
+                    continue;
+                }
+                if (childLocal.isPresent()) {
+                    byScope.computeIfAbsent(childLocal.get(), unused -> new ArrayList<>())
+                            .add(new HostRequirement(
+                                    dependency.key(),
+                                    "  " + bean.key() + " (@" + childLocal.get().getSimpleName() + ") depends on "
+                                            + dependency.key() + " (" + dependency.site() + "), which neither this"
+                                            + " injector nor its parents bind."));
+                } else {
+                    missing.add(describe(bean, dependency.site(), dependency.key()));
                 }
             }
         }
@@ -236,14 +234,7 @@ public final class DefaultContext implements Context {
             throw new UnsatisfiedDependencyException("Unsatisfied dependencies:" + System.lineSeparator()
                     + String.join(System.lineSeparator(), missing));
         }
-    }
-
-    private static void checkBound(
-            BeanDefinition bean, String site, Parameter parameter, Set<Key<?>> bound, List<String> missing) {
-        if (!parameter.annotationMetadata().hasStereotype(InjectingAnnotation.class)
-                && !bound.contains(parameter.key())) {
-            missing.add(describe(bean, site, parameter.key()));
-        }
+        return byScope;
     }
 
     private static String describe(BeanDefinition bean, String site, Key<?> key) {
@@ -436,6 +427,14 @@ public final class DefaultContext implements Context {
                     + " instances. Use childBuilder() for a child injector that hosts no scope.");
         }
         hostedScopes.add(scope);
+    }
+
+    /**
+     * {@return the dependencies of {@code scope}'s beans that nothing here binds, which a child hosting {@code scope}
+     * must bind itself or find in its parents}
+     */
+    List<HostRequirement> hostRequirements(Class<? extends Annotation> scope) {
+        return hostRequirements.getOrDefault(scope, List.of());
     }
 
     /** {@return the error for resolving {@code factory}'s child-local bean where no injector hosts its scope} */

@@ -144,7 +144,8 @@ public interface Injector extends AutoCloseable {
      *
      * @return a new injector backed by all registered factories and scopes
      * @throws UnsatisfiedDependencyException if a bean depends on a key nothing binds; the message lists every such
-     *     dependency
+     *     dependency. The dependencies of a bean of a child-local scope are checked when a child hosting that scope is
+     *     built instead.
      */
     static Injector create() {
         DefaultContext context = new DefaultContext();
@@ -233,7 +234,8 @@ public interface Injector extends AutoCloseable {
          *
          * @return a new injector applying the configured overrides
          * @throws UnsatisfiedDependencyException if a bean depends on a key that neither a discovered factory nor an
-         *     override binds; the message lists every such dependency
+         *     override binds; the message lists every such dependency. The dependencies of a bean of a child-local
+         *     scope are checked when a child hosting that scope is built instead.
          */
         public Injector build() {
             DefaultContext context = new DefaultContext(Map.copyOf(overrides));
@@ -329,6 +331,8 @@ public interface Injector extends AutoCloseable {
          * @return the child injector applying these bindings over the parent
          * @throws IllegalArgumentException if the child hosts a scope that a {@link be.imgn.inject.context.Scope}
          *     service handles, so it is not child-local
+         * @throws UnsatisfiedDependencyException if the child hosts a scope one of whose beans depends on a key that
+         *     neither the root, nor this child, nor one of its parents binds; the message lists every such dependency
          */
         public Injector build() {
             ChildContext context = scope == null

@@ -86,6 +86,15 @@ injector that built the bean, so a `@ViewScoped` bean's `Provider<Owner>`
 returns the `Owner` of its own view, and cycles broken by a `Provider` work as
 for singletons.
 
+A child-local bean may depend on keys the root does not bind, such as `Window`
+above: its hosts supply them. The root checks them when a host is built
+instead: building a child that hosts a scope fails with an
+`UnsatisfiedDependencyException` when one of the scope's beans depends on a key
+that neither the root, nor that child, nor one of its parents binds. The
+message names each bean, key and injection point. A key bound by several hosts
+of the chain, such as a `Scope` object each window and each view binds,
+resolves to the nearest one.
+
 Closing a child closes its live children first, then runs `@PreDestroy` on the
 instances it hosts, in reverse creation order (see
 [lifecycle callbacks](lifecycle-callbacks.md)). Closing the root closes its live
@@ -115,10 +124,11 @@ scope. When no child ever hosted the scope, the message also points out that a
   resolves `Injector` to itself.
 - A child holds a reference to its parent; it is a view over the parent's
   graph, not a detachable copy.
-- A child shadows bindings; it cannot supply one the root lacks. The root
-  injector checks at creation that every bean's dependencies are bound, so a
-  dependency meant to vary per child needs a root-level binding too — an
-  app-level default, as `RequestContext` has above.
+- Outside child-local scopes, a child shadows bindings; it cannot supply one
+  the root lacks. The root injector checks at creation that every bean's
+  dependencies are bound, so a dependency meant to vary per child needs a
+  root-level binding too — an app-level default, as `RequestContext` has
+  above.
 - A child binding for an [interceptor](interception.md) bean's own key shadows
   direct resolution through the child, but not the interceptor chain:
   `ChildContext.interceptor` always delegates to the parent, so intercepted
