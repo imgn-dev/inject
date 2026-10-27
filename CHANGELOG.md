@@ -66,6 +66,7 @@ the order the changes landed, each referencing its commits.
   ([06534a8](https://github.com/imgn-dev/inject/commit/06534a8))
 - **Gaia 0.1.2.** `inject-processor` depends on `gaia-processing` 0.1.2;
   processor plugins build against that version.
+  ([97d804f](https://github.com/imgn-dev/inject/commit/97d804f))
 
 ## 0.1.0 — 2026-10-12
 
