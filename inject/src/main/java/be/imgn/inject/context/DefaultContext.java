@@ -22,6 +22,8 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
@@ -48,6 +50,7 @@ public final class DefaultContext implements Context {
     private final Map<Class<? extends Annotation>, Scope> scopes;
     private final Map<Class<? extends Annotation>, List<HostRequirement>> hostRequirements;
     private final Map<Class<? extends Annotation>, List<HostScopeRequirement>> hostScopeRequirements;
+    private final Map<Key<?>, ScopedProduct> products;
     // The child-local scopes some child of this context has hosted, to tell a missing host from a missing Scope
     // service.
     private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
@@ -103,6 +106,7 @@ public final class DefaultContext implements Context {
         List<BeanDefinition> definitionList = new ArrayList<>();
         Map<Key<?>, List<Contributor>> contributions = new LinkedHashMap<>();
         List<PendingDefault> defaults = new ArrayList<>();
+        List<ScopedProduct> products = new ArrayList<>();
         Map<Class<? extends Annotation>, InterceptorEntry> interceptorIndex = new HashMap<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
@@ -110,6 +114,7 @@ public final class DefaultContext implements Context {
                 continue;
             }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
+            products.addAll(factory.scopedProducts());
             Optional<Class<? extends Annotation>> intercepts = factory.intercepts();
             if (intercepts.isPresent()) {
                 @SuppressWarnings("unchecked")
@@ -155,6 +160,10 @@ public final class DefaultContext implements Context {
                 throw new DuplicateBindingException("Duplicate binding for " + key);
             }
         });
+        Map<Key<?>, ScopedProduct> productsByKey = new HashMap<>();
+        for (ScopedProduct product : products) {
+            registerProduct(product, productsByKey, built);
+        }
         // Defaults join last: a default claims only keys no live binding took. Two live defaults for one key are
         // a configuration error even when a real binding wins that key.
         Set<Key<?>> defaultClaims = new HashSet<>();
@@ -196,7 +205,8 @@ public final class DefaultContext implements Context {
         // BeanDefinition and joins no stereotype query.
         built.put(INJECTOR_KEY, (Provider<Injector>) this::requireInjector);
         this.hostRequirements = Map.copyOf(requireSatisfied(definitionList, built.keySet()));
-        this.hostScopeRequirements = Map.copyOf(requireNoWidening(definitionList, definitionsByKey));
+        this.hostScopeRequirements = Map.copyOf(requireNoWidening(definitionList, definitionsByKey, productsByKey));
+        this.products = Map.copyOf(productsByKey);
         this.registry = Map.copyOf(built);
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
@@ -246,7 +256,9 @@ public final class DefaultContext implements Context {
      * that scope above its own host: it is returned, by scope, for the hosts to check when they are built.
      */
     private Map<Class<? extends Annotation>, List<HostScopeRequirement>> requireNoWidening(
-            List<BeanDefinition> beans, Map<Key<?>, BeanDefinition> definitions) {
+            List<BeanDefinition> beans,
+            Map<Key<?>, BeanDefinition> definitions,
+            Map<Key<?>, ScopedProduct> productsByKey) {
         List<String> widening = new ArrayList<>();
         Map<Class<? extends Annotation>, List<HostScopeRequirement>> byScope = new HashMap<>();
         for (BeanDefinition bean : beans) {
@@ -255,8 +267,11 @@ public final class DefaultContext implements Context {
             }
             Class<? extends Annotation> scope = factory.scope().get();
             for (Dependency dependency : Dependency.of(bean)) {
-                Optional<Class<? extends Annotation>> target =
-                        dependency.isProvider() ? Optional.empty() : childLocalScope(definitions.get(dependency.key()));
+                Optional<Class<? extends Annotation>> target = dependency.isProvider()
+                        ? Optional.empty()
+                        : childLocalScope(definitions.get(dependency.key()))
+                                .or(() -> Optional.ofNullable(productsByKey.get(dependency.key()))
+                                        .map(ScopedProduct::scope));
                 if (target.isEmpty() || target.get().equals(scope)) {
                     continue;
                 }
@@ -283,6 +298,38 @@ public final class DefaultContext implements Context {
                     + String.join(System.lineSeparator(), widening));
         }
         return byScope;
+    }
+
+    /**
+     * Binds {@code product}'s key to a provider that fails: a product resolves only through the injector hosting it,
+     * once created there.
+     *
+     * @throws ScopeResolutionException if the product's scope has a {@code Scope} service
+     * @throws DuplicateBindingException if another binding claims its key
+     */
+    private void registerProduct(
+            ScopedProduct product, Map<Key<?>, ScopedProduct> productsByKey, Map<Key<?>, Provider<?>> built) {
+        if (!isChildLocal(product.scope())) {
+            throw new ScopeResolutionException(product.key() + " is an assisted product and is @"
+                    + product.scope().getSimpleName() + ". Only a child-local scope (one without a Scope service) can"
+                    + " apply to an assisted product, since each factory call creates a new instance.");
+        }
+        ScopedProduct existing = productsByKey.putIfAbsent(product.key(), product);
+        if (existing != null) {
+            if (!existing.scope().equals(product.scope())) {
+                throw new DuplicateBindingException("Duplicate binding for " + product.key() + ": "
+                        + existing.creator() + " creates it @"
+                        + existing.scope().getSimpleName() + ", and "
+                        + product.creator() + " @" + product.scope().getSimpleName() + ".");
+            }
+            return;
+        }
+        Provider<?> unhosted = () -> {
+            throw noHost(product.key().toString(), product.scope());
+        };
+        if (built.putIfAbsent(product.key(), unhosted) != null) {
+            throw new DuplicateBindingException("Duplicate binding for " + product.key());
+        }
     }
 
     /** {@return the child-local scope of {@code definition}'s bean, if it has one} */
@@ -500,8 +547,13 @@ public final class DefaultContext implements Context {
 
     /** {@return the error for resolving {@code factory}'s child-local bean where no injector hosts its scope} */
     ScopeResolutionException noHost(Factory<?> factory, Class<? extends Annotation> scope) {
+        return noHost(factory.type().getName(), scope);
+    }
+
+    /** {@return the error for resolving the child-local {@code bean} where no injector hosts its scope} */
+    private ScopeResolutionException noHost(String bean, Class<? extends Annotation> scope) {
         String name = scope.getSimpleName();
-        String message = "Cannot resolve " + factory.type().getName() + ": it is @" + name
+        String message = "Cannot resolve " + bean + ": it is @" + name
                 + ", and no injector in this chain hosts @" + name + ". Resolve it through an injector created with"
                 + " scopedChildBuilder(" + name + ".class), or one of its descendants.";
         if (!hostedScopes.contains(scope)) {
@@ -509,6 +561,30 @@ public final class DefaultContext implements Context {
                     + " child injector, register one.";
         }
         return new ScopeResolutionException(message);
+    }
+
+    /** {@return the child-local assisted product resolvable by {@code key} once created, if any} */
+    @Nullable
+    ScopedProduct scopedProduct(Key<?> key) {
+        return products.get(key);
+    }
+
+    /**
+     * Rejects the call: the root never hosts a child-local scope.
+     *
+     * @throws ScopeResolutionException always
+     */
+    @Override
+    public <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+        Objects.requireNonNull(product, "product");
+        Objects.requireNonNull(instance, "instance");
+        if (closed) {
+            throw new IllegalStateException("This Injector has been closed.");
+        }
+        String name = product.scope().getSimpleName();
+        throw new ScopeResolutionException("Cannot create " + product.key() + " with " + product.creator() + "(...): it"
+                + " is @" + name + ", and no injector in this chain hosts @" + name + ". Call it through an injector"
+                + " created with scopedChildBuilder(" + name + ".class), or one of its descendants.");
     }
 
     private Injector requireInjector() {

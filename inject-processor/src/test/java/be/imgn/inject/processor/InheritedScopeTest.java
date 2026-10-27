@@ -228,7 +228,7 @@ class InheritedScopeTest {
     }
 
     @Test
-    void anAssistedRecipeCannotInheritAScope() {
+    void anAssistedRecipeInheritsAScope() {
         JavaFileObject rename = TestCompiler.source("example.RenameDialog", """
                 package example;
 
@@ -240,13 +240,25 @@ class InheritedScopeTest {
                     public RenameDialog(@Assisted String current) {}
                 }
                 """);
+        JavaFileObject factory = TestCompiler.source("example.RenameDialogFactory", """
+                package example;
 
-        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(VIEW_SCOPED, VIEW, rename);
+                import be.imgn.inject.AssistedFactory;
 
+                public interface RenameDialogFactory {
+                    @AssistedFactory
+                    RenameDialog create(String current);
+                }
+                """);
+
+        Compilation compilation =
+                javac().withProcessors(new InjectProcessor()).compile(VIEW_SCOPED, VIEW, rename, factory);
+
+        assertThat(compilation).succeeded();
         assertThat(compilation)
-                .failed()
-                .hadErrorContaining("An assisted recipe cannot be scoped; every factory call builds a fresh instance."
-                        + " RenameDialog inherits @ViewScoped from View.");
+                .generatedSourceFile("example.$RenameDialogFactory$$Impl")
+                .contains("new ScopedProduct(Key.of(RenameDialog.class), ViewScoped.class,"
+                        + " \"example.RenameDialogFactory.create\")");
     }
 
     @Test

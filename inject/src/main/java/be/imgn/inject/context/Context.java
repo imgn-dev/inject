@@ -3,10 +3,14 @@ package be.imgn.inject.context;
 import be.imgn.inject.InterceptorResolutionException;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
+import be.imgn.inject.ScopeResolutionException;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The internal resolution engine. Richer than {@code Injector} but accessible to {@link Factory} so generated factories
@@ -58,6 +62,27 @@ public interface Context {
         Objects.requireNonNull(annotationType, "annotationType");
         throw new InterceptorResolutionException("No interceptor bean for @" + annotationType.getSimpleName()
                 + "; annotate a bean with @Intercepts(" + annotationType.getSimpleName() + ".class).");
+    }
+
+    /**
+     * Creates the instance of a child-local assisted product, and caches it in the nearest context of the chain that
+     * hosts its scope, by its key. Generated assisted factories call this for a recipe with a child-local scope.
+     *
+     * <p>The default rejects every call, so minimal {@code Context} implementations need not host scopes.
+     *
+     * @param product the product to create
+     * @param preDestroy the product's {@code @PreDestroy} callback, run when its host closes, or {@code null}
+     * @param instance builds the instance, through this context
+     * @param <T> the product type
+     * @return the created instance
+     * @throws ScopeResolutionException if no context of the chain hosts the product's scope
+     * @throws IllegalStateException if the host already holds an instance of the product
+     */
+    default <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+        Objects.requireNonNull(product, "product");
+        Objects.requireNonNull(instance, "instance");
+        throw new ScopeResolutionException("Cannot create " + product.key() + " with " + product.creator() + "(...):"
+                + " no injector in this chain hosts @" + product.scope().getSimpleName() + ".");
     }
 
     /**

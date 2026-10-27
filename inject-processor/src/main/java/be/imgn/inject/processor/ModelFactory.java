@@ -438,20 +438,6 @@ final class ModelFactory {
 
     /** Reports every annotation that contradicts a recipe having no binding of its own. */
     void validateAssistedRecipe(Element annotated) {
-        String scoped = "An assisted recipe cannot be scoped; every factory call builds a fresh instance.";
-        if (annotated.getKind().isDeclaredType()) {
-            scope(MoreElements.asType(annotated))
-                    .ifPresent(scope -> diagnostics
-                            .on(annotated)
-                            .error(
-                                    scope.declaringType().equals(annotated)
-                                            ? scoped
-                                            : scoped + " " + annotated.getSimpleName() + " inherits @"
-                                                    + scope.annotationType().getSimpleName() + " from "
-                                                    + scope.declaringType().getSimpleName() + "."));
-        } else if (Annotations.scope(annotated).isPresent()) {
-            diagnostics.on(annotated).error(scoped);
-        }
         if (hasQualifier(annotated)) {
             diagnostics.on(annotated).error("An assisted recipe cannot be qualified; it has no binding key.");
         }
@@ -487,12 +473,12 @@ final class ModelFactory {
     LifecycleCallbacks lifecycleCallbacks(TypeElement bean, boolean scoped, boolean assisted) {
         ExecutableElement postConstruct = singleCallback(bean, PostConstruct.class);
         ExecutableElement preDestroy = singleCallback(bean, PreDestroy.class);
-        if (preDestroy != null) {
+        if (preDestroy != null && !scoped) {
             if (assisted) {
                 diagnostics
                         .on(preDestroy)
                         .error("@PreDestroy is not allowed on an assisted bean; assisted instances are caller-owned.");
-            } else if (!scoped) {
+            } else {
                 diagnostics
                         .on(preDestroy)
                         .error("@PreDestroy requires a scoped bean; an unscoped bean is never destroyed by the"
@@ -500,6 +486,33 @@ final class ModelFactory {
             }
         }
         return new LifecycleCallbacks(name(postConstruct), name(preDestroy));
+    }
+
+    /** {@return the bean's @PreDestroy method name without reporting diagnostics (generation-time reader)} */
+    @Nullable
+    String preDestroyName(TypeElement bean) {
+        return name(firstCallback(bean, PreDestroy.class));
+    }
+
+    /**
+     * {@return the scope of an assisted recipe's product, without reporting diagnostics (generation-time reader): the
+     * {@code @Provides} method's own, or the one its class declares or inherits}
+     */
+    Optional<ClassName> recipeScope(AssistedRecipe recipe) {
+        ExecutableElement providesMethod = recipe.providesMethod();
+        if (providesMethod != null) {
+            return Annotations.scope(providesMethod);
+        }
+        return scopes(recipe.owner()).stream().findFirst().map(ScopeDeclaration::type);
+    }
+
+    /** {@return the type expression of an assisted recipe's product key: its class, or the method's return type} */
+    CodeBlock productType(AssistedRecipe recipe) {
+        ExecutableElement providesMethod = recipe.providesMethod();
+        if (providesMethod != null) {
+            return typeExpression(providesMethod.getReturnType(), context.types(), providesMethod);
+        }
+        return CodeBlock.of("$T.class", ClassName.of(recipe.owner()));
     }
 
     /** {@return the bean's @PostConstruct method name without reporting diagnostics (generation-time reader)} */

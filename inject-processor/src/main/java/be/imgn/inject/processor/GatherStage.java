@@ -117,8 +117,8 @@ final class GatherStage {
                 // Assisted beans have no binding of their own: no BeanModel, no factory, no edges. They are
                 // reachable only through a generated @AssistedFactory implementation.
                 models.validateAssistedRecipe(bean);
-                // Validate: @PreDestroy on assisted -> error
-                models.lifecycleCallbacks(bean, false, true);
+                // @PreDestroy needs a scope: the host of a scoped product destroys it when it closes.
+                models.lifecycleCallbacks(bean, models.scope(bean).isPresent(), true);
                 String key = bean.getQualifiedName().toString();
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())

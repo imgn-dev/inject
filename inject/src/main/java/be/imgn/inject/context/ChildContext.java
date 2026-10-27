@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,6 +33,8 @@ public final class ChildContext implements Context {
     private final @Nullable Class<? extends Annotation> hostedScope;
     // The instances of the hosted scope, one memoizing provider per factory, so a bean's exposed keys share it.
     private final Map<Factory<?>, Provider<?>> hosted = new ConcurrentHashMap<>();
+    // The assisted products of the hosted scope created through this context, by key.
+    private final Map<Key<?>, Object> created = new ConcurrentHashMap<>();
     private final ResolutionStack stack = new ResolutionStack();
     private final Destroyables destroyables = new Destroyables();
     private final List<ChildContext> children = new ArrayList<>();
@@ -126,9 +130,14 @@ public final class ChildContext implements Context {
         if (INJECTOR_KEY.equals(key)) {
             provider = (Provider<Injector>) this::requireInjector;
         } else {
-            Provider<?> layered = localLookup(key);
-            Provider<?> built = layered != null ? layered : buildingProvider(key);
-            provider = built != null ? built : parent.getProvider(key);
+            Provider<?> found = localLookup(key);
+            if (found == null) {
+                found = productProvider(key);
+            }
+            if (found == null) {
+                found = buildingProvider(key);
+            }
+            provider = found != null ? found : parent.getProvider(key);
         }
         // A provider obtained through this context fails once it closes, wherever its instances come from.
         return () -> {
@@ -161,6 +170,62 @@ public final class ChildContext implements Context {
         }
         ChildContext host = host(scope.get());
         return host != null ? host.hosted(factory) : null;
+    }
+
+    /**
+     * {@return the provider of the assisted product bound to {@code key} in the nearest host of its scope, or
+     * {@code null} when {@code key} binds no product, or no context of the chain hosts its scope}
+     */
+    private @Nullable Provider<?> productProvider(Key<?> key) {
+        ScopedProduct product = root() instanceof DefaultContext root ? root.scopedProduct(key) : null;
+        if (product == null) {
+            return null;
+        }
+        ChildContext host = host(product.scope());
+        return host == null ? null : () -> host.created(product);
+    }
+
+    private Object created(ScopedProduct product) {
+        Object instance = created.get(product.key());
+        if (instance == null) {
+            throw new IllegalStateException(product.key() + " has not been created in this @"
+                    + product.scope().getSimpleName() + " injector yet: it is created by " + product.creator()
+                    + "(...).");
+        }
+        return instance;
+    }
+
+    @Override
+    public <T> T createScoped(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+        Objects.requireNonNull(product, "product");
+        Objects.requireNonNull(instance, "instance");
+        requireOpen(product.key());
+        ChildContext host = host(product.scope());
+        if (host == null) {
+            return parent.createScoped(product, preDestroy, instance);
+        }
+        return host.create(product, preDestroy, instance);
+    }
+
+    private <T> T create(ScopedProduct product, @Nullable Consumer<? super T> preDestroy, Supplier<T> instance) {
+        if (created.containsKey(product.key())) {
+            throw alreadyCreated(product);
+        }
+        T value = Objects.requireNonNull(instance.get(), "instance.get()");
+        if (created.putIfAbsent(product.key(), value) != null) {
+            throw alreadyCreated(product);
+        }
+        if (preDestroy != null) {
+            destroyables.track(() -> preDestroy.accept(value));
+        }
+        return value;
+    }
+
+    private IllegalStateException alreadyCreated(ScopedProduct product) {
+        String scope = product.scope().getSimpleName();
+        return new IllegalStateException(product.creator() + "(...) was already called through this @" + scope
+                + " injector. " + product.key() + " is @" + scope + ", so it exists once per injector; create a new @"
+                + scope + " injector for another one.");
     }
 
     /** {@return the nearest context of the chain, this one included, that hosts {@code scope}, or {@code null}} */

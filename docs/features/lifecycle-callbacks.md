@@ -71,11 +71,12 @@ same way. After closing, resolving through the child fails fast, and so does
 
 ## Limitations
 
-- `@PreDestroy` requires a scoped bean. On a prototype or an
+- `@PreDestroy` requires a scoped bean. On a prototype or an unscoped
   [assisted](assisted-injection.md) bean it is a compile error, not a silent
   no-op: those instances are caller-owned, and the container never sees them
   again to destroy them. A prototype that owns a resource should implement
-  `AutoCloseable` and be closed by whoever requested it.
+  `AutoCloseable` and be closed by whoever requested it. An assisted product
+  with a child-local scope is destroyed when its host closes.
 - `@PostConstruct` runs for constructor-built beans — including assisted beans
   and beans rebuilt through a [child injector](child-injectors.md). It does not
   run for [`@Provides`](provides-methods.md) results; the provider method already

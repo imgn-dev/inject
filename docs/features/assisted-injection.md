@@ -44,6 +44,46 @@ Each factory call builds a fresh instance; container-side dependencies still
 honor their [scopes](scopes.md), so a `@Singleton` dependency is shared across
 all created instances.
 
+### Scoped products
+
+A recipe with a [child-local scope](child-injectors.md#child-local-scopes) —
+declared on the class, inherited from a supertype, or on the `@Provides`
+method — makes the factory create its product in the nearest injector of the
+chain that hosts that scope, and cache it there:
+
+```java
+@ViewScoped
+public interface DialogView {}
+
+public final class RenameDialog implements DialogView { // @ViewScoped
+    @Inject
+    public RenameDialog(@Assisted String current, RenameDialogCommands commands) { ... }
+}
+
+@ViewScoped
+public final class RenameDialogCommands {
+    @Inject
+    public RenameDialogCommands(Provider<RenameDialog> dialog) { ... }
+}
+```
+
+```java
+Injector view = window.scopedChildBuilder(ViewScoped.class).build();
+RenameDialog dialog = view.getInstance(RenameDialogFactory.class).create("draft");
+view.getInstance(RenameDialog.class) == dialog; // true
+```
+
+The product is built with dependencies from its host. Once created, it
+resolves by its key (the recipe's class, or the `@Provides` method's return
+type) through the host and its descendants, a `Provider` included, like any
+bean of the scope. Before that, resolving it fails when `get()` is called, not
+when the `Provider` is injected, so `RenameDialogCommands` above is built while
+the dialog is. A second call through the same host fails: the product exists
+once per host. Its `@PreDestroy` runs when its host closes. Creating it through
+an injector with no host of its scope fails with a
+`ScopeResolutionException`, and a product whose scope has a `Scope` service,
+such as `@Singleton`, fails when the injector is created.
+
 ### `@Provides` recipes
 
 The recipe can also be a `@Provides` method, for types whose construction
@@ -70,8 +110,8 @@ public interface StampFactory {
   `@Inject` methods or fields.
 - A factory method returns the built type directly; it cannot return a
   [`Provider`](provider-injection.md) of it.
-- Assisted beans are effectively prototype: every factory call constructs; the
-  built instances themselves are not scoped or cached.
+- Assisted beans without a child-local scope are effectively prototype: every
+  factory call constructs, and the built instances are not cached.
 - The factory is the only door: a type with assisted parameters is not
   resolvable directly through the injector, since the container cannot supply
-  the assisted values.
+  the assisted values — except a scoped product, once its host created it.

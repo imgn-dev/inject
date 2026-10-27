@@ -128,8 +128,8 @@ class AssistedRecipeTest {
     }
 
     @Test
-    void scopedAssistedBeanIsAnError() {
-        JavaFileObject bad = TestCompiler.source("example.Bad", """
+    void aScopedAssistedBeanDeclaresItsScopedProduct() {
+        JavaFileObject dialog = TestCompiler.source("example.Dialog", """
                 package example;
 
                 import be.imgn.inject.Assisted;
@@ -137,16 +137,32 @@ class AssistedRecipeTest {
                 import be.imgn.inject.Singleton;
 
                 @Singleton
-                public class Bad {
+                public class Dialog {
                     @Inject
-                    public Bad(@Assisted String id) {}
+                    public Dialog(@Assisted String id) {}
+                }
+                """);
+        JavaFileObject factory = TestCompiler.source("example.DialogFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface DialogFactory {
+                    @AssistedFactory
+                    Dialog create(String id);
                 }
                 """);
 
-        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bad);
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(dialog, factory);
 
-        assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("assisted");
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$DialogFactory$$Impl")
+                .contains("return this.context.createScoped(new ScopedProduct(Key.of(Dialog.class), Singleton.class,"
+                        + " \"example.DialogFactory.create\"), null, () -> {");
+        assertThat(compilation)
+                .generatedSourceFile("example.$DialogFactory$$Factory")
+                .contains("protected List<ScopedProduct> scopedProducts()");
     }
 
     @Test
@@ -199,15 +215,15 @@ class AssistedRecipeTest {
     }
 
     @Test
-    void scopedAssistedProvidesIsAnError() {
-        JavaFileObject bad = TestCompiler.source("example.Bad", """
+    void aScopedAssistedProvidesMethodDeclaresItsReturnTypeAsTheProduct() {
+        JavaFileObject legacy = TestCompiler.source("example.Legacy", """
                 package example;
 
                 import be.imgn.inject.Assisted;
                 import be.imgn.inject.Provides;
                 import be.imgn.inject.Singleton;
 
-                public class Bad {
+                public class Legacy {
                     @Provides
                     @Singleton
                     public static Long legacy(@Assisted int id) {
@@ -215,11 +231,24 @@ class AssistedRecipeTest {
                     }
                 }
                 """);
+        JavaFileObject factory = TestCompiler.source("example.LegacyFactory", """
+                package example;
 
-        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(bad);
+                import be.imgn.inject.AssistedFactory;
 
-        assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("assisted");
+                public interface LegacyFactory {
+                    @AssistedFactory(value = Legacy.class, method = "legacy")
+                    Long create(int id);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(legacy, factory);
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("example.$LegacyFactory$$Impl")
+                .contains("new ScopedProduct(Key.of(Long.class), Singleton.class, \"example.LegacyFactory.create\")")
+                .contains("return Legacy.legacy(id);");
     }
 
     @Test

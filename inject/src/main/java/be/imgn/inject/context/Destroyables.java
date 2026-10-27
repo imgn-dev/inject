@@ -12,8 +12,13 @@ final class Destroyables {
 
     /** Records {@code instance}, to destroy with {@code factory} when the context closes. */
     <T> void track(Factory<T> factory, T instance) {
+        track(() -> factory.preDestroy(instance));
+    }
+
+    /** Records {@code callback}, to run when the context closes. */
+    void track(Runnable callback) {
         synchronized (callbacks) {
-            callbacks.push(() -> factory.preDestroy(instance));
+            callbacks.push(callback);
         }
     }
 

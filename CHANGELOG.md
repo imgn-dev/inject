@@ -101,6 +101,15 @@ the order the changes landed, each referencing its commits.
   depends directly on a bean of another child-local scope makes building its
   host fail unless a host of that scope is above it. `Provider` dependencies
   are not checked.
+  ([96a6db1](https://github.com/imgn-dev/inject/commit/96a6db1))
+- **Scoped assisted products.** An assisted recipe may have a scope. With a
+  child-local one, declared or inherited, the factory creates the product in
+  the nearest injector hosting that scope, which caches it: it then resolves
+  by its key through that injector and its descendants, a second call through
+  the same injector fails, and its `@PreDestroy` runs when the injector closes.
+  A product whose scope has a `Scope` service is an error at injector
+  creation. `Context` has the new default method `createScoped`, and `Factory`
+  the new method `scopedProducts`.
 
 ## 0.1.0 — 2026-10-12
 

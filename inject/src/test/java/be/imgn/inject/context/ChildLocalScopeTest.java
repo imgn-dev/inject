@@ -155,6 +155,15 @@ class ChildLocalScopeTest {
                         + " no @ViewScoped instance exists: remove the scope or the contribution.");
     }
 
+    @Test
+    void anAssistedProductMustHaveAChildLocalScope() {
+        assertThatExceptionOfType(ScopeResolutionException.class)
+                .isThrownBy(() -> root(new SingletonProductFactory()))
+                .withMessage(Key.of(Selection.class) + " is an assisted product and is @Singleton. Only a child-local"
+                        + " scope (one without a Scope service) can apply to an assisted product, since each factory"
+                        + " call creates a new instance.");
+    }
+
     /** {@return a root over {@code factories}, binding a {@code String} that hosts shadow} */
     private static DefaultContext root(Factory<?>... factories) {
         return new DefaultContext(
@@ -215,6 +224,23 @@ class ChildLocalScopeTest {
         @Override
         protected Optional<Contribution> contribution() {
             return Optional.of(new Contribution(Key.of(Types.setOf(Record.class)), null));
+        }
+    }
+
+    /** An assisted factory interface's factory declaring a {@code @Singleton} product. */
+    static final class SingletonProductFactory extends Factory<Runnable> {
+        SingletonProductFactory() {
+            super(Runnable.class);
+        }
+
+        @Override
+        protected List<ScopedProduct> scopedProducts() {
+            return List.of(new ScopedProduct(Key.of(Selection.class), Singleton.class, "example.Factory.create"));
+        }
+
+        @Override
+        protected Runnable createInstance(Context context) {
+            return () -> {};
         }
     }
 

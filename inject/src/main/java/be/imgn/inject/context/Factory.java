@@ -167,6 +167,15 @@ public abstract class Factory<T> implements BeanDefinition {
     }
 
     /**
+     * {@return the products of child-local scope this factory creates; none by default}
+     *
+     * <p>The factory of an assisted factory interface overrides this to declare the products of its scoped recipes.
+     */
+    protected List<ScopedProduct> scopedProducts() {
+        return List.of();
+    }
+
+    /**
      * {@return the intercepting annotation this bean handles, or empty when the bean is not an interceptor}
      *
      * <p>A generated factory overrides this for a bean annotated {@code @Intercepts}.

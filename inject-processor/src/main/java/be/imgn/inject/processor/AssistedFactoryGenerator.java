@@ -9,9 +9,11 @@ import be.imgn.gaia.processing.source.ParameterizedTypeName;
 import be.imgn.gaia.processing.source.Type;
 import be.imgn.inject.Assisted;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.lang.model.element.ExecutableElement;
@@ -32,6 +34,8 @@ final class AssistedFactoryGenerator {
     private static final ClassName ANNOTATION_METADATA = ClassName.of("be.imgn.inject.context", "AnnotationMetadata");
     private static final ClassName KEY = ClassName.of("be.imgn.inject", "Key");
     private static final ClassName OBJECTS = ClassName.of("java.util", "Objects");
+    private static final ClassName LIST = ClassName.of("java.util", "List");
+    private static final ClassName SCOPED_PRODUCT = ClassName.of("be.imgn.inject.context", "ScopedProduct");
 
     private AssistedFactoryGenerator() {}
 
@@ -47,8 +51,7 @@ final class AssistedFactoryGenerator {
         JavaFile implFile = JavaFile.newBuilder(packageName, implType(model, models, interfaceType, implType))
                 .build();
         JavaFile factoryFile = JavaFile.newBuilder(
-                        packageName,
-                        factoryType(factorySimpleName, interfaceType, implType, factoryInterface, elements))
+                        packageName, factoryType(model, models, factorySimpleName, interfaceType, implType, elements))
                 .build();
         return new Generated(implFile, factoryFile);
     }
@@ -65,18 +68,20 @@ final class AssistedFactoryGenerator {
                         .addStatement("this.context = $T.requireNonNull(context, $S)", OBJECTS, "context")
                         .build());
         for (AssistedFactoryMethod method : model.methods()) {
-            type.addMethod(createMethod(method, models));
+            type.addMethod(createMethod(method, model.factoryInterface(), models));
         }
         return type.build();
     }
 
     private static Type factoryType(
+            AssistedFactoryModel model,
+            ModelFactory models,
             String factorySimpleName,
             ClassName interfaceType,
             ClassName implType,
-            TypeElement factoryInterface,
             Elements elements) {
-        return Type.newClassBuilder(factorySimpleName)
+        TypeElement factoryInterface = model.factoryInterface();
+        Type.Builder type = Type.newClassBuilder(factorySimpleName)
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(ParameterizedTypeName.of(FACTORY, interfaceType))
                 .addMethod(Method.newConstructorBuilder()
@@ -95,11 +100,41 @@ final class AssistedFactoryGenerator {
                         .addModifiers(Modifier.PUBLIC)
                         .returns(ANNOTATION_METADATA)
                         .addStatement("return $L", Annotations.metadata(List.of(factoryInterface), elements))
-                        .build())
-                .build();
+                        .build());
+        Map<String, CodeBlock> products = new LinkedHashMap<>();
+        for (AssistedFactoryMethod method : model.methods()) {
+            scopedProduct(method, factoryInterface, models)
+                    .ifPresent(product -> products.putIfAbsent(product.toString(), product));
+        }
+        if (!products.isEmpty()) {
+            type.addMethod(Method.newBuilder("scopedProducts")
+                    .addAnnotation(Override.class)
+                    .addModifiers(Modifier.PROTECTED)
+                    .returns(ParameterizedTypeName.of(LIST, SCOPED_PRODUCT))
+                    .addStatement(
+                            "return $T.of($L)", LIST, products.values().stream().collect(CodeBlock.joining(", ")))
+                    .build());
+        }
+        return type.build();
     }
 
-    private static Method createMethod(AssistedFactoryMethod factoryMethod, ModelFactory models) {
+    /** {@return the {@code ScopedProduct} expression of the method's product, if its recipe has a scope} */
+    private static Optional<CodeBlock> scopedProduct(
+            AssistedFactoryMethod method, TypeElement factoryInterface, ModelFactory models) {
+        AssistedRecipe recipe = method.recipe();
+        return models.recipeScope(recipe)
+                .map(scope -> CodeBlock.of(
+                        "new $T($T.of($L), $T.class, $S)",
+                        SCOPED_PRODUCT,
+                        KEY,
+                        models.productType(recipe),
+                        scope,
+                        factoryInterface.getQualifiedName() + "."
+                                + method.method().getSimpleName()));
+    }
+
+    private static Method createMethod(
+            AssistedFactoryMethod factoryMethod, TypeElement factoryInterface, ModelFactory models) {
         Method.Builder method = Method.overriding(factoryMethod.method());
         AssistedRecipe recipe = factoryMethod.recipe();
         CodeBlock arguments = callArguments(factoryMethod, models.recipeParameters(recipe));
@@ -109,18 +144,34 @@ final class AssistedFactoryGenerator {
                 .map(parameter -> parameter.getSimpleName().toString())
                 .collect(Collectors.toSet());
         ExecutableElement providesMethod = recipe.providesMethod();
+        CodeBlock.Builder body = CodeBlock.newBuilder();
         if (providesMethod == null) {
             constructorBody(
-                    method,
+                    body,
                     recipe,
                     arguments,
                     models.members(recipe.owner()),
                     models,
                     unusedName("instance", parameterNames));
         } else {
-            providesBody(method, recipe, providesMethod, arguments, unusedName("host", parameterNames));
+            providesBody(body, recipe, providesMethod, arguments, unusedName("host", parameterNames));
         }
-        return method.build();
+        Optional<CodeBlock> product = scopedProduct(factoryMethod, factoryInterface, models);
+        if (product.isEmpty()) {
+            return method.addCode(body.build()).build();
+        }
+        // The host caches the product: its @PreDestroy runs when the host closes.
+        String preDestroyName = providesMethod == null ? models.preDestroyName(recipe.owner()) : null;
+        String destroyed = unusedName("destroyed", parameterNames);
+        CodeBlock preDestroy = preDestroyName == null
+                ? CodeBlock.of("null")
+                : CodeBlock.of("$N -> $N.$L()", destroyed, destroyed, preDestroyName);
+        return method.addStatement(
+                        "return this.context.createScoped($L, $L, () -> {\n$>$L$<})",
+                        product.get(),
+                        preDestroy,
+                        body.build())
+                .build();
     }
 
     /** {@return {@code base}, suffixed with underscores until it differs from every name in {@code taken}} */
@@ -133,7 +184,7 @@ final class AssistedFactoryGenerator {
     }
 
     private static void constructorBody(
-            Method.Builder method,
+            CodeBlock.Builder method,
             AssistedRecipe recipe,
             CodeBlock arguments,
             MemberInjection members,
@@ -167,7 +218,7 @@ final class AssistedFactoryGenerator {
     }
 
     private static void providesBody(
-            Method.Builder method,
+            CodeBlock.Builder method,
             AssistedRecipe recipe,
             ExecutableElement providesMethod,
             CodeBlock arguments,
