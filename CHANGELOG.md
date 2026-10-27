@@ -58,6 +58,11 @@ the order the changes landed, each referencing its commits.
 - **Gaia 0.1.1.** `inject-processor` depends on `gaia-processing` 0.1.1;
   processor plugins build against that version.
   ([8fd5b19](https://github.com/imgn-dev/inject/commit/8fd5b19))
+- **The processor is a module.** `inject-processor` is the module
+  `be.imgn.inject.processor`, which provides
+  `javax.annotation.processing.Processor`, so javac runs it from the processor
+  module path as well as from the processor path. Plugins on the processor
+  module path provide `InjectPlugin` in their descriptor.
 
 ## 0.1.0 — 2026-10-12
 

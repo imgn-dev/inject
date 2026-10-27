@@ -51,6 +51,18 @@ package, module encapsulation is never bypassed: a module injects its own
 beans with its own generated code, and exports nothing extra to make that
 work.
 
+**The processor** runs from either path. On the processor path, javac finds it
+through its service file. It is also the module `be.imgn.inject.processor`,
+which provides `javax.annotation.processing.Processor`, so javac finds it on
+the processor module path (`--processor-module-path`) too. That path then also
+holds the modules it requires: `inject`, `gaia-processing`, `gaia-core`,
+`jspecify` and `error_prone_annotations`.
+
+A [processor plugin](processor-plugins.md) on the processor module path must
+provide `be.imgn.inject.processor.spi.InjectPlugin` in its descriptor; a
+plugin jar without a descriptor is an automatic module, whose service file
+counts as that declaration.
+
 ## Limitations
 
 - On the module path, factory registration is a consumer-side obligation:

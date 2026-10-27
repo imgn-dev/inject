@@ -12,7 +12,8 @@ boilerplate injection exists to remove.
 
 The annotation processor is extensible. A plugin pairs a custom annotation,
 meta-annotated with `@InjectingAnnotation`, with an `InjectPlugin`
-implementation discovered through `ServiceLoader` **on the processor path**.
+implementation discovered through `ServiceLoader` **on the processor path**,
+or on the processor module path (see [module path](module-path.md)).
 For each injection site carrying the annotation, the plugin emits the
 initializer code that the generated factory will contain — the value is
 computed by generated code at build time, not looked up in the registry.
@@ -100,8 +101,8 @@ A plugin ships as two artifacts, mirroring `inject` / `inject-processor`:
   the graph belong in [`@Provides` methods](provides-methods.md).
 - Plugin-injected values bypass the registry: they have no key, no scope, and
   cannot be overridden or shadowed at runtime.
-- Plugins must be on the compiler's processor path in every module that uses
-  their annotation; a site whose plugin is absent at compile time is not
-  handled.
+- Plugins must be on the compiler's processor path or processor module path
+  in every module that uses their annotation; a site whose plugin is absent at
+  compile time is not handled.
 - Writing a plugin means writing code generation (emitting Java expressions),
   a heavier tool than declaring a binding.
