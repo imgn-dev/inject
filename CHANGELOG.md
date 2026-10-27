@@ -63,6 +63,7 @@ the order the changes landed, each referencing its commits.
   `javax.annotation.processing.Processor`, so javac runs it from the processor
   module path as well as from the processor path. Plugins on the processor
   module path provide `InjectPlugin` in their descriptor.
+  ([06534a8](https://github.com/imgn-dev/inject/commit/06534a8))
 
 ## 0.1.0 — 2026-10-12
 
