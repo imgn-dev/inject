@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +33,9 @@ import org.jspecify.annotations.Nullable;
  * cycle guard and its declared scope, checks that every live bean's dependencies are bound, and resolves keys lazily.
  * Fallback factories ({@code Factory#isDefault()}) bind only keys no other live factory claims. The registry is
  * immutable after construction; resolution is thread-safe.
+ *
+ * <p>A scoping annotation with no {@code Scope} service is child-local: the {@link ChildContext}s that host it cache
+ * its instances, and resolving such a bean here fails with a {@link ScopeResolutionException}.
  *
  * <p>{@code new DefaultContext()} loads all registered {@code Factory}, {@code Scope}, and {@code Condition} services.
  * The injector that owns this context attaches itself via {@link #setInjector(Injector)} immediately after
@@ -44,6 +48,10 @@ public final class DefaultContext implements Context {
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
     private final Map<Class<? extends Annotation>, InterceptorEntry> interceptors;
+    private final Map<Class<? extends Annotation>, Scope> scopes;
+    // The child-local scopes some child of this context has hosted, to tell a missing host from a missing Scope
+    // service.
+    private final Set<Class<? extends Annotation>> hostedScopes = ConcurrentHashMap.newKeySet();
     private final ResolutionStack stack = new ResolutionStack();
     private final Deque<TrackedInstance<?>> destroyables = new ArrayDeque<>();
     private @Nullable Injector injector;
@@ -87,6 +95,7 @@ public final class DefaultContext implements Context {
             ConditionContext conditionContext,
             Map<Key<?>, Provider<?>> overrides) {
         Map<Class<? extends Annotation>, Scope> scopesByAnnotation = indexScopes(scopes);
+        this.scopes = scopesByAnnotation;
         Map<Class<? extends Annotation>, Condition> conditionsByAnnotation = indexConditions(conditions);
 
         Map<Key<?>, Provider<?>> built = new HashMap<>();
@@ -114,6 +123,14 @@ public final class DefaultContext implements Context {
                 }
             }
             Optional<Contribution> contribution = factory.contribution();
+            if (contribution.isPresent()
+                    && factory.scope().filter(this::isChildLocal).isPresent()) {
+                throw new ScopeResolutionException(factory.type().getName() + " is @"
+                        + factory.scope().get().getSimpleName() + " and contributes to "
+                        + contribution.get().collectionKey() + ". A collection is resolved in the root injector,"
+                        + " where no @" + factory.scope().get().getSimpleName() + " instance exists: remove the"
+                        + " scope or the contribution.");
+            }
             if (contribution.isPresent()) {
                 contributions
                         .computeIfAbsent(contribution.get().collectionKey(), key -> new ArrayList<>())
@@ -317,8 +334,11 @@ public final class DefaultContext implements Context {
         }
         Scope scope = scopes.get(scopeAnnotation.get());
         if (scope == null) {
-            throw new ScopeResolutionException(
-                    "No scope registered for @" + scopeAnnotation.get().getSimpleName());
+            // Child-local: instances live in the child injectors hosting the scope, which never reach this provider.
+            Class<? extends Annotation> childLocal = scopeAnnotation.get();
+            return () -> {
+                throw noHost(factory, childLocal);
+            };
         }
         Provider<T> scoped = scope.wrap(guarded);
         if (!factory.hasPreDestroy()) {
@@ -396,6 +416,42 @@ public final class DefaultContext implements Context {
             throw new IllegalStateException("An Injector is already attached to this Context.");
         }
         this.injector = injector;
+    }
+
+    /**
+     * {@return whether {@code scope} is child-local: a scoping annotation with no {@code Scope} service, whose
+     * instances are cached by the child injectors hosting it}
+     */
+    boolean isChildLocal(Class<? extends Annotation> scope) {
+        return !scopes.containsKey(scope);
+    }
+
+    /**
+     * Records that a child of this context hosts {@code scope}.
+     *
+     * @throws IllegalArgumentException if a {@code Scope} service handles {@code scope}
+     */
+    void host(Class<? extends Annotation> scope) {
+        Scope service = scopes.get(scope);
+        if (service != null) {
+            throw new IllegalArgumentException("@" + scope.getSimpleName() + " is handled by the Scope service "
+                    + service.getClass().getName() + ", so it is not child-local: child injectors do not cache its"
+                    + " instances. Use childBuilder() for a child injector that hosts no scope.");
+        }
+        hostedScopes.add(scope);
+    }
+
+    /** {@return the error for resolving {@code factory}'s child-local bean where no injector hosts its scope} */
+    ScopeResolutionException noHost(Factory<?> factory, Class<? extends Annotation> scope) {
+        String name = scope.getSimpleName();
+        String message = "Cannot resolve " + factory.type().getName() + ": it is @" + name
+                + ", and no injector in this chain hosts @" + name + ". Resolve it through an injector created with"
+                + " scopedChildBuilder(" + name + ".class), or one of its descendants.";
+        if (!hostedScopes.contains(scope)) {
+            message += " No Scope service is registered for @" + name + " either; if it is not meant to live in a"
+                    + " child injector, register one.";
+        }
+        return new ScopeResolutionException(message);
     }
 
     private Injector requireInjector() {

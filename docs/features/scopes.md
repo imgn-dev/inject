@@ -107,5 +107,7 @@ resolution goes through the returned wrapper.
   consumer cannot request "a fresh instance" of a singleton (though injecting a
   [`Provider`](provider-injection.md) of a prototype bean gives fresh instances
   on demand).
-- [Child injectors](child-injectors.md) add no scopes of their own: a scoped
-  bean anchors to the injector whose registry declared it.
+- A scoping annotation with no `Scope` service is child-local: the
+  [child injectors](child-injectors.md#child-local-scopes) that host it cache
+  its instances, and resolving such a bean elsewhere fails. Other scoped beans
+  anchor to the injector whose registry declared them.

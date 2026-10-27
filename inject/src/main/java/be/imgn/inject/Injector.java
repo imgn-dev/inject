@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The user-facing entry point for obtaining instances and providers.
@@ -112,6 +113,21 @@ public interface Injector extends AutoCloseable {
      * @return a builder for a child of this injector: its bindings layer over this injector's graph
      */
     ChildBuilder childBuilder();
+
+    /**
+     * Returns a builder for a child of this injector that hosts the child-local {@code scope}: its bindings layer over
+     * this injector's graph, and it builds and caches the instances of {@code scope}'s beans resolved through it or its
+     * descendants.
+     *
+     * <p>A scoping annotation is child-local when no {@link be.imgn.inject.context.Scope} service handles it. Each bean
+     * of such a scope is created once per hosting child, built through that child, and cached there. Resolving it
+     * through an injector with no hosting child in its chain fails with a {@link ScopeResolutionException}. Hosting
+     * children nest: the nearest one in the chain hosts the bean.
+     *
+     * @param scope the child-local scope the child hosts
+     * @return a builder for a child of this injector that hosts {@code scope}
+     */
+    ChildBuilder scopedChildBuilder(Class<? extends Annotation> scope);
 
     /**
      * Closes this injector: invokes {@code @PreDestroy} on every scoped instance it created, in reverse creation order,
@@ -241,10 +257,12 @@ public interface Injector extends AutoCloseable {
      */
     final class ChildBuilder {
         private final Context parentContext;
+        private final @Nullable Class<? extends Annotation> scope;
         private final Map<Key<?>, Provider<?>> bindings = new HashMap<>();
 
-        ChildBuilder(Context parentContext) {
+        ChildBuilder(Context parentContext, @Nullable Class<? extends Annotation> scope) {
             this.parentContext = parentContext;
+            this.scope = scope;
         }
 
         /**
@@ -307,9 +325,13 @@ public interface Injector extends AutoCloseable {
          * Returns the child injector applying these bindings over the parent.
          *
          * @return the child injector applying these bindings over the parent
+         * @throws IllegalArgumentException if the child hosts a scope that a {@link be.imgn.inject.context.Scope}
+         *     service handles, so it is not child-local
          */
         public Injector build() {
-            ChildContext context = new ChildContext(parentContext, bindings);
+            ChildContext context = scope == null
+                    ? new ChildContext(parentContext, bindings)
+                    : new ChildContext(parentContext, bindings, scope);
             DefaultInjector child = new DefaultInjector(context);
             context.setInjector(child);
             return child;

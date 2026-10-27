@@ -3,18 +3,20 @@ package be.imgn.inject.context;
 import be.imgn.inject.Injector;
 import be.imgn.inject.Key;
 import be.imgn.inject.Provider;
-import be.imgn.inject.ScopingAnnotation;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 
 /**
  * A child {@link Context}: nearest-ancestor local bindings first (walking up through any intermediate
  * {@code ChildContext}s), then the parent. Unscoped parent beans are rebuilt at this — the deepest — context so their
- * dependencies see the full child binding stack; scoped beans and everything without a {@link BeanDefinition} anchor to
+ * dependencies see the full child binding stack. A bean of a child-local scope (one with no {@code Scope} service) is
+ * built once by the nearest context of the chain that hosts its scope, this one included, which caches it; its
+ * dependencies resolve through that host. Other scoped beans and everything without a {@link BeanDefinition} anchor to
  * the parent unchanged.
  */
 public final class ChildContext implements Context {
@@ -23,6 +25,9 @@ public final class ChildContext implements Context {
 
     private final Context parent;
     private final Map<Key<?>, Provider<?>> bindings;
+    private final @Nullable Class<? extends Annotation> hostedScope;
+    // The instances of the hosted scope, one memoizing provider per factory, so a bean's exposed keys share it.
+    private final Map<Factory<?>, Provider<?>> hosted = new ConcurrentHashMap<>();
     private final ResolutionStack stack = new ResolutionStack();
     private @Nullable Injector injector;
     private boolean closed;
@@ -36,6 +41,28 @@ public final class ChildContext implements Context {
     public ChildContext(Context parent, Map<Key<?>, Provider<?>> bindings) {
         this.parent = Objects.requireNonNull(parent, "parent");
         this.bindings = Map.copyOf(Objects.requireNonNull(bindings, "bindings"));
+        this.hostedScope = null;
+    }
+
+    /**
+     * Creates a child context over {@code parent} that hosts the child-local {@code scope}: it builds and caches the
+     * instances of that scope's beans resolved through it or its descendants.
+     *
+     * @param parent the parent context resolutions fall back to
+     * @param bindings the child's own bindings, by key
+     * @param scope the child-local scope this context hosts
+     * @throws IllegalArgumentException if {@code scope} is handled by a {@code Scope} service, or if the root of the
+     *     chain is not a {@link DefaultContext}
+     */
+    public ChildContext(Context parent, Map<Key<?>, Provider<?>> bindings, Class<? extends Annotation> scope) {
+        this.parent = Objects.requireNonNull(parent, "parent");
+        this.bindings = Map.copyOf(Objects.requireNonNull(bindings, "bindings"));
+        this.hostedScope = Objects.requireNonNull(scope, "scope");
+        if (!(root() instanceof DefaultContext root)) {
+            throw new IllegalArgumentException("Only a child of an injector created by Injector.create() or"
+                    + " Injector.builder() can host a scope.");
+        }
+        root.host(scope);
     }
 
     /**
@@ -67,14 +94,47 @@ public final class ChildContext implements Context {
         if (layered != null) {
             return (Provider<T>) layered;
         }
+        Provider<?> built = buildingProvider(key);
+        return built != null ? (Provider<T>) built : parent.getProvider(key);
+    }
+
+    /**
+     * {@return the provider building the bean bound to {@code key} through this chain, or {@code null} when the parent
+     * provides it unchanged}
+     */
+    private @Nullable Provider<?> buildingProvider(Key<?> key) {
         Optional<BeanDefinition> definition = parent.getBeanDefinition(key);
-        if (definition.isPresent()
-                && definition.get() instanceof Factory<?> factory
-                && !definition.get().annotationMetadata().hasStereotype(ScopingAnnotation.class)) {
-            // Unscoped parent bean: rebuild here so its dependencies resolve through this child.
-            return new CycleGuardProvider<>(key, (Provider<T>) (Provider<?>) () -> factory.build(this), stack);
+        if (definition.isEmpty() || !(definition.get() instanceof Factory<?> factory)) {
+            return null;
         }
-        return parent.getProvider(key);
+        Optional<Class<? extends Annotation>> scope = factory.scope();
+        if (scope.isEmpty()) {
+            // Unscoped parent bean: rebuild here so its dependencies resolve through this child.
+            return new CycleGuardProvider<>(key, () -> factory.build(this), stack);
+        }
+        ChildContext host = host(scope.get());
+        return host != null ? host.hosted(factory) : null;
+    }
+
+    /** {@return the nearest context of the chain, this one included, that hosts {@code scope}, or {@code null}} */
+    private @Nullable ChildContext host(Class<? extends Annotation> scope) {
+        if (scope.equals(hostedScope)) {
+            return this;
+        }
+        return parent instanceof ChildContext child ? child.host(scope) : null;
+    }
+
+    /** {@return the provider of this host's instance of {@code factory}'s bean, built through this context once} */
+    private Provider<?> hosted(Factory<?> factory) {
+        return hosted.computeIfAbsent(
+                factory,
+                unused -> new SingletonProvider<>(
+                        new CycleGuardProvider<>(factory.key(), () -> factory.build(this), stack)));
+    }
+
+    /** {@return the context at the top of the chain: the first ancestor that is not a {@code ChildContext}} */
+    private Context root() {
+        return parent instanceof ChildContext child ? child.root() : parent;
     }
 
     /** {@return the nearest local binding for {@code key} in this context or an ancestor child, or {@code null}} */

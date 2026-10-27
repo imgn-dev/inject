@@ -39,7 +39,7 @@ solves it, examples per use case, and its limitations.
 ## Structuring graphs
 
 - [Child injectors](child-injectors.md) — request- or tenant-scoped binding
-  layers over a shared parent graph.
+  layers over a shared parent graph, and child-local scopes cached per child.
 - [Builder overrides](builder-overrides.md) — replacing discovered bindings
   with explicit instances or providers, primarily for tests.
 

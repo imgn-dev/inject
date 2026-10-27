@@ -49,13 +49,59 @@ Injector session = app.childBuilder()
 Children nest: a child's `childBuilder()` layers again, and lookups honor the
 nearest binding.
 
+### Child-local scopes
+
+A scoping annotation with no `Scope` service is child-local: its beans live in
+the children that host it. `scopedChildBuilder(scope)` builds such a child:
+
+```java
+@ScopingAnnotation
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.TYPE)
+public @interface WindowScoped {}
+
+@WindowScoped
+public final class Toolbar {
+    @Inject
+    public Toolbar(Window window) {}
+}
+```
+
+```java
+Injector window = app.scopedChildBuilder(WindowScoped.class)
+        .bind(Window.class, frame)
+        .build();
+Injector view = window.scopedChildBuilder(ViewScoped.class).build();
+
+window.getInstance(Toolbar.class) == view.getInstance(Toolbar.class); // true
+```
+
+Each bean of the scope is created once per hosting child, the first time it is
+resolved through that child or one of its descendants, and cached there. It is
+built through its host, so its dependencies see the host's bindings and those
+above it, never those of the descendant that asked for it. Hosts nest: the
+nearest one in the chain hosts the bean, so another window opened below a view
+gets its own `Toolbar`. A `Provider` injected into a bean resolves through the
+injector that built the bean, so a `@ViewScoped` bean's `Provider<Owner>`
+returns the `Owner` of its own view, and cycles broken by a `Provider` work as
+for singletons.
+
+Resolving a child-local bean through an injector with no host of its scope in
+its chain fails with a `ScopeResolutionException` naming the bean and the
+scope. When no child ever hosted the scope, the message also points out that a
+`Scope` service may be missing.
+
 ## Limitations
 
 - Child bindings are explicit instances and providers only. A child does not
   discover annotated beans, load factories, or accept `@Provides` classes of
   its own.
-- No child-local scopes: a child cannot declare "singleton per child". A
-  scoped bean belongs to the injector whose registry declared it.
+- A child hosts at most one scope, and only a child-local one: hosting a
+  scope that a `Scope` service handles, such as `@Singleton`, is an error.
+- A child-local bean cannot contribute to a [collection](multibindings.md):
+  collections are resolved in the root injector, where it has no instance.
+  The root injector reports it at creation.
+- Other scoped beans belong to the injector whose registry declared them.
 - Child bindings cannot contribute to the parent's
   [collections](multibindings.md); a `Set` or `Map` binding resolved through a
   child has the parent's contents.

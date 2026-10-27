@@ -57,7 +57,12 @@ final class DefaultInjector implements Injector {
 
     @Override
     public ChildBuilder childBuilder() {
-        return new ChildBuilder(context);
+        return new ChildBuilder(context, null);
+    }
+
+    @Override
+    public ChildBuilder scopedChildBuilder(Class<? extends Annotation> scope) {
+        return new ChildBuilder(context, Objects.requireNonNull(scope, "scope"));
     }
 
     @Override

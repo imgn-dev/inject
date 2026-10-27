@@ -72,6 +72,15 @@ the order the changes landed, each referencing its commits.
   files; the nearest declaration wins along each path. Different scopes
   inherited along different paths are a compile error. A bean whose supertype
   another processor has yet to generate waits for a later round.
+  ([c2e9352](https://github.com/imgn-dev/inject/commit/c2e9352))
+- **Child-local scopes.** A scoping annotation with no `Scope` service is
+  child-local, and `Injector.scopedChildBuilder(scope)` builds a child that
+  hosts it: each bean of the scope is created once per hosting child, built
+  through it, and cached there; the nearest host in the chain wins. Resolving
+  such a bean with no host in the chain throws a `ScopeResolutionException`.
+  A scoping annotation with no `Scope` service is no longer an error at
+  injector creation. **Breaking** for `Injector` implementations: the
+  interface has the new method `scopedChildBuilder`.
 
 ## 0.1.0 — 2026-10-12
 
