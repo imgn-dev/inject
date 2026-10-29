@@ -25,7 +25,7 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 |---|----------|
 | Default scope | **Prototype** — a new instance per `get()`. Scopes are opt-in wrappers. |
 | Cycles | **Compile-time detection** in the processor **plus a runtime guard** in `Context`. Constructor cycles are always fatal. |
-| Scope binding | A `@ScopingAnnotation` pairs with a `Scope` SPI implementation, discovered by `ServiceLoader` and registered via a generated `ScopeBinding`. |
+| Scope binding | A `@ScopingAnnotation` pairs with a `Scope` SPI implementation, discovered by `ServiceLoader` and keyed by `annotationType()`. A scoping annotation with no `Scope` is child-local: the child injector that hosts it caches its beans. |
 | Qualifier identity | Annotation **type + attribute values** (`@Named("db")` ≠ `@Named("cache")`; marker qualifiers match by type alone). |
 | `@Provides` host | **Any class.** Static method → called directly. Instance method → host resolved via its own factory first. |
 | `Provider<T>` injection | **Supported** — a `Provider<Foo>` dependency injects the provider itself (deferred/repeated `get()`). |
@@ -159,8 +159,11 @@ public interface Scope {
 - `SingletonProvider` = the wrapper returned by the built-in singleton scope;
   double-checked locking (or holder) so `get()` instantiates exactly once under
   contention.
-- The processor emits a `ScopeBinding` registering each `@ScopingAnnotation` →
-  `Scope` pairing. Custom scopes are user-definable.
+- A project registers its own `Scope` implementations in
+  `META-INF/services/be.imgn.inject.context.Scope`; the processor writes only the
+  `Factory` file. Custom scopes are user-definable.
+- A scoping annotation with no `Scope` service is child-local: a child injector
+  built with `scopedChildBuilder(scope)` hosts it and caches its beans.
 
 ### `Factory<T>` — abstract base
 ```java
@@ -254,16 +257,15 @@ compute each factory's scope and `exposedKeys`. Plugins may rewrite/validate the
   `@Singleton`): the qualifier becomes part of the produced `Key` (via
   `exposedKeys`), and the scope is the one `Context` wraps the resulting
   `FactoryProvider` with — exactly as for `@Inject` beans.
-- `ScopeBinding` — maps each `@ScopingAnnotation` to its `Scope`.
 
 Plugins may emit code.
 
-**4. Write.** Flush all `JavaFileObject`s and register each `Factory` (and `Scope`)
-as a `ServiceLoader` provider.
+**4. Write.** Flush all `JavaFileObject`s and register each `Factory` as a
+`ServiceLoader` provider.
 
 ### Generated type naming
-All generated types live in the **same package** as the type they are generated
-for. The simple name is built from the enclosing-class chain (outermost → target),
+Generated types live in the **same package** as the type they are generated for,
+except annotation implementations (below). The simple name is built from the enclosing-class chain (outermost → target),
 joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`. The
 names come from gaia-processing's `ClassName.generatedName`; a `$` inside a name
 is written `$0`:
@@ -274,9 +276,6 @@ is written `$0`:
 | `Bean.SubBean` (nested) | `$Bean$SubBean$$Factory` |
 | `A.B.C` (deeper nesting) | `$A$B$C$$Factory` |
 
-- **Scopes** follow the same pattern, suffix `$$Scope`: the binding generated for a
-  `@ScopingAnnotation` named `Singleton` is `$Singleton$$Scope` (nested annotation
-  `Outer.MyScope` → `$Outer$MyScope$$Scope`), in the annotation's package.
 - **`@Provides`** factories append `$$` and the method name to the host chain,
   suffix `$$Factory`: a method `provideX` on host `Config` →
   `$Config$$provideX$$Factory`, distinct from the factory of a nested class
@@ -288,8 +287,8 @@ is written `$0`:
   `com.example` → `$$com$example$$Named$$Impl`.
 
 ### Service registration & conflict rule
-- **Classpath:** the processor generates `META-INF/services/be.imgn.inject.context.Factory`
-  (and `...Scope`). The processor owns these files exclusively — if a matching
+- **Classpath:** the processor generates `META-INF/services/be.imgn.inject.context.Factory`.
+  The processor owns these files exclusively — if a matching
   service file **already exists on the source path** (hand-authored or checked in),
   **compilation fails** to prevent stale/duplicate registration.
   gaia's `ServiceFiles` writes the file after the last round: entries sorted, each
@@ -358,7 +357,7 @@ public class InjectionException extends RuntimeException { … }        // base,
 public class UnsatisfiedDependencyException extends InjectionException // no factory for a Key
 public class CircularDependencyException  extends InjectionException   // runtime cycle guard; carries the A → B → A path
 public class DuplicateBindingException    extends InjectionException   // two providers for one Key
-public class ScopeResolutionException     extends InjectionException   // no Scope for a @ScopingAnnotation, or wrap failure
+public class ScopeResolutionException     extends InjectionException   // several Scopes for one annotation; a child-local bean with no host, or in a collection
 ```
 - Runtime resolution failures throw the specific subtype, always with a descriptive
   message (offending `Key`, resolution path, or conflicting factories).

@@ -261,7 +261,7 @@ per chain position.
 ## Generated code
 
 One new artifact per intercepted bean, `$Bean$$Intercepted`, in the bean's package, following the existing naming
-rule (`$$Factory`, `$$Impl`, `$$Scope`):
+rule (`$$Factory`, `$$Impl`):
 
 ```java
 public final class $OrderService$$Intercepted extends OrderService {

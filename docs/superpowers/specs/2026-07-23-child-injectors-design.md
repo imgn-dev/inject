@@ -12,8 +12,9 @@ provider bindings first and falls back to its parent, while the parent stays unt
 - Scoped beans stay coherent: a parent `@Singleton` remains one application-wide instance built from parent
   bindings, shared with every child.
 
-Out of scope (v1): child-registered factories or ServiceLoader layers, child-local scopes, child contributions to
-collections, per-child condition re-evaluation.
+Out of scope (v1): child-registered factories or ServiceLoader layers, child contributions to collections, per-child
+condition re-evaluation. Child-local scopes, hosted by `scopedChildBuilder(scope)`, are described in
+`docs/features/scopes.md` and `docs/features/child-injectors.md`.
 
 ## User-facing API
 
@@ -109,7 +110,7 @@ generated factories derive both from the same annotation, which keeps the two vi
 
 ## Decisions log
 
-- Instances + providers only (no child factories/scopes/conditions): covers request/session/test layering with a
+- Instances + providers only (no child factories or conditions): covers request/session/test layering with a
   small, runtime-only surface.
 - Shadowing allowed — consistent with the root builder's documented override semantics and required by the
   override use cases.
