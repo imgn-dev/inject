@@ -153,6 +153,7 @@ the order the changes landed, each referencing its commits.
   (`$$com$example$$Named$$Impl`). A `$` inside a type or method name is written
   `$0`. **Breaking:** a hand-written module descriptor whose `provides` clause
   names a `@Provides` factory must use the new name.
+  ([a58d70b](https://github.com/imgn-dev/inject/commit/a58d70b))
 
 ## 0.1.0 — 2026-10-12
 
