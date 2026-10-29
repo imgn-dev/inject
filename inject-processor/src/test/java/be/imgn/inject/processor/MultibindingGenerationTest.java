@@ -84,7 +84,7 @@ class MultibindingGenerationTest {
 
         assertThat(compilation).succeeded();
         assertThat(compilation)
-                .generatedSourceFile("example.$Config$fallback$$Factory")
+                .generatedSourceFile("example.$Config$$fallback$$Factory")
                 .contains("new Contribution(Key.of(Types.setOf(Handler.class)), null)");
     }
 

@@ -211,7 +211,7 @@ class AssistedRecipeTest {
 
         assertThat(compilation).succeeded();
         Assertions.assertThat(compilation.generatedSourceFiles())
-                .noneMatch(f -> f.getName().contains("$Config$legacy$$Factory"));
+                .noneMatch(f -> f.getName().contains("$Config$$legacy$$Factory"));
     }
 
     @Test

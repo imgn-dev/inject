@@ -264,7 +264,9 @@ as a `ServiceLoader` provider.
 ### Generated type naming
 All generated types live in the **same package** as the type they are generated
 for. The simple name is built from the enclosing-class chain (outermost → target),
-joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`:
+joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`. The
+names come from gaia-processing's `ClassName.generatedName`; a `$` inside a name
+is written `$0`:
 
 | Source | Generated factory |
 |--------|-------------------|
@@ -275,9 +277,15 @@ joined by a single `$`, prefixed with `$`, and suffixed with `$$<Kind>`:
 - **Scopes** follow the same pattern, suffix `$$Scope`: the binding generated for a
   `@ScopingAnnotation` named `Singleton` is `$Singleton$$Scope` (nested annotation
   `Outer.MyScope` → `$Outer$MyScope$$Scope`), in the annotation's package.
-- **`@Provides`** factories append the method name to the host chain, suffix
-  `$$Factory`: a method `provideX` on host `Config` → `$Config$provideX$$Factory`.
-  Overloads disambiguate with a stable index suffix (`$Config$provideX$0$$Factory`).
+- **`@Provides`** factories append `$$` and the method name to the host chain,
+  suffix `$$Factory`: a method `provideX` on host `Config` →
+  `$Config$$provideX$$Factory`, distinct from the factory of a nested class
+  `Config.provideX` (`$Config$provideX$$Factory`). An overloaded method adds its
+  1-based position among the host's methods of that name, in declaration order
+  (`$Config$$provideX$2$$Factory`).
+- **Annotation implementations** go in the package of the factory that uses them,
+  and start with the annotation's own package between `$$` markers: `Named` from
+  `com.example` → `$$com$example$$Named$$Impl`.
 
 ### Service registration & conflict rule
 - **Classpath:** the processor generates `META-INF/services/be.imgn.inject.context.Factory`

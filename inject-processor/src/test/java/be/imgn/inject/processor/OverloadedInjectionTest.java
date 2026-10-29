@@ -87,7 +87,7 @@ class OverloadedInjectionTest {
         assertThat(compilation)
                 .succeeded()
                 .hadNoWarnings()
-                .generatedSourceFile("example.$Labels$label$$Factory")
+                .generatedSourceFile("example.$Labels$$label$1$$Factory")
                 .contains("return Labels.label(this.<String>getInstanceForConstructor(0, String.class, context))");
     }
 

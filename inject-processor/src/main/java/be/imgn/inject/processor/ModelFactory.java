@@ -136,7 +136,7 @@ final class ModelFactory {
         InterceptionModel interception = interception(bean, interceptsAnnotation);
         return new BeanModel(
                 packageOf(bean),
-                GeneratedNames.factoryName(enclosingChain(bean)),
+                ClassName.of(bean).generatedName("Factory").simpleName(),
                 ClassName.of(bean),
                 constructorParameters,
                 Annotations.metadata(inheritedScope, constructorSites, elements),
@@ -217,7 +217,7 @@ final class ModelFactory {
         List<TypeName> defaultExposed = exposedTypes(type, beanQualifier != null);
         return new BeanModel(
                 packageOf(type),
-                GeneratedNames.factoryName(enclosingChain(type)),
+                ClassName.of(type).generatedName("Factory").simpleName(),
                 ClassName.of(type),
                 List.of(),
                 Annotations.metadata(inheritedScope, List.of(type), elements),
@@ -237,7 +237,7 @@ final class ModelFactory {
                 type);
     }
 
-    ProvidesModel providesModel(ExecutableElement method, TypeElement host, int index) {
+    ProvidesModel providesModel(ExecutableElement method, TypeElement host) {
         Types types = context.types();
         Elements elements = context.elements();
         Optional<TypeElement> frameworkReturn =
@@ -267,7 +267,7 @@ final class ModelFactory {
                 : null;
         return new ProvidesModel(
                 packageOf(host),
-                GeneratedNames.providesFactoryName(enclosingChain(host), name, index),
+                ClassName.generatedName(method, "Factory").simpleName(),
                 TypeName.of(types.erasure(method.getReturnType())),
                 ClassName.of(host),
                 name,
@@ -760,7 +760,7 @@ final class ModelFactory {
             return null;
         }
         return new InterceptionModel(
-                GeneratedNames.interceptedName(enclosingChain(bean)),
+                ClassName.of(bean).generatedName("Intercepted").simpleName(),
                 injectConstructor(bean).map(ModelFactory::proxyParameters).orElse(List.of()),
                 List.copyOf(methods));
     }
@@ -1400,10 +1400,6 @@ final class ModelFactory {
             return Optional.of(declared.getTypeArguments().get(0));
         }
         return Optional.empty();
-    }
-
-    static List<String> enclosingChain(TypeElement bean) {
-        return ClassName.of(bean).simpleNames();
     }
 
     /**

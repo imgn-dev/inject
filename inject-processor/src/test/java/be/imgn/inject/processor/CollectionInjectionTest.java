@@ -142,7 +142,7 @@ class CollectionInjectionTest {
 
         assertThat(compilation).succeeded();
         assertThat(compilation)
-                .generatedSourceFile("example.$Config$handlers$$Factory")
+                .generatedSourceFile("example.$Config$$handlers$$Factory")
                 .contains("Key.of(Types.setOf(Handler.class))");
     }
 
@@ -167,7 +167,7 @@ class CollectionInjectionTest {
 
         assertThat(compilation).succeeded();
         assertThat(compilation)
-                .generatedSourceFile("example.$Config$handlers$$Factory")
+                .generatedSourceFile("example.$Config$$handlers$$Factory")
                 .doesNotContain("exposedKeys");
     }
 

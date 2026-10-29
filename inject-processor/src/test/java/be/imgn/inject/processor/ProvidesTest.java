@@ -30,7 +30,7 @@ class ProvidesTest {
 
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source =
-                assertThat(compilation).generatedSourceFile("example.$Config$provideName$$Factory");
+                assertThat(compilation).generatedSourceFile("example.$Config$$provideName$$Factory");
         source.contains("extends Factory<String>");
         source.contains("super(String.class)");
         source.contains("return Config.provideName()");
@@ -55,7 +55,7 @@ class ProvidesTest {
 
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source =
-                assertThat(compilation).generatedSourceFile("example.$Config$provideName$$Factory");
+                assertThat(compilation).generatedSourceFile("example.$Config$$provideName$$Factory");
         source.contains("new Parameter(\"host\", Config.class)");
         source.contains("Config host = this.<Config>getInstanceForConstructor(0, Config.class, context)");
         source.contains("return host.provideName()");
@@ -82,7 +82,7 @@ class ProvidesTest {
 
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source =
-                assertThat(compilation).generatedSourceFile("example.$Config$greeting$$Factory");
+                assertThat(compilation).generatedSourceFile("example.$Config$$greeting$$Factory");
         source.contains("new Parameter(\"count\", Integer.class,");
         source.contains("return Config.greeting(this.<Integer>getInstanceForConstructor(0, Integer.class, context))");
     }
@@ -109,7 +109,7 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$url$$Factory");
+        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$$url$$Factory");
         source.contains("Key.of(String.class,");
         source.contains("Names.named(\"db\")");
         source.contains("return Optional.of(Singleton.class)");
@@ -139,7 +139,8 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
 
         assertThat(compilation).succeeded();
-        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$engine$$Factory");
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$Config$$engine$$Factory");
         source.contains("Key.of(Engine.class)");
         source.doesNotContain("Key.of(V8Engine.class)");
     }
@@ -170,7 +171,8 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(engine, v8, config);
 
         assertThat(compilation).succeeded();
-        AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Config$engine$$Factory");
+        AbstractStringAssert<?> source =
+                assertThat(compilation).generatedSourceFile("example.$Config$$engine$$Factory");
         source.contains("Key.of(Engine.class,");
         source.contains("Names.named(\"fast\")");
     }
@@ -198,7 +200,39 @@ class ProvidesTest {
         Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
 
         assertThat(compilation).succeeded();
-        assertThat(compilation).generatedSourceFile("example.$Config$make$$Factory");
-        assertThat(compilation).generatedSourceFile("example.$Config$make$1$$Factory");
+        assertThat(compilation).generatedSourceFile("example.$Config$$make$1$$Factory");
+        assertThat(compilation).generatedSourceFile("example.$Config$$make$2$$Factory");
+    }
+
+    @Test
+    void aNestedBeanNamedLikeAProvidesMethodGetsItsOwnFactory() {
+        JavaFileObject config = TestCompiler.source("example.Config", """
+                package example;
+
+                import be.imgn.inject.Inject;
+                import be.imgn.inject.Provides;
+
+                public class Config {
+                    @Provides
+                    public static String engine() {
+                        return "v8";
+                    }
+
+                    public static class engine {
+                        @Inject
+                        public engine() {}
+                    }
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new InjectProcessor()).compile(config);
+
+        assertThat(compilation)
+                .succeeded()
+                .generatedSourceFile("example.$Config$$engine$$Factory")
+                .contains("return Config.engine()");
+        assertThat(compilation)
+                .generatedSourceFile("example.$Config$engine$$Factory")
+                .contains("new Config.engine()");
     }
 }

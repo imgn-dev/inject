@@ -16,7 +16,6 @@ import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provides;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -272,7 +271,6 @@ final class GatherStage {
             Map<String, List<AssistedRecipe>> assistedRecipes,
             List<TypeElement> seeds,
             List<AssistedReference> assistedReferences) {
-        Map<String, Integer> indices = new HashMap<>();
         List<ProvidesModel> result = new ArrayList<>();
         for (Element element : round.annotatedWith(Provides.class.getCanonicalName())) {
             if (element.getKind() != ElementKind.METHOD) {
@@ -300,8 +298,7 @@ final class GatherStage {
                 }
                 continue;
             }
-            int index = indices.merge(key, 0, (existing, ignored) -> existing + 1);
-            result.add(models.providesModel(method, host, index));
+            result.add(models.providesModel(method, host));
             assistedReferences.addAll(toAssistedReferences(method, models.containerDependencies(method)));
         }
         return result;

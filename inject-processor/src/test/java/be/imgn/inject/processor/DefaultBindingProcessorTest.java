@@ -31,7 +31,7 @@ class DefaultBindingProcessorTest {
 
         assertThat(compilation).succeeded();
         assertThat(compilation)
-                .generatedSourceFile("example.$Config$provideName$$Factory")
+                .generatedSourceFile("example.$Config$$provideName$$Factory")
                 .contains("protected boolean isDefault()");
     }
 
@@ -54,7 +54,7 @@ class DefaultBindingProcessorTest {
 
         assertThat(compilation).succeeded();
         assertThat(compilation)
-                .generatedSourceFile("example.$Config$provideName$$Factory")
+                .generatedSourceFile("example.$Config$$provideName$$Factory")
                 .doesNotContain("isDefault");
     }
 

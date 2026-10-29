@@ -109,7 +109,7 @@ class QualifierScopeProviderTest {
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Widget$$Factory");
         source.contains("Key.of(Widget.class,");
-        source.contains("$example$Tag$$Impl(\"primary\")");
+        source.contains("$$example$$Tag$$Impl(\"primary\")");
     }
 
     @Test
@@ -139,7 +139,7 @@ class QualifierScopeProviderTest {
 
         assertThat(compilation).succeeded();
         AbstractStringAssert<?> source = assertThat(compilation).generatedSourceFile("example.$Task$$Factory");
-        source.contains("$example$Priority$$Impl(5)");
-        assertThat(compilation).generatedSourceFile("example.$example$Priority$$Impl");
+        source.contains("$$example$$Priority$$Impl(5)");
+        assertThat(compilation).generatedSourceFile("example.$$example$$Priority$$Impl");
     }
 }

@@ -144,6 +144,15 @@ the order the changes landed, each referencing its commits.
   included, are all explicit: two beans with the same qualifier on a shared
   supertype are a `DuplicateBindingException`, not an ambiguous key.
   ([ee8583b](https://github.com/imgn-dev/inject/commit/ee8583b))
+- **Generated names follow gaia-processing's convention.** `@Provides`
+  factories put `$$` before the method name (`$Config$$url$$Factory`), so they
+  no longer clash with the factory of a nested class of the same name. An
+  overloaded method adds its 1-based position among the host's methods of that
+  name, `@Provides` or not (`$Config$$make$2$$Factory`). Annotation
+  implementations start with the annotation's package between `$$` markers
+  (`$$com$example$$Named$$Impl`). A `$` inside a type or method name is written
+  `$0`. **Breaking:** a hand-written module descriptor whose `provides` clause
+  names a `@Provides` factory must use the new name.
 
 ## 0.1.0 — 2026-10-12
 

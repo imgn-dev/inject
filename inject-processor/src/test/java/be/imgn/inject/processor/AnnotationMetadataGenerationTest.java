@@ -164,6 +164,6 @@ class AnnotationMetadataGenerationTest {
 
         assertThat(compilation).succeeded();
         // emitted into the consuming factory's package, so it never splits the annotation's package
-        assertThat(compilation).generatedSourceFile("example.$tags$Tag$$Impl");
+        assertThat(compilation).generatedSourceFile("example.$$tags$$Tag$$Impl");
     }
 }

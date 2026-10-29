@@ -44,9 +44,8 @@ final class AssistedFactoryGenerator {
         String packageName =
                 elements.getPackageOf(factoryInterface).getQualifiedName().toString();
         ClassName interfaceType = ClassName.of(factoryInterface);
-        List<String> chain = ModelFactory.enclosingChain(factoryInterface);
-        ClassName implType = ClassName.of(packageName, GeneratedNames.implName(chain));
-        String factorySimpleName = GeneratedNames.factoryName(chain);
+        ClassName implType = interfaceType.generatedName("Impl");
+        String factorySimpleName = interfaceType.generatedName("Factory").simpleName();
 
         JavaFile implFile = JavaFile.newBuilder(packageName, implType(model, models, interfaceType, implType))
                 .build();

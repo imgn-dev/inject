@@ -32,30 +32,23 @@ final class AnnotationImplGenerator {
     private AnnotationImplGenerator() {}
 
     /**
-     * {@return the simple name of the generated implementation for {@code annotationType}}
-     *
-     * <p>The annotation's qualified name is mangled into the simple name so implementations for same-named annotations
-     * from different packages can coexist in one target package.
-     */
-    static String implSimpleName(TypeElement annotationType) {
-        return "$" + annotationType.getQualifiedName().toString().replace('.', '$') + "$$Impl";
-    }
-
-    /**
      * {@return the name of the generated implementation, emitted into {@code targetPackage}}
      *
      * <p>Implementations are emitted into the package of the factory that uses them, never the annotation's own
-     * package: the annotation may live in another module, and generating into it would split that package.
+     * package: the annotation may live in another module, and generating into it would split that package. The
+     * annotation's package is part of the name, so implementations for same-named annotations from different packages
+     * can coexist in one target package.
      */
     static ClassName implClassName(TypeElement annotationType, String targetPackage) {
-        return ClassName.of(targetPackage, implSimpleName(annotationType));
+        return ClassName.of(annotationType).generatedNameIn(targetPackage, "Impl");
     }
 
     static JavaFile generate(TypeElement annotationType, String targetPackage) {
         ClassName annotationName = ClassName.of(annotationType);
         List<ExecutableElement> members = ElementFilter.methodsIn(annotationType.getEnclosedElements());
 
-        Type.Builder type = Type.newClassBuilder(implSimpleName(annotationType))
+        Type.Builder type = Type.newClassBuilder(
+                        implClassName(annotationType, targetPackage).simpleName())
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .addSuperinterface(annotationName);
 
