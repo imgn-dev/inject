@@ -102,6 +102,7 @@ final class InjectStep implements Step {
 
     @Override
     public void processingOver() {
+        gatherStage.reportPendingFactories();
         serviceRegistrar.finish();
     }
 

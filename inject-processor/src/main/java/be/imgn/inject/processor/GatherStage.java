@@ -16,6 +16,7 @@ import be.imgn.inject.IntoMap;
 import be.imgn.inject.IntoSet;
 import be.imgn.inject.Provides;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,6 +28,7 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.ElementFilter;
 
 /** Stage 1: discovers injectable types and {@code @Provides} methods and builds their models. */
 final class GatherStage {
@@ -34,6 +36,11 @@ final class GatherStage {
     private final ProcessingContext context;
     private final ModelFactory models;
     private final Diagnostics diagnostics;
+    // The link keys of the recipes gathered in any round, so a factory of a later round finds them.
+    private final Set<String> knownRecipeKeys = new HashSet<>();
+    // The @AssistedFactory interfaces waiting for their product's recipe, by qualified name: retried each round, and
+    // reported after the last one. The stage keeps them itself, as the step processor would report them as deferred.
+    private final Set<String> pendingFactories = new LinkedHashSet<>();
 
     GatherStage(ProcessingContext context, ModelFactory models, Diagnostics diagnostics) {
         this.context = context;
@@ -137,6 +144,7 @@ final class GatherStage {
 
         List<ProvidesModel> provides = gatherProvides(round, assistedRecipes, seeds, assistedReferences);
         seeds.addAll(providesDependencies(round));
+        knownRecipeKeys.addAll(assistedRecipes.keySet());
         List<AssistedFactoryModel> assistedFactories = gatherAssistedFactories(round, assistedRecipes);
         return new Gathered(
                 beans,
@@ -164,9 +172,8 @@ final class GatherStage {
                 .toList();
     }
 
-    @SuppressWarnings("checkstyle:CyclomaticComplexity")
-    private List<AssistedFactoryModel> gatherAssistedFactories(
-            AnnotatedElements round, Map<String, List<AssistedRecipe>> recipes) {
+    /** {@return the round's {@code @AssistedFactory} interfaces and the pending ones, each with its factory methods} */
+    private Map<TypeElement, List<ExecutableElement>> assistedFactoryInterfaces(AnnotatedElements round) {
         Map<TypeElement, List<ExecutableElement>> byInterface = new LinkedHashMap<>();
         for (Element element : round.annotatedWith(AssistedFactory.class.getCanonicalName())) {
             ExecutableElement method = MoreElements.asExecutable(element);
@@ -179,10 +186,31 @@ final class GatherStage {
                     .computeIfAbsent(enclosing.get(), unused -> new ArrayList<>())
                     .add(method);
         }
+        for (String name : pendingFactories) {
+            TypeElement pending = context.elements().getTypeElement(name);
+            if (pending != null && !byInterface.containsKey(pending)) {
+                byInterface.put(pending, assistedFactoryMethods(pending));
+            }
+        }
+        return byInterface;
+    }
+
+    @SuppressWarnings("checkstyle:CyclomaticComplexity")
+    private List<AssistedFactoryModel> gatherAssistedFactories(
+            AnnotatedElements round, Map<String, List<AssistedRecipe>> recipes) {
+        Map<TypeElement, List<ExecutableElement>> byInterface = assistedFactoryInterfaces(round);
         AssistedMatcher matcher = new AssistedMatcher(models.types(), diagnostics);
         List<AssistedFactoryModel> factories = new ArrayList<>();
         for (Map.Entry<TypeElement, List<ExecutableElement>> entry : byInterface.entrySet()) {
             TypeElement factoryInterface = entry.getKey();
+            String interfaceName = factoryInterface.getQualifiedName().toString();
+            if (awaitsRecipe(entry.getValue(), recipes)) {
+                // The product's constructor may name a type another processor has yet to generate: javac holds it
+                // back until a later round.
+                pendingFactories.add(interfaceName);
+                continue;
+            }
+            pendingFactories.remove(interfaceName);
             Set<ExecutableElement> annotatedMethods = new LinkedHashSet<>(entry.getValue());
             boolean valid = true;
             for (Element enclosed : factoryInterface.getEnclosedElements()) {
@@ -205,7 +233,7 @@ final class GatherStage {
                     continue;
                 }
                 AnnotationReader annotation = found.get();
-                Map<String, List<AssistedRecipe>> withFallback = withCrossModuleFallback(method, annotation, recipes);
+                Map<String, List<AssistedRecipe>> withFallback = withRecipeFromMembers(method, annotation, recipes);
                 Optional<AssistedFactoryMethod> resolved = matcher.resolve(method, annotation, withFallback);
                 if (resolved.isEmpty()) {
                     valid = false;
@@ -221,21 +249,76 @@ final class GatherStage {
     }
 
     /**
-     * Cross-module recipes: when {@code method}'s link key is absent from {@code recipes} because the implementation
-     * class was compiled in a previous module (not from a source of this compilation), builds its
-     * {@link AssistedRecipe} directly from the class's members and merges it in. Misses on a source of this compilation
-     * are left alone: a genuinely missing recipe is an error, not a fallback.
+     * {@return whether one of {@code methods} links to a source of this compilation whose recipe no round has gathered
+     * yet}
      */
-    private Map<String, List<AssistedRecipe>> withCrossModuleFallback(
+    private boolean awaitsRecipe(List<ExecutableElement> methods, Map<String, List<AssistedRecipe>> recipes) {
+        for (ExecutableElement method : methods) {
+            Optional<AssistedMatcher.Link> link = context.annotation(method, AssistedFactory.class.getCanonicalName())
+                    .flatMap(annotation -> AssistedMatcher.link(method, annotation));
+            if (link.isPresent()
+                    && !recipes.containsKey(link.get().key())
+                    && !knownRecipeKeys.contains(link.get().key())
+                    && context.isFromSource(link.get().implementationElement())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Reports the {@code @AssistedFactory} interfaces still waiting for their product's recipe after the last round. A
+     * product with a recipe-shaped member was held back as unresolved, which the step processor reports itself.
+     */
+    void reportPendingFactories() {
+        AssistedMatcher matcher = new AssistedMatcher(models.types(), diagnostics);
+        for (String name : pendingFactories) {
+            TypeElement factoryInterface = context.elements().getTypeElement(name);
+            if (factoryInterface == null) {
+                continue;
+            }
+            for (ExecutableElement method : assistedFactoryMethods(factoryInterface)) {
+                Optional<AnnotationReader> annotation =
+                        context.annotation(method, AssistedFactory.class.getCanonicalName());
+                if (annotation.isEmpty()) {
+                    continue;
+                }
+                Map<String, List<AssistedRecipe>> members = new LinkedHashMap<>();
+                AssistedMatcher.link(method, annotation.get()).ifPresent(link -> {
+                    List<AssistedRecipe> recipe = recipeFromMembers(link.implementationElement(), link.recipeMethod());
+                    if (!recipe.isEmpty()) {
+                        members.put(link.key(), recipe);
+                    }
+                });
+                matcher.resolve(method, annotation.get(), members);
+            }
+        }
+        pendingFactories.clear();
+    }
+
+    private static List<ExecutableElement> assistedFactoryMethods(TypeElement factoryInterface) {
+        return ElementFilter.methodsIn(factoryInterface.getEnclosedElements()).stream()
+                .filter(method -> MoreElements.isAnnotatedWith(method, AssistedFactory.class))
+                .toList();
+    }
+
+    /**
+     * When {@code method}'s link key is absent from {@code recipes}, builds its {@link AssistedRecipe} directly from
+     * the implementation class's members and merges it in: the class was compiled in a previous module, or its recipe
+     * was gathered in an earlier round. Other misses on a source of this compilation are left alone: a genuinely
+     * missing recipe is an error, not a fallback.
+     */
+    private Map<String, List<AssistedRecipe>> withRecipeFromMembers(
             ExecutableElement method, AnnotationReader annotation, Map<String, List<AssistedRecipe>> recipes) {
         Optional<AssistedMatcher.Link> link = AssistedMatcher.link(method, annotation);
         if (link.isEmpty()
                 || recipes.containsKey(link.get().key())
-                || context.isFromSource(link.get().implementationElement())) {
+                || (context.isFromSource(link.get().implementationElement())
+                        && !knownRecipeKeys.contains(link.get().key()))) {
             return recipes;
         }
         List<AssistedRecipe> fallback =
-                crossModuleRecipe(link.get().implementationElement(), link.get().recipeMethod());
+                recipeFromMembers(link.get().implementationElement(), link.get().recipeMethod());
         if (fallback.isEmpty()) {
             return recipes;
         }
@@ -244,7 +327,7 @@ final class GatherStage {
         return merged;
     }
 
-    private List<AssistedRecipe> crossModuleRecipe(TypeElement implementationElement, String recipeMethod) {
+    private List<AssistedRecipe> recipeFromMembers(TypeElement implementationElement, String recipeMethod) {
         List<AssistedRecipe> result = new ArrayList<>();
         for (Element enclosed : implementationElement.getEnclosedElements()) {
             if (recipeMethod.isEmpty()) {

@@ -154,6 +154,12 @@ the order the changes landed, each referencing its commits.
   `$0`. **Breaking:** a hand-written module descriptor whose `provides` clause
   names a `@Provides` factory must use the new name.
   ([a58d70b](https://github.com/imgn-dev/inject/commit/a58d70b))
+- **Assisted factories work across processing rounds.** An `@AssistedFactory`
+  was matched only with the recipes of its own round, so it failed with
+  "… has no assisted constructor" when its product's constructor named a type
+  another processor generates, or when another processor generated the factory
+  interface. Recipes now stay known for later rounds, and a factory waits for a
+  product of the same compilation until the last round.
 
 ## 0.1.0 — 2026-10-12
 

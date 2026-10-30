@@ -104,6 +104,15 @@ public interface StampFactory {
 }
 ```
 
+## Generated types
+
+A factory and its product can reach the processor in different rounds of one
+compilation: the product's constructor may name a type another processor
+generates, or another processor may generate the factory interface itself.
+The processor keeps the recipes of earlier rounds, and a factory waits for a
+product of the same compilation until its recipe is known. A product that
+still has no assisted constructor after the last round is an error.
+
 ## Limitations
 
 - `@Assisted` is valid on constructor and `@Provides` parameters only — not on

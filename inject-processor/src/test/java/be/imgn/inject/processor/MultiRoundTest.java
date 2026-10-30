@@ -121,6 +121,117 @@ class MultiRoundTest {
                 .contains("return Optional.of(Singleton.class)");
     }
 
+    @Test
+    void assistedFactoryWaitsForAProductWhoseConstructorNamesAGeneratedType() {
+        JavaFile commands = new JavaFile("example.DialogCommands", """
+                package example;
+
+                public class DialogCommands {
+                    public DialogCommands() {}
+                }
+                """);
+        JavaFileObject dialog = TestCompiler.source("example.Dialog", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Dialog {
+                    @Inject
+                    public Dialog(@Assisted String title, DialogCommands commands) {}
+                }
+                """);
+        JavaFileObject factory = TestCompiler.source("example.DialogFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface DialogFactory {
+                    @AssistedFactory
+                    Dialog create(String title);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new GeneratingProcessor(commands), new InjectProcessor())
+                .compile(dialog, factory);
+
+        assertThat(compilation)
+                .succeeded()
+                .hadNoWarnings()
+                .generatedSourceFile("example.$DialogFactory$$Impl")
+                .contains("new Dialog(");
+    }
+
+    @Test
+    void assistedFactoryFromALaterRoundMatchesAProductOfAnEarlierRound() {
+        JavaFile factory = new JavaFile("example.DialogFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface DialogFactory {
+                    @AssistedFactory
+                    Dialog create(String title);
+                }
+                """);
+        JavaFileObject dialog = TestCompiler.source("example.Dialog", """
+                package example;
+
+                import be.imgn.inject.Assisted;
+                import be.imgn.inject.Inject;
+
+                public class Dialog {
+                    @Inject
+                    public Dialog(@Assisted String title) {}
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new GeneratingProcessor(factory), new InjectProcessor())
+                .compile(dialog);
+
+        assertThat(compilation)
+                .succeeded()
+                .hadNoWarnings()
+                .generatedSourceFile("example.$DialogFactory$$Impl")
+                .contains("new Dialog(");
+    }
+
+    @Test
+    void aProductWithoutAnAssistedConstructorFailsAfterTheLastRound() {
+        JavaFile commands = new JavaFile("example.DialogCommands", """
+                package example;
+
+                public class DialogCommands {
+                    public DialogCommands() {}
+                }
+                """);
+        JavaFileObject dialog = TestCompiler.source("example.Dialog", """
+                package example;
+
+                import be.imgn.inject.Inject;
+
+                public class Dialog {
+                    @Inject
+                    public Dialog(DialogCommands commands) {}
+                }
+                """);
+        JavaFileObject factory = TestCompiler.source("example.DialogFactory", """
+                package example;
+
+                import be.imgn.inject.AssistedFactory;
+
+                public interface DialogFactory {
+                    @AssistedFactory
+                    Dialog create(String title);
+                }
+                """);
+
+        Compilation compilation = javac().withProcessors(new GeneratingProcessor(commands), new InjectProcessor())
+                .compile(dialog, factory);
+
+        assertThat(compilation).failed().hadErrorCount(1).hadErrorContaining("Dialog has no assisted constructor.");
+    }
+
     /** A source file for {@link GeneratingProcessor} to generate. */
     private record JavaFile(String qualifiedName, String text) {}
 
