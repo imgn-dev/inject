@@ -170,6 +170,7 @@ the order the changes landed, each referencing its commits.
   bean injected through a JDK superclass, or through a JDK interface it only
   inherits from one (`Writer` for a `StringWriter` subclass, `CommonDataSource`
   for a `DataSource`), now needs `@ExposeAs` or a `@Provides` method.
+  ([f91df6b](https://github.com/imgn-dev/inject/commit/f91df6b))
 
 ## 0.1.0 — 2026-10-12
 
