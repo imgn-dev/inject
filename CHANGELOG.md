@@ -161,6 +161,15 @@ the order the changes landed, each referencing its commits.
   interface. Recipes now stay known for later rounds, and a factory waits for a
   product of the same compilation until the last round.
   ([72c7632](https://github.com/imgn-dev/inject/commit/72c7632))
+- **JDK supertypes are exposed only when named.** A bean extending a JDK class,
+  such as `JPanel`, was exposed as every JDK supertype and interface of that
+  class, and could even fail to compile on a package-private one. The default
+  exposure now keeps a JDK (`java.*`, `javax.*`) interface only when the bean,
+  or one of its own supertypes, implements or extends it directly; a JDK
+  superclass, and every type a JDK type brings in, is left out. **Breaking:** a
+  bean injected through a JDK superclass, or through a JDK interface it only
+  inherits from one (`Writer` for a `StringWriter` subclass, `CommonDataSource`
+  for a `DataSource`), now needs `@ExposeAs` or a `@Provides` method.
 
 ## 0.1.0 — 2026-10-12
 

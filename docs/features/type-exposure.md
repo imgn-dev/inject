@@ -32,6 +32,21 @@ accidental binding keys: `Object`, `Serializable`, `Cloneable`, `Comparable`,
 `Runnable`, `AutoCloseable`, `Closeable`, `Iterable`, `EventListener`,
 `MethodInterceptor`, and the framework's own types.
 
+JDK types (`java.*` and `javax.*`) are exposed only as interfaces your own
+code names. A JDK interface stays exposed when the bean, or one of its own
+supertypes, implements or extends it directly. A JDK superclass is left out,
+and so is every type a JDK type brings in:
+
+```java
+public final class Scene extends JPanel implements View { ... }
+// Scene and View: not JPanel, JComponent, Container, Accessible, ...
+
+public final class Pool implements DataSource { ... }
+// Pool and DataSource: not CommonDataSource or Wrapper
+```
+
+`@ExposeAs` can still list any JDK type.
+
 Several beans may share a supertype: two views implementing `View` are both
 valid beans. A key a bean has only through its supertypes binds it when no
 other binding claims that key. When several beans have it this way, it is left

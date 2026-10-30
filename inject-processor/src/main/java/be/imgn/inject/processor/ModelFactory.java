@@ -74,7 +74,8 @@ final class ModelFactory {
     private static final ClassName TYPES = ClassName.of("be.imgn.inject", "Types");
 
     // Types never exposed by the default (no-@ExposeAs) supertype closure: universal supertypes and common marker
-    // interfaces that would collide across unrelated beans. @ExposeAs can still expose these explicitly.
+    // interfaces that would collide across unrelated beans. @ExposeAs can still expose these explicitly. The closure
+    // also leaves out JDK superclasses and what JDK types inherit: see supertypeClosure.
     private static final Set<String> EXCLUDED_DEFAULT_EXPOSURES = Set.of(
             Object.class.getName(),
             Serializable.class.getName(),
@@ -1225,23 +1226,44 @@ final class ModelFactory {
                 .orElse(null);
     }
 
+    /**
+     * {@return {@code bean} and the supertypes it is exposed as by default}
+     *
+     * <p>A JDK ({@code java.*}, {@code javax.*}) interface stays exposed when the bean, or one of its own supertypes,
+     * names it directly; a JDK superclass is left out, and so is every supertype a JDK type brings in. A bean extending
+     * {@code JPanel} would otherwise claim keys like {@code JComponent} or {@code Accessible}, which every such bean
+     * shares.
+     */
     private static List<TypeElement> supertypeClosure(TypeElement bean, Types types) {
         LinkedHashSet<TypeElement> collected = new LinkedHashSet<>();
         Deque<TypeMirror> queue = new ArrayDeque<>();
         queue.add(bean.asType());
         while (!queue.isEmpty()) {
             TypeMirror current = queue.poll();
-            Optional<TypeElement> typeElement = MoreTypes.asTypeElement(current);
-            if (typeElement.isEmpty()
-                    || EXCLUDED_DEFAULT_EXPOSURES.contains(
-                            typeElement.get().getQualifiedName().toString())) {
+            Optional<TypeElement> typeElement = MoreTypes.asTypeElement(current).filter(ModelFactory::isExposable);
+            if (typeElement.isEmpty() || !collected.add(typeElement.get())) {
                 continue;
             }
-            if (collected.add(typeElement.get())) {
-                queue.addAll(types.directSupertypes(current));
+            for (TypeMirror supertype : types.directSupertypes(current)) {
+                Optional<TypeElement> supertypeElement = MoreTypes.asTypeElement(supertype);
+                if (supertypeElement.isEmpty() || !isJdkType(supertypeElement.get())) {
+                    queue.add(supertype);
+                } else if (supertypeElement.get().getKind() == ElementKind.INTERFACE
+                        && isExposable(supertypeElement.get())) {
+                    collected.add(supertypeElement.get());
+                }
             }
         }
         return List.copyOf(collected);
+    }
+
+    private static boolean isExposable(TypeElement type) {
+        return !EXCLUDED_DEFAULT_EXPOSURES.contains(type.getQualifiedName().toString());
+    }
+
+    private static boolean isJdkType(TypeElement type) {
+        String name = type.getQualifiedName().toString();
+        return name.startsWith("java.") || name.startsWith("javax.");
     }
 
     private static boolean hasInjectingAnnotation(Element element) {
