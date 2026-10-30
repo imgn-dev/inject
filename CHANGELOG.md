@@ -160,6 +160,7 @@ the order the changes landed, each referencing its commits.
   another processor generates, or when another processor generated the factory
   interface. Recipes now stay known for later rounds, and a factory waits for a
   product of the same compilation until the last round.
+  ([72c7632](https://github.com/imgn-dev/inject/commit/72c7632))
 
 ## 0.1.0 — 2026-10-12
 
