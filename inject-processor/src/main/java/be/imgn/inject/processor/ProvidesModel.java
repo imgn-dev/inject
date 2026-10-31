@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
  * @param producedKeyType the parameterized collection key type expression for a Set/Map-returning method, or
  *     {@code null}
  * @param isDefault whether the method is a {@code @Default} fallback recipe
+ * @param isEager whether the method is {@code @Eager}: its singleton is built when the root injector is created
  * @param origin the {@code @Provides} method, which the factory is generated from
  */
 record ProvidesModel(
@@ -46,4 +47,5 @@ record ProvidesModel(
         @Nullable ContributionModel contribution,
         @Nullable CodeBlock producedKeyType,
         boolean isDefault,
+        boolean isEager,
         ExecutableElement origin) {}

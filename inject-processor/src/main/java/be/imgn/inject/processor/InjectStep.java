@@ -6,6 +6,7 @@ import be.imgn.gaia.processing.Step;
 import be.imgn.gaia.processing.source.JavaFile;
 import be.imgn.inject.AssistedFactory;
 import be.imgn.inject.Default;
+import be.imgn.inject.Eager;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -53,7 +54,8 @@ final class InjectStep implements Step {
                         ExposeAs.class,
                         IntoSet.class,
                         IntoMap.class,
-                        Default.class)
+                        Default.class,
+                        Eager.class)
                 .map(Class::getCanonicalName)
                 .collect(Collectors.toUnmodifiableSet());
     }

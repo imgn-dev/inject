@@ -31,6 +31,7 @@ import org.jspecify.annotations.Nullable;
  * @param preDestroy the bean's {@code @PreDestroy} method name, or {@code null}
  * @param interceptsAnnotation the annotation this bean intercepts (from {@code @Intercepts}), or {@code null}
  * @param interception the intercepted-proxy model, or {@code null} when the bean has no intercepted method
+ * @param eager whether the bean is {@code @Eager}: built when the root injector is created
  * @param origin the bean type, which the factory is generated from
  */
 record BeanModel(
@@ -52,4 +53,5 @@ record BeanModel(
         @Nullable String preDestroy,
         @Nullable ClassName interceptsAnnotation,
         @Nullable InterceptionModel interception,
+        boolean eager,
         TypeElement origin) {}

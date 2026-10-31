@@ -12,6 +12,7 @@ import be.imgn.gaia.processing.source.TypeVariableName;
 import be.imgn.inject.Assisted;
 import be.imgn.inject.ConditioningAnnotation;
 import be.imgn.inject.Default;
+import be.imgn.inject.Eager;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -25,6 +26,7 @@ import be.imgn.inject.PreDestroy;
 import be.imgn.inject.Provider;
 import be.imgn.inject.Provides;
 import be.imgn.inject.QualifyingAnnotation;
+import be.imgn.inject.Singleton;
 import be.imgn.inject.context.Context;
 import be.imgn.inject.context.Factory;
 import be.imgn.inject.context.MethodInterceptor;
@@ -135,6 +137,10 @@ final class ModelFactory {
         List<TypeName> exposedTypes = contribution != null ? List.of() : exposedTypes(bean, beanQualifier != null);
         ClassName interceptsAnnotation = interceptsAnnotation(bean);
         InterceptionModel interception = interception(bean, interceptsAnnotation);
+        boolean eager = MoreElements.isAnnotatedWith(bean, Eager.class);
+        if (eager) {
+            requireSingleton(bean, scope.orElse(null));
+        }
         return new BeanModel(
                 packageOf(bean),
                 ClassName.of(bean).generatedName("Factory").simpleName(),
@@ -154,7 +160,22 @@ final class ModelFactory {
                 callbacks.preDestroy(),
                 interceptsAnnotation,
                 interception,
+                eager,
                 bean);
+    }
+
+    /** Reports an {@code @Eager} bean whose scope is not {@code @Singleton}. */
+    private void requireSingleton(TypeElement bean, @Nullable ScopeDeclaration scope) {
+        if (scope != null && isSingleton(scope.type())) {
+            return;
+        }
+        String actual =
+                scope == null ? "unscoped" : "@" + scope.annotationType().getSimpleName();
+        diagnostics.on(bean).error("@Eager requires @Singleton: " + bean.getQualifiedName() + " is " + actual + ".");
+    }
+
+    private static boolean isSingleton(ClassName scope) {
+        return scope.canonicalName().equals(Singleton.class.getCanonicalName());
     }
 
     /**
@@ -235,6 +256,7 @@ final class ModelFactory {
                 callbacks.preDestroy(),
                 interceptsAnnotation,
                 interception(type, interceptsAnnotation),
+                false,
                 type);
     }
 
@@ -266,6 +288,10 @@ final class ModelFactory {
         CodeBlock producedKeyType = qualifier == null && exposedTypes.isEmpty() && contribution == null
                 ? collectionKeyExpression(method.getReturnType(), types)
                 : null;
+        boolean eager = MoreElements.isAnnotatedWith(method, Eager.class);
+        if (eager && !Annotations.scope(method).map(ModelFactory::isSingleton).orElse(false)) {
+            diagnostics.on(method).error("@Eager requires @Singleton on @Provides " + name + "().");
+        }
         return new ProvidesModel(
                 packageOf(host),
                 ClassName.generatedName(method, "Factory").simpleName(),
@@ -282,6 +308,7 @@ final class ModelFactory {
                 contribution,
                 producedKeyType,
                 MoreElements.isAnnotatedWith(method, Default.class),
+                eager,
                 method);
     }
 
@@ -298,8 +325,10 @@ final class ModelFactory {
             diagnostics
                     .on(bean)
                     .error(bean.getQualifiedName()
-                            + " has @Inject members but no @Inject constructor and no accessible no-argument"
-                            + " constructor.");
+                            + (MoreElements.isAnnotatedWith(bean, Eager.class)
+                                    ? " is @Eager but has"
+                                    : " has @Inject members but")
+                            + " no @Inject constructor and no accessible no-argument constructor.");
             valid = false;
         }
         for (Element enclosed : bean.getEnclosedElements()) {

@@ -40,7 +40,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code new DefaultContext()} loads all registered {@code Factory}, {@code Scope}, and {@code Condition} services.
  * The injector that owns this context attaches itself via {@link #setInjector(Injector)} immediately after
- * construction, which is what lets {@code Key.of(Injector.class)} resolve.
+ * construction, which is what lets {@code Key.of(Injector.class)} resolve, and builds the eager singletons
+ * ({@code Factory#isEager()}) still live in the registry.
  */
 public final class DefaultContext implements Context {
     private static final Key<?> INJECTOR_KEY = Key.of(Injector.class);
@@ -50,6 +51,8 @@ public final class DefaultContext implements Context {
     private final Map<Key<?>, BeanDefinition> definitions;
     private final List<BeanDefinition> allDefinitions;
     private final Map<Class<? extends Annotation>, InterceptorEntry> interceptors;
+    // The providers of the eager factories still live in the registry, built when the injector is attached.
+    private final List<Provider<?>> eager;
     private final Map<Class<? extends Annotation>, Scope> scopes;
     private final Map<Class<? extends Annotation>, List<HostRequirement>> hostRequirements;
     private final Map<Class<? extends Annotation>, List<HostScopeRequirement>> hostScopeRequirements;
@@ -116,12 +119,16 @@ public final class DefaultContext implements Context {
         List<ScopedProduct> products = new ArrayList<>();
         Map<Key<?>, List<Claim>> supertypeClaims = new LinkedHashMap<>();
         Map<Class<? extends Annotation>, InterceptorEntry> interceptorIndex = new HashMap<>();
+        List<EagerBean> eagerBeans = new ArrayList<>();
         for (Factory<?> factory : factories) {
             if (!conditionsPass(factory, conditionsByAnnotation, conditionContext)) {
                 // An unmatched condition removes the bean from the graph entirely
                 continue;
             }
             Provider<?> provider = wrap(factory, scopesByAnnotation);
+            if (factory.isEager()) {
+                eagerBeans.add(new EagerBean(factory, provider));
+            }
             products.addAll(factory.scopedProducts());
             Optional<Class<? extends Annotation>> intercepts = factory.intercepts();
             if (intercepts.isPresent()) {
@@ -245,6 +252,19 @@ public final class DefaultContext implements Context {
         this.definitions = Map.copyOf(definitionsByKey);
         this.allDefinitions = List.copyOf(definitionList);
         this.interceptors = Map.copyOf(interceptorIndex);
+        this.eager = live(eagerBeans, allDefinitions);
+    }
+
+    /**
+     * {@return the providers of the eager beans still in {@code definitions}} A default that lost its key and a bean
+     * every key of which an override shadows are not.
+     */
+    private static List<Provider<?>> live(List<EagerBean> eagerBeans, List<BeanDefinition> definitions) {
+        Set<BeanDefinition> live = Set.copyOf(definitions);
+        return eagerBeans.stream()
+                .filter(bean -> live.contains(bean.factory()))
+                .<Provider<?>>map(EagerBean::provider)
+                .toList();
     }
 
     /**
@@ -551,9 +571,12 @@ public final class DefaultContext implements Context {
     }
 
     /**
-     * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to, then resolves the
-     * {@link ConstructionListener}s. Called once by the injector that owns this context, immediately after
-     * construction.
+     * Attaches the {@link Injector} this context resolves {@code Key.of(Injector.class)} to, resolves the
+     * {@link ConstructionListener}s, then builds the eager singletons, which the listeners see. Called once by the
+     * injector that owns this context, immediately after construction.
+     *
+     * <p>When building a listener or an eager singleton fails, this context is closed, destroying the singletons
+     * already built, and the failure is thrown.
      *
      * @param injector the owning injector
      * @throws IllegalStateException if an injector is already attached
@@ -564,12 +587,29 @@ public final class DefaultContext implements Context {
             throw new IllegalStateException("An Injector is already attached to this Context.");
         }
         this.injector = injector;
+        AtomicBoolean started = new AtomicBoolean();
+        // A failure to close is added to the failure to start, which is thrown.
+        Destroyables.runAll(List.of(
+                () -> {
+                    start();
+                    started.set(true);
+                },
+                () -> {
+                    if (!started.get()) {
+                        close();
+                    }
+                }));
+    }
+
+    /** Resolves the listeners, then builds the eager singletons. */
+    private void start() {
         Provider<?> contributed = registry.get(LISTENERS_KEY);
         // The listeners and their dependencies, built here, are not reported: no listener exists yet.
         this.listeners = contributed == null
                 ? List.of()
                 : ((Set<?>) contributed.get())
                         .stream().map(ConstructionListener.class::cast).toList();
+        eager.forEach(Provider::get);
     }
 
     @Override
@@ -752,6 +792,9 @@ public final class DefaultContext implements Context {
 
     /** One buffered default binding: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
     private record PendingDefault(Factory<?> factory, Provider<?> provider) {}
+
+    /** One eager bean: its factory and its fully wrapped (scoped, cycle-guarded) provider. */
+    private record EagerBean(Factory<?> factory, Provider<?> provider) {}
 
     /** One indexed interceptor: the factory that declared it and its fully wrapped provider. */
     private record InterceptorEntry(Factory<?> factory, Provider<MethodInterceptor> provider) {}

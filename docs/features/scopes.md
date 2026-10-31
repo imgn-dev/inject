@@ -13,7 +13,8 @@ was meant to remove.
 The default is **prototype**: every resolution builds a new instance. Sharing
 is opt-in, declared where the bean is declared.
 
-`@Singleton` is built in — one instance per injector, created on first use,
+`@Singleton` is built in — one instance per injector, created on first use
+(or when the injector is created, for an [eager](eager-singletons.md) one),
 exactly once even under concurrent resolution:
 
 ```java

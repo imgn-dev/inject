@@ -66,6 +66,9 @@ final class BeanFactoryGenerator {
         if (model.interceptsAnnotation() != null) {
             type.addMethod(intercepts(model.interceptsAnnotation()));
         }
+        if (model.eager()) {
+            type.addMethod(isEager());
+        }
         addKeys(type, model);
         return JavaFile.newBuilder(model.packageName(), type.build()).build();
     }
@@ -210,6 +213,15 @@ final class BeanFactoryGenerator {
                 .addModifiers(Modifier.PROTECTED)
                 .returns(returnType)
                 .addStatement("return $T.of($T.class)", OPTIONAL, scopeAnnotation)
+                .build();
+    }
+
+    private static Method isEager() {
+        return Method.newBuilder("isEager")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(boolean.class)
+                .addStatement("return true")
                 .build();
     }
 

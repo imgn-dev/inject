@@ -37,6 +37,9 @@ injection and `@PostConstruct`. That covers singletons, unscoped beans,
 results, [interception](interception.md) proxies and
 [assisted](assisted-injection.md) products.
 
+[Eager singletons](eager-singletons.md) are built right after the listeners
+are resolved, so the listeners see them and their dependencies.
+
 The injector passed along is the one the instance belongs to: the root for a
 singleton, the child that built an unscoped bean, and for a child-local bean or
 a scoped assisted product, the child that hosts it.
@@ -50,5 +53,7 @@ a scoped assisted product, the child that hosts it.
   container did not build them.
 - A listener that throws fails the construction of that instance: it is neither
   cached nor destroyed, and the next resolution builds it again.
+- A listener that fails to build fails the injector's creation, after the
+  singletons already built are destroyed.
 - Every listener sees every instance: filtering, by type or otherwise, is the
   listener's job.

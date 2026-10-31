@@ -21,6 +21,8 @@ solves it, examples per use case, and its limitations.
   injection and `@PreDestroy` on injector close.
 - [Construction listeners](construction-listeners.md) — `ConstructionListener`
   contributions called with every instance the container builds.
+- [Eager singletons](eager-singletons.md) — `@Eager` singletons built when the
+  root injector is created.
 - [Method interception](interception.md) — `@InterceptingAnnotation` triggers
   and `@Intercepts` beans running around method calls, wired by a generated
   subclass.

@@ -171,6 +171,11 @@ the order the changes landed, each referencing its commits.
   inherits from one (`Writer` for a `StringWriter` subclass, `CommonDataSource`
   for a `DataSource`), now needs `@ExposeAs` or a `@Provides` method.
   ([f91df6b](https://github.com/imgn-dev/inject/commit/f91df6b))
+- **Eager singletons.** `@Eager` on a `@Singleton` bean or `@Provides` method
+  builds it when the root injector is created, right after the construction
+  listeners, so they see it. If building a listener or an eager singleton
+  fails, the singletons already built are now destroyed before the exception
+  propagates. `Factory` gains `isEager()`.
 
 ## 0.1.0 — 2026-10-12
 

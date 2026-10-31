@@ -55,6 +55,9 @@ final class ProvidesFactoryGenerator {
         if (model.isDefault()) {
             type.addMethod(isDefaultMethod());
         }
+        if (model.isEager()) {
+            type.addMethod(isEagerMethod());
+        }
         return JavaFile.newBuilder(model.packageName(), type.build()).build();
     }
 
@@ -210,6 +213,15 @@ final class ProvidesFactoryGenerator {
                 Qualifiers.instanceArgument(qualifier),
                 parameter.metadata(),
                 parameter.isProvider());
+    }
+
+    private static Method isEagerMethod() {
+        return Method.newBuilder("isEager")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PROTECTED)
+                .returns(boolean.class)
+                .addStatement("return true")
+                .build();
     }
 
     private static Method isDefaultMethod() {

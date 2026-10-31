@@ -211,7 +211,7 @@ public abstract class Factory<T> {
 Built on `be.imgn.gaia:gaia-processing`. `InjectProcessor` is a gaia `StepProcessor`
 with one step, `InjectStep`, which receives the elements annotated with the
 framework's annotations (`@Inject`, `@Provides`, `@Intercepts`, `@AssistedFactory`,
-`@ExposeAs`, `@IntoSet`, `@IntoMap`, `@Default`) and those carrying an annotation
+`@ExposeAs`, `@IntoSet`, `@IntoMap`, `@Default`, `@Eager`) and those carrying an annotation
 meta-annotated with `@InjectingAnnotation` or `@InterceptingAnnotation`. The
 processor therefore supports `*`, and claims nothing. An element whose signature
 names a type not generated yet, typically by another processor, is held back

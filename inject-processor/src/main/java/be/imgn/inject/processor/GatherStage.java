@@ -7,6 +7,7 @@ import be.imgn.gaia.processing.MoreElements;
 import be.imgn.gaia.processing.ProcessingContext;
 import be.imgn.inject.AssistedFactory;
 import be.imgn.inject.Default;
+import be.imgn.inject.Eager;
 import be.imgn.inject.ExposeAs;
 import be.imgn.inject.Inject;
 import be.imgn.inject.InjectingAnnotation;
@@ -70,6 +71,7 @@ final class GatherStage {
                 MoreElements.enclosingType(element).ifPresent(bean -> addBean(beanTypes, bean, element));
             }
         }
+        gatherEagerBeans(round, beanTypes);
         for (Element element : round.annotatedWith(ExposeAs.class.getCanonicalName())) {
             if (element.getKind() == ElementKind.METHOD && !MoreElements.isAnnotatedWith(element, Provides.class)) {
                 diagnostics.on(element).error("@ExposeAs on a method is only allowed together with @Provides.");
@@ -123,6 +125,11 @@ final class GatherStage {
                 // Assisted beans have no binding of their own: no BeanModel, no factory, no edges. They are
                 // reachable only through a generated @AssistedFactory implementation.
                 models.validateAssistedRecipe(bean);
+                if (MoreElements.isAnnotatedWith(bean, Eager.class)) {
+                    diagnostics
+                            .on(bean)
+                            .error("@Eager cannot mark an assisted product: only its @AssistedFactory builds it.");
+                }
                 // @PreDestroy needs a scope: the host of a scoped product destroys it when it closes.
                 models.lifecycleCallbacks(bean, models.scope(bean).isPresent(), true);
                 String key = bean.getQualifiedName().toString();
@@ -157,6 +164,22 @@ final class GatherStage {
                 assistedReferences,
                 interceptionRejected,
                 deferred);
+    }
+
+    /** Adds the round's {@code @Eager} classes to the beans, and reports {@code @Eager} where it cannot apply. */
+    private void gatherEagerBeans(AnnotatedElements round, Map<TypeElement, Set<Element>> beanTypes) {
+        for (Element element : round.annotatedWith(Eager.class.getCanonicalName())) {
+            if (element.getKind() == ElementKind.METHOD) {
+                if (!MoreElements.isAnnotatedWith(element, Provides.class)) {
+                    diagnostics.on(element).error("@Eager on a method requires @Provides.");
+                }
+            } else if ((element.getKind() == ElementKind.CLASS || element.getKind() == ElementKind.RECORD)
+                    && !element.getModifiers().contains(Modifier.ABSTRACT)) {
+                addBean(beanTypes, MoreElements.asType(element), element);
+            } else {
+                diagnostics.on(element).error("@Eager belongs on a concrete class or a @Provides method.");
+            }
+        }
     }
 
     private static void addBean(Map<TypeElement, Set<Element>> beanTypes, TypeElement bean, Element element) {
@@ -370,6 +393,9 @@ final class GatherStage {
                 // An assisted @Provides method has no binding of its own: skip factory generation, keep the
                 // recipe for @AssistedFactory link resolution.
                 models.validateAssistedRecipe(method);
+                if (MoreElements.isAnnotatedWith(method, Eager.class)) {
+                    diagnostics.on(method).error("@Eager cannot mark an assisted recipe.");
+                }
                 assistedRecipes
                         .computeIfAbsent(key, unused -> new ArrayList<>())
                         .add(new AssistedRecipe(host, method, method));

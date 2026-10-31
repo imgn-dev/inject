@@ -146,6 +146,8 @@ public interface Injector extends AutoCloseable {
      * @throws UnsatisfiedDependencyException if a bean depends on a key nothing binds; the message lists every such
      *     dependency. The dependencies of a bean of a child-local scope are checked when a child hosting that scope is
      *     built instead.
+     * @throws RuntimeException any exception thrown building a construction listener or an {@link Eager} singleton,
+     *     once the singletons already built are destroyed
      */
     static Injector create() {
         DefaultContext context = new DefaultContext();
@@ -236,6 +238,8 @@ public interface Injector extends AutoCloseable {
          * @throws UnsatisfiedDependencyException if a bean depends on a key that neither a discovered factory nor an
          *     override binds; the message lists every such dependency. The dependencies of a bean of a child-local
          *     scope are checked when a child hosting that scope is built instead.
+         * @throws RuntimeException any exception thrown building a construction listener or an {@link Eager} singleton,
+         *     once the singletons already built are destroyed
          */
         public Injector build() {
             DefaultContext context = new DefaultContext(Map.copyOf(overrides));

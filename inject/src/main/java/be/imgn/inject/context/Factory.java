@@ -176,6 +176,11 @@ public abstract class Factory<T> implements BeanDefinition {
         return false;
     }
 
+    /** {@return whether the root injector builds this factory's singleton when it is created; false by default} */
+    protected boolean isEager() {
+        return false;
+    }
+
     /**
      * {@return the products of child-local scope this factory creates; none by default}
      *
