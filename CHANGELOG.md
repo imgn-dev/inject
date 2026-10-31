@@ -176,6 +176,7 @@ the order the changes landed, each referencing its commits.
   listeners, so they see it. If building a listener or an eager singleton
   fails, the singletons already built are now destroyed before the exception
   propagates. `Factory` gains `isEager()`.
+  ([7d5ab8c](https://github.com/imgn-dev/inject/commit/7d5ab8c))
 
 ## 0.1.0 — 2026-10-12
 
