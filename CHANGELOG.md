@@ -3,7 +3,7 @@
 One section per release, newest first. Within a section, entries are listed in
 the order the changes landed, each referencing its commits.
 
-## Unreleased
+## 0.1.1 — 2026-11-01
 
 - **Processor supports newer source versions.** `InjectProcessor` declared
   `RELEASE_21` as its supported source version, so javac warned on every build
@@ -181,6 +181,8 @@ the order the changes landed, each referencing its commits.
 - **The Maven plugin requires Maven 3.10.0.** `inject-maven-plugin` builds
   against the Maven 3.10.0 API and depends on ASM 9.11.1.
   ([d88d2a9](https://github.com/imgn-dev/inject/commit/d88d2a9))
+- **Release 0.1.1.**
+  ([ccbea88](https://github.com/imgn-dev/inject/commit/ccbea88))
 
 ## 0.1.0 — 2026-10-12
 
