@@ -3,6 +3,14 @@
 One section per release, newest first. Within a section, entries are listed in
 the order the changes landed, each referencing its commits.
 
+## Unreleased
+
+- **A guide and API documentation online.** The guide, one page per feature,
+  and the API documentation of `inject` and `inject-processor` are published at
+  https://imgn-dev.github.io/inject/: `api/latest/`, `api/<version>/` for each
+  release, and `api/snapshot/` for `main`. New API carries `@since`.
+  ([77d5959](https://github.com/imgn-dev/inject/commit/77d5959))
+
 ## 0.1.1 — 2026-11-01
 
 - **Processor supports newer source versions.** `InjectProcessor` declared
