@@ -114,13 +114,13 @@ jobs:
         name: Build the documentation
         run: main/scripts/javadoc.sh source "$RUNNER_TEMP/site-input/javadoc"
 
-      # Versions before 0.1.2 have no guide.
+      # Versions before 0.1.2 have no guide: their docs directory is not a module.
       - if: env.ACTION == 'publish' || env.ACTION == 'guide'
         id: guide
         name: Build the guide
         working-directory: source
         run: |
-          if [[ -d docs ]]; then
+          if [[ -f docs/pom.xml ]]; then
             ./mvnw -B -ntp package -pl docs -am -DskipTests
             mkdir -p "$RUNNER_TEMP/site-input"
             cp -R docs/target/guide "$RUNNER_TEMP/site-input/guide"
