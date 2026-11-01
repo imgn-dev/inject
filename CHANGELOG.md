@@ -178,6 +178,9 @@ the order the changes landed, each referencing its commits.
   fails, the singletons already built are now destroyed before the exception
   propagates. `Factory` gains `isEager()`.
   ([7d5ab8c](https://github.com/imgn-dev/inject/commit/7d5ab8c))
+- **The Maven plugin requires Maven 3.10.0.** `inject-maven-plugin` builds
+  against the Maven 3.10.0 API and depends on ASM 9.11.1.
+  ([d88d2a9](https://github.com/imgn-dev/inject/commit/d88d2a9))
 
 ## 0.1.0 — 2026-10-12
 
