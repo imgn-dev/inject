@@ -1,0 +1,5 @@
+module:be.imgn.inject
+be.imgn.inject
+be.imgn.inject.context
+module:be.imgn.inject.processor
+be.imgn.inject.processor.spi
