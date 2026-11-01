@@ -7,7 +7,7 @@
     <parent>
         <groupId>be.imgn.inject</groupId>
         <artifactId>inject-parent</artifactId>
-        <version>0.1.1</version>
+        <version>0.1.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>inject-maven-plugin</artifactId>
