@@ -249,10 +249,10 @@ private void gatherEagerBeans(AnnotatedElements round, Map<TypeElement, Set<Elem
 ### Task 5: Documentation
 
 **Files:**
-- Create: `docs/features/eager-singletons.md`. Use the "The problem / How it solves it / Limitations" layout of the
+- Create: `docs/src/main/markdown/eager-singletons.md`. Use the "The problem / How it solves it / Limitations" layout of the
   other feature docs. Limitations: `@Singleton` only, order unspecified beyond dependencies, built on the creating
   thread, no switch to turn it off, and a listener's eager dependency isn't reported.
-- Modify: `docs/features/README.md` (link), `docs/features/construction-listeners.md` (eager singletons are reported;
+- Modify: `docs/src/main/markdown/index.md` (link), `docs/src/main/markdown/construction-listeners.md` (eager singletons are reported;
   link), and `CHANGELOG.md` (an entry under `## Unreleased`, with its hash added in a follow-up
   `docs: update the changelog` commit).
 - Modify: the main design spec's annotation table, if it lists the annotations in `be.imgn.inject`.

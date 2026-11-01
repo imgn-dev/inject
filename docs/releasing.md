@@ -22,6 +22,26 @@ be pinned the same way.
 `.github/dependabot.yml` opens weekly pull requests for Maven dependencies and
 GitHub Actions.
 
+## Documentation
+
+`.github/workflows/docs.yml` publishes to the `gh-pages` branch, served at
+https://imgn-dev.github.io/inject/:
+
+- `api/<version>/`, the API documentation of each released version, and
+  `api/latest/`, a copy of the newest one;
+- `api/snapshot/`, the API documentation of `main`, replaced on every push to
+  it;
+- `api/index.html`, the list of versions;
+- the guide, built by the `docs` module, at the root.
+
+`scripts/javadoc.sh` builds the API documentation of `inject` and
+`inject-processor` in one javadoc run, from the sources of any tag;
+`scripts/docs-site.sh` maintains the `gh-pages` tree. Run the workflow by hand
+to publish a version again (`replace`), to remove one that was never published
+to Central, or to publish the guide alone. Versions before 0.1.2 have no guide.
+The repository's Pages settings serve the `gh-pages` branch, which the first
+run creates.
+
 ## Releasing
 
 Manual, via the **Release** workflow in GitHub Actions, from `main`. It takes
@@ -36,7 +56,9 @@ the release version and the next development version, both
    with GPG, and uploads the bundle with `central-publishing-maven-plugin`;
 5. commits `Release X`, tags `vX`, sets the next `-SNAPSHOT` version, commits
    `Start Y-SNAPSHOT`, and pushes both commits and the tag;
-6. creates the GitHub release with generated notes.
+6. creates the GitHub release with generated notes;
+7. publishes the API documentation of the version and the guide on GitHub
+   Pages, through the API docs workflow (see [Documentation](#documentation)).
 
 `autoPublish` is false: the deployment waits in the
 [Central portal](https://central.sonatype.com/publishing/deployments) until a
@@ -65,7 +87,8 @@ already done, so it is safe to re-run.
 Release workflow does, locally, with no GitHub Actions minutes: the same
 version checks, `versions:set`, `clean verify`, `-Prelease deploy`, release
 commit and tag, next `-SNAPSHOT` commit, push, and a GitHub release through
-`gh`, which uses no Actions minutes.
+`gh`, which uses no Actions minutes. It does not publish the documentation: run the
+API docs workflow by hand afterwards.
 
 ```bash
 scripts/release.sh --dry-run 0.1.0 0.2.0   # every prompt and the same build; upload nothing

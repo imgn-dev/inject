@@ -20,7 +20,7 @@
 - Checkstyle forbids fully-qualified names in code — import instead.
 - Tests use AssertJ **fluent chaining**: one `assertThat(subject)` with chained assertions, not repeated `assertThat` calls on the same object.
 - Generated types live in the target's package; names are `$` + enclosing-class chain joined by `$` + `$$<Kind>`. Interception adds the `$$Intercepted` kind.
-- Docs are part of the change: a feature is not done until `docs/features/` describes the current state.
+- Docs are part of the change: a feature is not done until `docs/src/main/markdown/` describes the current state.
 
 ## File Structure
 
@@ -59,7 +59,7 @@
 **New — examples and docs**
 - `inject-examples/.../Timed.java`, `Audited.java`, `CallLog.java`, `TimingInterceptor.java`, `AuditInterceptor.java`, `Checkout.java`, and `InterceptionExampleTest.java`.
 - `inject-examples-module/.../Traced.java`, `TracingInterceptor.java`, `TracedService.java` + `module-info.java` `provides` entries.
-- `docs/features/interception.md`, plus edits to `docs/features/README.md` and `docs/features/type-exposure.md`.
+- `docs/src/main/markdown/interception.md`, plus edits to `docs/src/main/markdown/index.md` and `docs/src/main/markdown/type-exposure.md`.
 
 ---
 
@@ -2934,9 +2934,9 @@ Proves the feature on both the classpath and the module path — the module-path
 - Create: `inject-examples-module/src/main/java/be/imgn/inject/examples/modular/TracingInterceptor.java`
 - Create: `inject-examples-module/src/main/java/be/imgn/inject/examples/modular/TracedService.java`
 - Modify: `inject-examples-module/src/main/java/module-info.java`
-- Create: `docs/features/interception.md`
-- Modify: `docs/features/README.md`
-- Modify: `docs/features/type-exposure.md`
+- Create: `docs/src/main/markdown/interception.md`
+- Modify: `docs/src/main/markdown/index.md`
+- Modify: `docs/src/main/markdown/type-exposure.md`
 
 **Interfaces:**
 - Consumes: everything from Tasks 1–5.
@@ -3276,7 +3276,7 @@ If the module has no test source set, verify through the existing module-path ru
 
 - [ ] **Step 6: Write the feature documentation**
 
-Create `docs/features/interception.md`:
+Create `docs/src/main/markdown/interception.md`:
 
 ```markdown
 # Method Interception
@@ -3414,7 +3414,7 @@ public Object invoke(MethodInvocation invocation) throws Throwable {
 
 - [ ] **Step 7: Update the documentation index and the exposure page**
 
-In `docs/features/README.md`, add under "Declaring beans", after the lifecycle-callbacks entry:
+In `docs/src/main/markdown/index.md`, add under "Declaring beans", after the lifecycle-callbacks entry:
 
 ```markdown
 - [Method interception](interception.md) — `@InterceptingAnnotation` triggers
@@ -3422,7 +3422,7 @@ In `docs/features/README.md`, add under "Declaring beans", after the lifecycle-c
   subclass.
 ```
 
-In `docs/features/type-exposure.md`, extend the excluded-contracts sentence so it states the current list:
+In `docs/src/main/markdown/type-exposure.md`, extend the excluded-contracts sentence so it states the current list:
 
 ```markdown
 Universal contracts are excluded from that default so they never become
@@ -3443,7 +3443,7 @@ Expected: `BUILD SUCCESS`, `exit=0`, with the module-path example run passing.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add inject-examples inject-examples-module docs/features
+git add inject-examples inject-examples-module docs/src/main/markdown
 git commit -m "feat(examples): interception examples and feature documentation"
 ```
 

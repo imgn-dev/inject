@@ -1,0 +1,230 @@
+name: API docs
+
+# Publishes or removes the API documentation of a released version on the
+# gh-pages branch, served at https://imgn-dev.github.io/inject/api/, and publishes
+# the guide of the newest version at https://imgn-dev.github.io/inject/. The
+# release workflow calls it; run it by hand to publish an older version again,
+# to remove one that was never published to Maven Central, or to publish the
+# guide alone, from a branch, between releases. Every push to main replaces
+# the API documentation of the snapshot, at api/snapshot/.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'With publish or remove: released version, MAJOR.MINOR.PATCH, e.g. 0.1.0'
+        required: false
+        type: string
+      action:
+        description: 'publish the documentation of the version, remove it, or publish the guide alone'
+        required: true
+        type: choice
+        options:
+          - publish
+          - remove
+          - guide
+        default: publish
+      ref:
+        description: 'With guide: the branch or tag to build the guide from (default: the default branch)'
+        required: false
+        type: string
+        default: ''
+      replace:
+        description: 'With publish: replace the documentation of a version already published'
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+# Nothing by default: each job asks for what it needs.
+permissions: {}
+
+env:
+  VERSION: ${{ inputs.version }}
+  # A call from the release workflow always publishes, and never replaces.
+  ACTION: ${{ github.event_name == 'push' && 'snapshot' || inputs.action || 'publish' }}
+
+jobs:
+  # Runs the build, so it gets a read-only token that is not even kept on disk:
+  # a compromised plugin or dependency cannot push anything.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.snapshot.outputs.skip }}
+      snapshot-version: ${{ steps.snapshot.outputs.version }}
+      snapshot-commit: ${{ steps.snapshot.outputs.commit }}
+      guide-commit: ${{ steps.guide.outputs.commit }}
+    steps:
+      - if: env.ACTION == 'publish' || env.ACTION == 'remove'
+        name: Check version format
+        run: |
+          if [[ ! $VERSION =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::version is '$VERSION'. It must be MAJOR.MINOR.PATCH, e.g. 0.1.0, and nothing else."
+            exit 1
+          fi
+
+      # The scripts of the default branch work on the sources of any tag.
+      - if: env.ACTION != 'remove'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: main
+          persist-credentials: false
+
+      - if: env.ACTION != 'remove'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.ACTION == 'snapshot' && github.sha || env.ACTION == 'guide' && (inputs.ref || github.event.repository.default_branch) || format('v{0}', inputs.version) }}
+          path: source
+          persist-credentials: false
+
+      # A release pushes its own commit and the next snapshot's together, so the
+      # pushed commit is a snapshot unless main was set to a release by hand.
+      - if: env.ACTION == 'snapshot'
+        id: snapshot
+        name: Check snapshot version
+        working-directory: source
+        run: |
+          # The project's version is the first <version> after the parent's.
+          version=$(awk '/<\/parent>/ { found = 1 } found && /<version>/ { gsub(/.*<version>|<\/version>.*/, ""); print; exit }' pom.xml)
+          if [[ $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-SNAPSHOT$ ]]; then
+            echo "version=$version" >>"$GITHUB_OUTPUT"
+            echo "commit=$(git rev-parse --short HEAD)" >>"$GITHUB_OUTPUT"
+          else
+            echo "The version is '$version', not a snapshot: nothing to publish."
+            echo 'skip=true' >>"$GITHUB_OUTPUT"
+            echo 'SKIP=true' >>"$GITHUB_ENV"
+          fi
+
+      - if: env.ACTION != 'remove' && env.SKIP != 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - if: (env.ACTION == 'publish' || env.ACTION == 'snapshot') && env.SKIP != 'true'
+        name: Build the documentation
+        run: main/scripts/javadoc.sh source "$RUNNER_TEMP/site-input/javadoc"
+
+      # Versions before 0.1.2 have no guide.
+      - if: env.ACTION == 'publish' || env.ACTION == 'guide'
+        id: guide
+        name: Build the guide
+        working-directory: source
+        run: |
+          if [[ -d docs ]]; then
+            ./mvnw -B -ntp package -pl docs -am -DskipTests
+            mkdir -p "$RUNNER_TEMP/site-input"
+            cp -R docs/target/guide "$RUNNER_TEMP/site-input/guide"
+            echo "commit=$(git rev-parse --short HEAD)" >>"$GITHUB_OUTPUT"
+          elif [[ $ACTION == guide ]]; then
+            echo '::error::This ref has no guide.'
+            exit 1
+          else
+            echo 'This version has no guide.'
+          fi
+
+      - if: env.ACTION != 'remove' && env.SKIP != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-input
+          path: ${{ runner.temp }}/site-input
+          if-no-files-found: error
+          retention-days: 1
+
+  # Pushes to gh-pages, so it runs none of the build: only the scripts of the
+  # default branch, on what the build job produced.
+  publish:
+    needs: build
+    if: needs.build.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    # A pending snapshot gives way to a newer one, as GitHub keeps one pending
+    # run per group. Any other run, a release's among them, has a group of its
+    # own so that it is never cancelled; the push below rebases on a run that
+    # pushed meanwhile.
+    concurrency:
+      group: ${{ github.event_name == 'push' && 'docs-snapshot' || format('docs-{0}', github.run_id) }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      REPLACE: ${{ inputs.replace && '--replace' || '' }}
+      SNAPSHOT_VERSION: ${{ needs.build.outputs.snapshot-version }}
+      SNAPSHOT_COMMIT: ${{ needs.build.outputs.snapshot-commit }}
+      GUIDE_COMMIT: ${{ needs.build.outputs.guide-commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: main
+
+      - if: env.ACTION != 'remove'
+        uses: actions/download-artifact@v8
+        with:
+          name: site-input
+          path: ${{ runner.temp }}/site-input
+
+      - name: Check out gh-pages
+        working-directory: main
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth=1 origin gh-pages:gh-pages; then
+            git worktree add ../site gh-pages
+          else
+            echo 'No gh-pages branch yet: starting it.'
+            git worktree add --orphan -b gh-pages ../site
+          fi
+
+      - name: Update the site
+        run: |
+          input=$RUNNER_TEMP/site-input
+          case $ACTION in
+          publish)
+            main/scripts/docs-site.sh publish site "$VERSION" "$input/javadoc" $REPLACE
+            if [[ -d $input/guide ]]; then
+              main/scripts/docs-site.sh guide site "$input/guide" "$VERSION"
+            fi
+            ;;
+          guide)
+            main/scripts/docs-site.sh guide site "$input/guide"
+            ;;
+          snapshot)
+            main/scripts/docs-site.sh snapshot site "$input/javadoc"
+            ;;
+          remove)
+            main/scripts/docs-site.sh remove site "$VERSION"
+            ;;
+          esac
+
+      - name: Push gh-pages
+        working-directory: site
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nothing changed.'
+            exit 0
+          fi
+          case $ACTION in
+          publish) git commit -m "docs: publish the documentation of $VERSION" ;;
+          guide)   git commit -m "docs: publish the guide of $GUIDE_COMMIT" ;;
+          snapshot) git commit -m "docs: publish the API of $SNAPSHOT_VERSION ($SNAPSHOT_COMMIT)" ;;
+          remove)  git commit -m "docs: remove the API of $VERSION" ;;
+          esac
+          # Another run may have pushed meanwhile: runs mostly publish different
+          # directories, so its commit is rebased on; a conflict fails the step.
+          for attempt in 1 2 3; do
+            if git push origin gh-pages; then
+              exit 0
+            fi
+            git pull --rebase origin gh-pages
+          done
+          git push origin gh-pages

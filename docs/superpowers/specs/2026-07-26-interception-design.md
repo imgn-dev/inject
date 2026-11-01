@@ -344,7 +344,7 @@ Shape rules for overrides:
 - **End-to-end examples**: `inject-examples` gets `@Timed` and `@Audited` on one bean demonstrating order, with an
   interceptor holding an injected collaborator; `inject-examples-module` gets one interceptor, proving no new
   `provides` directive is required.
-- **Docs**: new `docs/features/interception.md` plus its README entry; `docs/features/type-exposure.md` updated,
+- **Docs**: new `docs/src/main/markdown/interception.md` plus its README entry; `docs/src/main/markdown/type-exposure.md` updated,
   since its excluded-contracts list is user-visible and `MethodInterceptor` joins it.
 
 ## Decisions log

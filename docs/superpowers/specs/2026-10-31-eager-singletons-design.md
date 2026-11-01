@@ -146,7 +146,7 @@ limitations), and the bus must not depend on any subscriber.
 
 ## Documentation
 
-- New `docs/features/eager-singletons.md`, linked from `docs/features/README.md`.
+- New `docs/src/main/markdown/eager-singletons.md`, linked from `docs/src/main/markdown/index.md`.
 - `construction-listeners.md`: a line saying eager singletons are reported.
 - Javadoc on `@Eager`, `Factory.isEager()`, `Injector.create()` and `Builder.build()` (`@throws`).
 - A changelog entry.

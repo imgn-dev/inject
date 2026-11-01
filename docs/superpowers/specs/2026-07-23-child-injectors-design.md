@@ -14,7 +14,7 @@ provider bindings first and falls back to its parent, while the parent stays unt
 
 Out of scope (v1): child-registered factories or ServiceLoader layers, child contributions to collections, per-child
 condition re-evaluation. Child-local scopes, hosted by `scopedChildBuilder(scope)`, are described in
-`docs/features/scopes.md` and `docs/features/child-injectors.md`.
+`docs/src/main/markdown/scopes.md` and `docs/src/main/markdown/child-injectors.md`.
 
 ## User-facing API
 

@@ -28,6 +28,21 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
   asides ("this is because we previously had an issue with X"): if the issue is
   gone, the reference is noise. Delete it.
 - When code changes, update its docs in the same change. Stale docs are a defect.
+- `README.md` says only what inject does and how to use it.
+- The guide is the `docs` module (`inject-docs`, never deployed): one page per
+  feature in `docs/src/main/markdown`, in the navigation order of `pages.txt`.
+  Pages link to each other (`scopes.md#custom-scopes`), to the API
+  (`api:be.imgn.inject.Injector`) or to the web; the build fails on any other
+  link, a broken one, an image or raw HTML.
+- `.github/workflows/docs.yml` publishes the guide and the API documentation
+  (`scripts/javadoc.sh`, one javadoc run over `inject` and `inject-processor`)
+  on GitHub Pages: `api/snapshot/` on every push to `main`, `api/<version>/`
+  and `api/latest/` when `release.yml` calls it.
+- `WONTDO.md` lists rejected features, with the reason and what to use
+  instead. Read it before proposing API; add to it when a feature is rejected.
+- Javadoc: `@since <version>` on every new public type or member, from 0.1.2
+  on; the API of earlier versions has none. JDK links are offline, from
+  `scripts/jdk-21/element-list`, so no build reaches docs.oracle.com.
 
 ## Changelog
 

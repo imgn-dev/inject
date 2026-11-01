@@ -129,3 +129,15 @@ jobs:
         run: |
           gh release create 'v${{ inputs.releaseVersion }}' \
             --title 'v${{ inputs.releaseVersion }}' --generate-notes
+
+  # Built from the tag, so it does not wait for the deployment to be published
+  # in the Central portal. If it never is, remove the documentation with the
+  # API docs workflow.
+  docs:
+    needs: release
+    permissions:
+      # The publish job of the API docs workflow pushes to gh-pages.
+      contents: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      version: ${{ inputs.releaseVersion }}
