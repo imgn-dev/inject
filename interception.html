@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method Interception · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html" aria-current="page">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="method-interception">Method Interception</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Timing, auditing, retries, and transactions are the same few lines wrapped
+around many methods. Written by hand they are copied into every method that
+needs them; written with a reflective proxy they cost the zero-reflection
+guarantee.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>An annotation meta-annotated <code>@InterceptingAnnotation</code> marks calls to route
+through interceptors. The processor emits a subclass of the bean that
+overrides each intercepted method and dispatches through a chain to <code>super</code>:</p>
+<pre><code class="language-java">@InterceptingAnnotation
+@Retention(RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface Timed {
+    String value() default &quot;&quot;;
+}
+</code></pre>
+<p>The interceptor is an ordinary bean marked <code>@Intercepts</code>, so it is injected,
+scoped, and conditioned like any other:</p>
+<pre><code class="language-java">@Singleton
+@Intercepts(Timed.class)
+public final class TimingInterceptor implements MethodInterceptor {
+
+    private final Metrics metrics;
+
+    @Inject
+    public TimingInterceptor(Metrics metrics) {
+        this.metrics = metrics;
+    }
+
+    @Override
+    public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
+        long start = System.nanoTime();
+        try {
+            return invocation.proceed();
+        } finally {
+            metrics.record(invocation.annotation().stringValue(&quot;value&quot;).orElse(invocation.methodName()),
+                    System.nanoTime() - start);
+        }
+    }
+}
+</code></pre>
+<p>The bean itself changes only by being subclassable:</p>
+<pre><code class="language-java">public class OrderService {
+
+    @Inject
+    public OrderService(Repo repo) { ... }
+
+    @Timed(&quot;place&quot;)
+    public Order place(Cart cart) { ... }
+}
+</code></pre>
+<p>Because the generated proxy <em>is</em> the instance the injector hands out, member
+injection, <code>@PostConstruct</code>, scoping, and destruction are unaffected, and a
+call from one bean method to another is intercepted too.</p>
+<h3 id="placement-and-order">Placement and order</h3>
+<p>A class-level annotation sweeps every declared method that is not <code>private</code>,
+<code>static</code>, or <code>final</code>, skipping <code>Object</code> methods, <code>@Provides</code> methods, and
+<code>@Inject</code> / <code>@PostConstruct</code> / <code>@PreDestroy</code> methods. A method-level
+annotation applies to that method alone.</p>
+<p>Interceptors run in source order, first listed outermost, and class-level
+annotations wrap method-level ones:</p>
+<pre><code class="language-java">@Retry
+public class OrderService {
+
+    @Secured
+    @Timed
+    public Order place(Cart cart) { ... }
+}
+</code></pre>
+<p>runs <code>Retry → Secured → Timed → place</code>. Declaring the same annotation at both
+levels replaces the class-level one in place, so a method can retune
+<code>@Timed(&quot;checkout&quot;)</code> without inheriting <code>@Timed(&quot;&quot;)</code> as well.</p>
+<h3 id="reading-and-substituting-arguments">Reading and substituting arguments</h3>
+<p><code>MethodInvocation</code> exposes the call site as compile-time constants — no
+<code>java.lang.reflect.Method</code> anywhere — and <code>proceed(Object...)</code> substitutes
+arguments for the rest of the chain, validating count and types:</p>
+<pre><code class="language-java">@Override
+public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
+    String raw = (String) invocation.arguments().get(0);
+    return invocation.proceed(raw.strip());
+}
+</code></pre>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>The bean must be subclassable. A <code>final</code> class, a <code>record</code>, an <code>enum</code>, a
+<code>sealed</code> class, and a generic class are each a compile error naming the
+reason; so is a <code>final</code>, <code>static</code>, or <code>private</code> method carrying the
+annotation.</li>
+<li>A method whose <code>throws</code> clause contains a type variable (for example
+<code>&lt;E extends Exception&gt; void run() throws E</code>) cannot be intercepted — a type
+variable cannot be a <code>catch</code> parameter. A class-level sweep skips such a
+method silently; annotating it directly is a compile error.</li>
+<li>An intercepting annotation is honoured on types and methods only: placing
+one on a field or a parameter has no effect.</li>
+<li>Only method calls are intercepted: no constructor or field interception, and
+an interceptor cannot add methods a bean does not declare.</li>
+<li>Calls made from the bean's own constructor are not intercepted — the chain
+is assigned after <code>super(...)</code> returns, so a constructor-time call falls
+through to the bean's own implementation. The chain is live by the time the
+container runs <code>@Inject</code> methods, field injection, and <code>@PostConstruct</code>, so a
+call made from any of those <strong>is</strong> intercepted. <code>@Inject</code> methods run before
+field injection, so an interceptor invoked from one may observe a bean whose
+<code>@Inject</code> fields are still null.</li>
+<li>A <code>synchronized</code> intercepted method still holds its monitor for the call
+into <code>super</code>, but the interceptors themselves run outside that lock.</li>
+<li>Inherited methods are not swept; a class-level annotation covers declared
+methods only, consistent with
+<a href="injection.html">member injection</a> and <a href="lifecycle-callbacks.html">lifecycle callbacks</a>.</li>
+<li><a href="provides-methods.html"><code>@Provides</code></a> products and
+<a href="assisted-injection.html">assisted</a> beans cannot be intercepted: the container
+does not construct them.</li>
+<li><a href="builder-overrides.html">Builder overrides</a> of an intercepted bean bypass
+interception entirely — an override binds a raw instance, and nothing
+proxies it. Overriding the <em>interceptor</em> bean itself is different: it gets
+test overrides for free, replacing it in every chain it participates in, not
+just direct resolution — but only when the override targets the
+interceptor's own key (<code>Key.of(TheInterceptor.class)</code>); an override bound
+under a qualifier or a supertype key is not picked up by the chain. This
+reach-the-chain behaviour is for <code>Injector.builder()</code> overrides only: a
+<a href="child-injectors.html">child injector</a>'s binding for the interceptor's own key
+shadows direct resolution through the child but leaves every chain — the
+parent's and the child's — running the original interceptor.</li>
+<li>There is no ordering attribute: the bean's author fixes the order by writing
+the annotations in the order they should run.</li>
+<li>An intercepting annotation with no <code>@Intercepts</code> bean fails when the bean is
+constructed, with <code>InterceptorResolutionException</code> naming the annotation and
+the intercepted method, not at compile time and not deferred until an
+intercepted method is actually called — the chain is bound in the generated
+proxy's constructor. The interceptor may legitimately live in another
+artifact.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

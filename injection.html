@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero-Reflection Injection · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html" aria-current="page">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="zero-reflection-injection">Zero-Reflection Injection</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Wiring an object graph by hand means every constructor call site repeats the
+same assembly code, and every new dependency ripples through all of them.
+Automating that wiring usually costs something at runtime: scanning classes,
+inspecting members, bypassing visibility. Those costs grow with the graph and
+resist ahead-of-time analysis.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>All wiring code is generated at compile time. An annotation processor emits one
+<code>Factory</code> subclass per injectable class — plain Java source, compiled along with
+the rest of the build. At runtime the framework only calls those generated
+factories; it never inspects a class.</p>
+<p>A class opts in by annotating its injection points with <code>@Inject</code>:</p>
+<ul>
+<li><strong>Constructor</strong> — exactly one constructor carries <code>@Inject</code>; its parameters
+are resolved and passed in.</li>
+<li><strong>Methods</strong> — after construction, each <code>@Inject</code> instance method is called
+with resolved arguments.</li>
+<li><strong>Fields</strong> — each <code>@Inject</code> field is assigned a resolved value.</li>
+</ul>
+<pre><code class="language-java">public final class GreetingService {
+    private final Registry registry;
+
+    @Inject
+    Clock clock; // field injection
+
+    @Inject
+    public GreetingService(Registry registry) { // constructor injection
+        this.registry = registry;
+    }
+
+    @Inject
+    void connect(Notifier notifier) { // method injection
+        // called after construction with a resolved Notifier
+    }
+}
+</code></pre>
+<p>The generated factory is emitted <strong>into the bean's own package</strong>, so it can
+legally call package-private constructors, methods, and fields. Visibility is
+enforced by the Java compiler at build time, not worked around at runtime.</p>
+<p>Generated factories are discovered through <code>ServiceLoader</code>. Creating an
+injector loads them and builds the binding registry once; the registry is
+immutable afterwards and safe for concurrent use:</p>
+<pre><code class="language-java">Injector injector = Injector.create();
+GreetingService service = injector.getInstance(GreetingService.class);
+</code></pre>
+<p>Because wiring is ordinary generated code, mistakes the processor can see —
+a missing <code>@Inject</code> constructor, a marker misused — are reported as compile
+errors, with no cost deferred to runtime.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>
+<p><code>private</code> members cannot be injected: the generated factory is a separate
+class in the same package, so it reaches package-private members but not
+private ones.</p>
+</li>
+<li>
+<p>New instances are created per resolution by default (see
+<a href="scopes.html">scopes</a>); nothing is cached unless a scope says so.</p>
+</li>
+<li>
+<p>The graph is assembled from whatever factories <code>ServiceLoader</code> finds at
+runtime, plus any <a href="builder-overrides.html">builder bindings</a>. Creating the
+injector checks that every bean's dependencies are bound, and fails with one
+<code>UnsatisfiedDependencyException</code> listing every missing one. A key requested
+directly from the injector but never bound fails on that request.</p>
+</li>
+<li>
+<p>A class without an <code>@Inject</code> constructor gets a generated default factory
+only when something in the same compilation depends on it, nothing in that
+compilation binds it already (a <code>@Provides</code> method or a bean's exposed
+type), and it is a concrete class with an accessible no-argument
+constructor. Any other dependency — a type you do not control, or a value
+such as a configuration record — is supplied through a
+<a href="provides-methods.html"><code>@Provides</code> method</a> or a
+<a href="builder-overrides.html">builder binding</a>.</p>
+</li>
+<li>
+<p>The annotation processor reads every annotation and claims none, so other
+processors still see them all. javac's <code>processing</code> lint reports each
+annotation no processor claims (<code>No processor claimed any of these annotations: …</code>), which fails a build compiling with <code>-Xlint:all -Werror</code>.
+Disable that one category with <code>-Xlint:all,-processing</code>:</p>
+<pre><code class="language-xml">&lt;compilerArgs&gt;
+    &lt;arg&gt;-Xlint:all,-processing&lt;/arg&gt;
+    &lt;arg&gt;-Werror&lt;/arg&gt;
+&lt;/compilerArgs&gt;
+</code></pre>
+</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

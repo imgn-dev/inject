@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Provider&lt;T&gt; Injection · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html" aria-current="page">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="providert-injection"><code>Provider&lt;T&gt;</code> Injection</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Plain injection hands a consumer one instance, built before the consumer
+exists. That is wrong when the consumer needs an instance <em>later</em> (deferred,
+possibly never), or needs <em>several</em> over its lifetime (one per unit of work),
+or when eager construction of a heavy dependency would slow down building the
+consumer itself.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>Declaring a dependency as <code>Provider&lt;T&gt;</code> instead of <code>T</code> injects the resolution
+handle rather than a resolved value. Each <code>get()</code> performs a fresh resolution:</p>
+<pre><code class="language-java">public final class GreetingService {
+    private final Provider&lt;Clock&gt; clock;
+
+    @Inject
+    public GreetingService(Provider&lt;Clock&gt; clock) {
+        this.clock = clock;
+    }
+
+    public Clock now() {
+        return clock.get(); // resolved here, on every call
+    }
+}
+</code></pre>
+<p><code>Provider</code> is a <code>@FunctionalInterface</code> with a single method, <code>T get()</code>.</p>
+<p>Scope still governs what <code>get()</code> returns: a provider of a prototype bean
+builds a new instance per call; a provider of a <code>@Singleton</code> returns the one
+shared instance every time. <code>Provider</code> defers <em>when</em> resolution happens, the
+scope decides <em>what</em> it yields.</p>
+<p>Providers are also available programmatically without declaring a dependency:</p>
+<pre><code class="language-java">Provider&lt;Registry&gt; registries = injector.getProvider(Registry.class);
+</code></pre>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><code>get()</code> resolves through the registry every call. There is no memoizing
+wrapper that caches the first result at the injection point; caching is the
+bean's scope's job, or the caller's.</li>
+<li>A <code>Provider</code> obtained from a live injector never reports absence: if the
+binding is missing, <code>get()</code> throws <code>UnsatisfiedDependencyException</code> — the
+provider is not a presence probe (see
+<a href="injector-injection.html">injector injection</a> for probing).</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

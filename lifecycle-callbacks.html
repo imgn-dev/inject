@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lifecycle callbacks · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html" aria-current="page">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="lifecycle-callbacks">Lifecycle callbacks</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Construction is not always the whole of setup. A bean may need a step that runs
+only once every dependency is in place — open a connection, warm a cache,
+register a listener — which a constructor cannot do while fields are still being
+injected. And some beans hold resources that must be released: a pool to drain,
+a file to flush, a thread to stop. Leaving that to the caller reintroduces the
+manual bookkeeping the container was meant to remove.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>Two method annotations, run by the generated factory — no reflection.</p>
+<p><code>@PostConstruct</code> marks the method invoked once the bean is fully built: after
+the constructor, <code>@Inject</code> methods, and <code>@Inject</code> fields, as the last step of
+construction.</p>
+<pre><code class="language-java">@Singleton
+public final class Db {
+    private final Config config;
+
+    @Inject
+    public Db(Config config) {
+        this.config = config;
+    }
+
+    @PostConstruct
+    void connect() {
+        // every dependency is set; safe to use config here
+    }
+}
+</code></pre>
+<p><code>@PreDestroy</code> marks the method invoked when the owning injector closes.
+<code>Injector</code> is <code>AutoCloseable</code>, so the natural shape is try-with-resources:</p>
+<pre><code class="language-java">@Singleton
+public final class Db {
+    @PreDestroy
+    void disconnect() { ... }
+}
+</code></pre>
+<pre><code class="language-java">try (Injector app = Injector.create()) {
+    app.getInstance(Db.class);   // @PostConstruct connect() runs here, on first use
+}                                // close(): @PreDestroy disconnect() runs
+</code></pre>
+<p><code>close()</code> invokes <code>@PreDestroy</code> on every scoped instance the injector actually
+created, in <strong>reverse creation order</strong> — so a bean is destroyed before the
+dependencies it was built from. It is idempotent, and resolving through a closed
+injector fails fast. If a callback throws, the remaining beans are still
+destroyed and the first failure propagates with the rest attached as suppressed
+exceptions.</p>
+<p>Only instances that were created are destroyed: a singleton never resolved is
+never touched. The container tracks nothing beyond scoped beans that declare a
+<code>@PreDestroy</code>, so a prototype-heavy graph carries no bookkeeping.</p>
+<p>The owning injector of a bean of a <a href="child-injectors.html#child-local-scopes">child-local scope</a>
+is the child that hosts it. Closing a child closes its live children first,
+newest first, then destroys its own instances, in reverse creation order, with
+the same handling of failures; closing the root closes its live children the
+same way. After closing, resolving through the child fails fast, and so does
+<code>get()</code> on any <code>Provider</code> obtained through it; building a child under a closed
+injector fails too.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><code>@PreDestroy</code> requires a scoped bean. On a prototype or an unscoped
+<a href="assisted-injection.html">assisted</a> bean it is a compile error, not a silent
+no-op: those instances are caller-owned, and the container never sees them
+again to destroy them. A prototype that owns a resource should implement
+<code>AutoCloseable</code> and be closed by whoever requested it. An assisted product
+with a child-local scope is destroyed when its host closes.</li>
+<li><code>@PostConstruct</code> runs for constructor-built beans — including assisted beans
+and beans rebuilt through a <a href="child-injectors.html">child injector</a>. It does not
+run for <a href="provides-methods.html"><code>@Provides</code></a> results; the provider method already
+runs arbitrary code and can call the initializer itself.</li>
+<li>At most one <code>@PostConstruct</code> and one <code>@PreDestroy</code> per class. Each must be a
+non-private, non-static, no-argument <code>void</code> method declared on the bean
+itself; inherited callbacks are not collected.</li>
+<li>Closing a <a href="child-injectors.html">child injector</a> never closes its parent. The
+beans of other scopes that a child resolves belong to the injector that
+declared them, and are destroyed when it closes; unscoped beans a child builds
+are never tracked.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

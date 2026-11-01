@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Builder Overrides · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html" aria-current="page">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="builder-overrides">Builder Overrides</h1>
+<h2 id="the-problem">The problem</h2>
+<p>The graph that <code>ServiceLoader</code> discovers is the production graph. A test — or
+a <code>main</code> method wiring a simulation — often needs that exact graph with a few
+bindings replaced: the real gateway swapped for a recording fake, a clock
+pinned to a fixed instant. Editing the beans to make them swappable would
+pollute production code for the test's benefit.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p><code>Injector.builder()</code> creates an injector from the same discovered factories,
+with explicit bindings that <strong>shadow</strong> any discovered binding for the same
+key. Overrides win silently — no duplicate check — because replacing is their
+purpose:</p>
+<pre><code class="language-java">Injector injector = Injector.builder()
+        .bind(Clock.class, Clock.fixed(instant, ZoneOffset.UTC))
+        .bind(Key.of(String.class, Names.named(&quot;greeting&quot;)), &quot;Hi&quot;)
+        .bindProvider(Gateway.class, RecordingGateway::new)
+        .build();
+</code></pre>
+<p>Everything downstream sees the override: any bean depending on <code>Clock</code>
+receives the fixed one, with the rest of the graph untouched. That includes
+resolutions through a <a href="child-injectors.html">child injector</a>, which never
+rebuilds the discovered bean an override replaced.</p>
+<ul>
+<li><code>bind(...)</code> — a fixed instance, returned for every resolution.</li>
+<li><code>bindProvider(...)</code> — a provider consulted on every resolution.</li>
+</ul>
+<p>A binding does not need a discovered binding to replace: it also supplies a
+dependency nothing else binds, such as a configuration record built in <code>main</code>.
+A type that neither has an <code>@Inject</code> constructor nor an accessible no-argument
+constructor gets no generated factory, so a binding is how it enters the
+graph:</p>
+<pre><code class="language-java">Injector injector = Injector.builder()
+        .bind(DisplayConfig.class, new DisplayConfig(1920, 1080))
+        .build();
+</code></pre>
+<p><code>build()</code> checks that every bean's dependencies are bound, overrides included,
+and throws one <code>UnsatisfiedDependencyException</code> listing every missing one.</p>
+<p>The same pair of operations exists on
+<a href="child-injectors.html"><code>childBuilder()</code></a>; the difference is lifecycle. Builder
+overrides bake replacement into a standalone injector at creation; a child
+layers bindings over a live parent.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Overrides replace whole bindings by key. They cannot wrap or decorate the
+discovered binding, and there is no way to reach the shadowed original
+through the same injector.</li>
+<li>Framework keys (<code>Injector</code>, <code>Context</code>, <code>Factory</code>) are not bindable.</li>
+<li>An override is raw: no scoping, no member injection, no
+<a href="injector-injection.html"><code>BeanDefinition</code></a>. A <code>bindProvider</code> provider that
+should cache must cache itself.</li>
+<li>Overrides shadow silently — binding a key nothing uses is not an error, so a
+typo in a <code>Key</code> yields an unused override rather than a diagnostic.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

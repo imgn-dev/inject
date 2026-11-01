@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Injector Injection and Introspection · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html" aria-current="page">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="injector-injection-and-introspection">Injector Injection and Introspection</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Most beans should name their dependencies statically. A few legitimately
+cannot: a dispatcher that picks a bean by runtime data, infrastructure that
+enumerates what the graph contains, code that must handle a bean that may not
+exist in this deployment (see <a href="conditional-beans.html">conditional beans</a>).</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>The <code>Injector</code> is itself injectable. Every injector resolves
+<code>Key.of(Injector.class)</code> to itself — in a <a href="child-injectors.html">child</a>, to that
+child — with no registration required:</p>
+<pre><code class="language-java">public final class BeanLocator {
+    private final Injector injector;
+
+    @Inject
+    public BeanLocator(Injector injector) {
+        this.injector = injector;
+    }
+
+    public Registry locateRegistry() {
+        return injector.getInstance(Registry.class);
+    }
+}
+</code></pre>
+<p>For decisions that need &quot;does this binding exist?&quot; or &quot;what is in the graph?&quot;,
+the injector exposes read-only introspection:</p>
+<pre><code class="language-java">// probe: present only when the bean is in this deployment's graph
+Optional&lt;BeanDefinition&gt; premium = injector.getBeanDefinition(Key.of(PremiumFeature.class));
+premium.ifPresent(definition -&gt; use(injector.getInstance(PremiumFeature.class)));
+
+// enumerate: all beans carrying a scoping stereotype
+List&lt;BeanDefinition&gt; scoped = injector.getBeanDefinitionsByStereotype(ScopingAnnotation.class);
+</code></pre>
+<p>A <code>BeanDefinition</code> describes a bean without instantiating it: its key, its
+annotation metadata (queried by annotation type or by stereotype — the
+meta-annotation a marker carries), and its injection points. This is the
+supported way to consume a bean that a condition may have removed: probe
+first, resolve only when present.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Injector injection is a service-locator escape hatch. A bean using it hides
+its real dependencies from its constructor signature and cannot be built
+without an injector; prefer declared dependencies wherever the set is known
+statically.</li>
+<li>Introspection is read-only. Definitions cannot be registered, altered, or
+removed through it — the registry is immutable after creation.</li>
+<li>Framework-provided bindings (the injector's self-binding) and
+<a href="builder-overrides.html">builder overrides</a> carry no <code>BeanDefinition</code>;
+introspection covers beans that came from generated factories.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

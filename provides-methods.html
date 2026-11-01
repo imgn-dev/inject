@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@Provides Methods · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html" aria-current="page">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="provides-methods"><code>@Provides</code> Methods</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Constructor injection requires annotating the class itself. That is impossible
+for types you do not own (<code>String</code>, <code>Clock</code>, anything from a library) and
+awkward for values that need assembly logic — reading configuration, choosing a
+variant, composing several inputs into one object.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>A method annotated <code>@Provides</code> becomes a binding: its return type (plus
+qualifier, if any) is the key, its body is the recipe, and its parameters are
+injected like constructor parameters.</p>
+<pre><code class="language-java">public final class Config {
+    private Config() {}
+
+    @Provides
+    @Named(&quot;greeting&quot;)
+    static String greeting() {
+        return &quot;Hello&quot;;
+    }
+
+    @Provides
+    static Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+</code></pre>
+<p>Any class can host <code>@Provides</code> methods:</p>
+<ul>
+<li><strong>Static method</strong> — called directly; the host class is never instantiated.</li>
+<li><strong>Instance method</strong> — the host is resolved through its own factory first,
+so the host's own dependencies are injected before the method runs.</li>
+</ul>
+<p><code>@Provides</code> methods compose with the rest of the framework: they accept
+qualified parameters, can be scoped (<code>@Singleton</code> on the method), can
+contribute to <a href="multibindings.html">collections</a> (<code>@IntoSet</code> / <code>@IntoMap</code>), can be
+<a href="conditional-beans.html">conditional</a>, and can serve as
+<a href="assisted-injection.html">assisted-injection recipes</a>.</p>
+<pre><code class="language-java">public final class Wiring {
+    @Provides
+    @Singleton
+    static DataSource dataSource(@Named(&quot;jdbc.url&quot;) String url) {
+        return DataSource.open(url);
+    }
+}
+</code></pre>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>A <code>@Provides</code> method is a build recipe, not a managed bean: members of the
+returned object are not injected afterwards. The method body must fully
+finish the object.</li>
+<li>Two unconditioned bindings for the same key — whether from <code>@Provides</code> or
+<code>@Inject</code> classes — are a <code>DuplicateBindingException</code> at injector creation.
+There is no priority order between competing bindings.</li>
+<li>The host of an instance <code>@Provides</code> method must itself be constructible by
+the framework, which makes static methods the simpler default.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

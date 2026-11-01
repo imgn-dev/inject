@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classpath and Module Path Support · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html" aria-current="page">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="classpath-and-module-path-support">Classpath and Module Path Support</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Factory discovery has to work in both worlds Java applications actually run
+in: the flat classpath and the module path with its explicit <code>provides</code>
+directives and encapsulation rules. A mechanism that relies on runtime
+classpath scanning or on breaking module encapsulation fails exactly where
+the module system is strictest.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>Discovery is plain <code>ServiceLoader</code> over generated <code>Factory</code> implementations —
+the one mechanism both worlds support natively, with no scanning and no
+reflective access into foreign packages.</p>
+<p><strong>Classpath</strong> — fully automatic. The processor writes
+<code>META-INF/services/be.imgn.inject.context.Factory</code> entries for every factory
+it generates, merging with existing entries. Compile and run:</p>
+<pre><code class="language-java">Injector injector = Injector.create(); // finds every generated factory
+</code></pre>
+<p><strong>Module path</strong> — the module's descriptor must declare what it provides. The
+processor cannot edit a hand-written <code>module-info.java</code>, so there are two
+supported routes:</p>
+<ol>
+<li>
+<p><strong>Manual.</strong> List the generated factories (the processor prints their names
+in a compile-time note):</p>
+<pre><code class="language-java">module my.app {
+    requires be.imgn.inject;
+
+    provides be.imgn.inject.context.Factory with
+            my.app.$Widget$$Factory,
+            my.app.$Service$$Factory;
+}
+</code></pre>
+</li>
+<li>
+<p><strong>Build plugin.</strong> The <code>inject-maven-plugin</code> goal <code>register-factories</code>
+(bound to <code>process-classes</code>) reads the generated service files and patches
+the compiled <code>module-info.class</code> with the matching <code>provides</code> directives —
+no factory names in source. With <code>generateModuleInfo=true</code> it can even
+synthesize a descriptor for a project that has none; <code>inject.skip</code> turns
+the goal off.</p>
+</li>
+</ol>
+<p>Because factories are ordinary compiled classes emitted into each bean's own
+package, module encapsulation is never bypassed: a module injects its own
+beans with its own generated code, and exports nothing extra to make that
+work.</p>
+<p><strong>The processor</strong> runs from either path. On the processor path, javac finds it
+through its service file. It is also the module <code>be.imgn.inject.processor</code>,
+which provides <code>javax.annotation.processing.Processor</code>, so javac finds it on
+the processor module path (<code>--processor-module-path</code>) too. That path then also
+holds the modules it requires: <code>inject</code>, <code>gaia-processing</code>, <code>gaia-core</code>,
+<code>jspecify</code> and <code>error_prone_annotations</code>.</p>
+<p>A <a href="processor-plugins.html">processor plugin</a> on the processor module path must
+provide <code>be.imgn.inject.processor.spi.InjectPlugin</code> in its descriptor; a
+plugin jar without a descriptor is an automatic module, whose service file
+counts as that declaration.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>On the module path, factory registration is a consumer-side obligation:
+keep the manual <code>provides</code> list in sync with the processor's note, or adopt
+the build plugin. A factory missing from the descriptor is simply not
+discovered, surfacing as <code>UnsatisfiedDependencyException</code>: at injector
+creation when a bean depends on it, otherwise when it is requested.</li>
+<li>The build plugin is Maven-only; other build tools take the manual route.</li>
+<li>All <code>ServiceLoader</code>-discovered extension points — factories,
+<a href="scopes.html">scopes</a>, <a href="conditional-beans.html">conditions</a> — share this
+registration story; on the module path each needs its <code>provides</code> directive.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

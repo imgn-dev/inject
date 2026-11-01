@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Processor Plugins · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html" aria-current="page">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="processor-plugins">Processor Plugins</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Some injected values are derived from the injection site itself rather than
+resolved from the graph — the canonical case being a logger named after the
+class that holds it. A graph binding cannot express &quot;a different value per
+declaring class&quot;, and writing <code>Logger.getLogger(...)</code> in every class is the
+boilerplate injection exists to remove.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>The annotation processor is extensible. A plugin pairs a custom annotation,
+meta-annotated with <code>@InjectingAnnotation</code>, with an <code>InjectPlugin</code>
+implementation discovered through <code>ServiceLoader</code> <strong>on the processor path</strong>,
+or on the processor module path (see <a href="module-path.html">module path</a>).
+For each injection site carrying the annotation, the plugin emits the
+initializer code that the generated factory will contain — the value is
+computed by generated code at build time, not looked up in the registry.</p>
+<p>The bundled <code>@Log</code> plugin:</p>
+<pre><code class="language-java">@InjectingAnnotation
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+public @interface Log {}
+
+public final class LogPlugin implements InjectPlugin {
+    @Override
+    public Optional&lt;CodeBlock&gt; initializer(InjectionSite site) {
+        if (site.element().getAnnotation(Log.class) == null) {
+            return Optional.empty();
+        }
+        // emits: Logger.getLogger(&lt;declaring class&gt;.class.getName())
+        return Optional.of(CodeBlock.of(&quot;$T.getLogger($T.class.getName())&quot;,
+                LOGGER, ClassName.of(site.beanType())));
+    }
+}
+</code></pre>
+<p>Usage — note the field needs only the plugin's annotation, and the site's
+declaring class drives the value:</p>
+<pre><code class="language-java">public final class GreetingService {
+    @Log
+    Logger logger; // named &quot;…GreetingService&quot;
+}
+
+@Singleton
+public final class Registry {
+    @Inject
+    public Registry(@Log Logger logger) { // named &quot;…Registry&quot;
+        ...
+    }
+}
+</code></pre>
+<p>Because the plugin runs inside the processor, its output is ordinary generated
+source: visible in the build output, debuggable, and free at runtime.</p>
+<h2 id="packaging">Packaging</h2>
+<p>A plugin ships as two artifacts, mirroring <code>inject</code> / <code>inject-processor</code>:</p>
+<ul>
+<li><code>inject-log</code> holds the <code>@Log</code> annotation and depends only on <code>inject</code>. It is
+a regular dependency of the code that writes <code>@Log</code>.</li>
+<li><code>inject-log-processor</code> holds <code>LogPlugin</code> and its <code>ServiceLoader</code>
+registration, and depends on <code>inject-processor</code> and gaia-processing, whose
+<code>CodeBlock</code> the plugin returns. It belongs on the annotation processor path
+only, so neither it nor its code-generation dependencies reach the
+application classpath.</li>
+</ul>
+<pre><code class="language-xml">&lt;dependency&gt;
+    &lt;groupId&gt;be.imgn.inject&lt;/groupId&gt;
+    &lt;artifactId&gt;inject-log&lt;/artifactId&gt;
+    &lt;version&gt;${inject.version}&lt;/version&gt;
+&lt;/dependency&gt;
+
+&lt;!-- maven-compiler-plugin --&gt;
+&lt;annotationProcessorPaths&gt;
+    &lt;path&gt;
+        &lt;groupId&gt;be.imgn.inject&lt;/groupId&gt;
+        &lt;artifactId&gt;inject-processor&lt;/artifactId&gt;
+        &lt;version&gt;${inject.version}&lt;/version&gt;
+    &lt;/path&gt;
+    &lt;path&gt;
+        &lt;groupId&gt;be.imgn.inject&lt;/groupId&gt;
+        &lt;artifactId&gt;inject-log-processor&lt;/artifactId&gt;
+        &lt;version&gt;${inject.version}&lt;/version&gt;
+    &lt;/path&gt;
+&lt;/annotationProcessorPaths&gt;
+</code></pre>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>A plugin emits an initializer expression for a site; it cannot register
+graph bindings, alter resolution, or observe runtime state. Values needing
+the graph belong in <a href="provides-methods.html"><code>@Provides</code> methods</a>.</li>
+<li>Plugin-injected values bypass the registry: they have no key, no scope, and
+cannot be overridden or shadowed at runtime.</li>
+<li>Plugins must be on the compiler's processor path or processor module path
+in every module that uses their annotation; a site whose plugin is absent at
+compile time is not handled.</li>
+<li>Writing a plugin means writing code generation (emitting Java expressions),
+a heavier tool than declaring a binding.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

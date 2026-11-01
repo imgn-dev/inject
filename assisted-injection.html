@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assisted Injection · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html" aria-current="page">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="assisted-injection">Assisted Injection</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Some objects mix two kinds of inputs: dependencies the container knows
+(services, configuration) and values only the caller knows at the moment of
+creation (the current user, a filename). Neither side can build the object
+alone — the caller would have to fetch container services by hand, and the
+container cannot invent caller data.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>The constructor marks caller-supplied parameters with <code>@Assisted</code>; container
+parameters stay unmarked. A factory interface declares a creation method whose
+parameters are exactly the assisted ones. The framework generates the
+implementation: container parameters resolved from the graph, assisted
+parameters forwarded from the call.</p>
+<pre><code class="language-java">public final class Badge {
+    @Inject
+    public Badge(Registry registry, @Assisted String owner, @Assisted(&quot;role&quot;) String role) {
+        // registry comes from the container; owner and role from the caller
+    }
+}
+
+public interface BadgeFactory {
+    @AssistedFactory
+    Badge create(String owner, @Assisted(&quot;role&quot;) String role);
+}
+</code></pre>
+<pre><code class="language-java">BadgeFactory badges = injector.getInstance(BadgeFactory.class);
+Badge badge = badges.create(&quot;olivier&quot;, &quot;admin&quot;);
+</code></pre>
+<p>Factory parameters and assisted constructor parameters are matched into a
+bijection — by type, or by the <code>@Assisted(&quot;name&quot;)</code> value when several assisted
+parameters share a type. Mismatches (a parameter left over on either side, an
+ambiguous pairing) are compile errors.</p>
+<p>Each factory call builds a fresh instance; container-side dependencies still
+honor their <a href="scopes.html">scopes</a>, so a <code>@Singleton</code> dependency is shared across
+all created instances.</p>
+<h3 id="scoped-products">Scoped products</h3>
+<p>A recipe with a <a href="child-injectors.html#child-local-scopes">child-local scope</a> —
+declared on the class, inherited from a supertype, or on the <code>@Provides</code>
+method — makes the factory create its product in the nearest injector of the
+chain that hosts that scope, and cache it there:</p>
+<pre><code class="language-java">@ViewScoped
+public interface DialogView {}
+
+public final class RenameDialog implements DialogView { // @ViewScoped
+    @Inject
+    public RenameDialog(@Assisted String current, RenameDialogCommands commands) { ... }
+}
+
+@ViewScoped
+public final class RenameDialogCommands {
+    @Inject
+    public RenameDialogCommands(Provider&lt;RenameDialog&gt; dialog) { ... }
+}
+</code></pre>
+<pre><code class="language-java">Injector view = window.scopedChildBuilder(ViewScoped.class).build();
+RenameDialog dialog = view.getInstance(RenameDialogFactory.class).create(&quot;draft&quot;);
+view.getInstance(RenameDialog.class) == dialog; // true
+</code></pre>
+<p>The product is built with dependencies from its host. Once created, it
+resolves by its key (the recipe's class, or the <code>@Provides</code> method's return
+type) through the host and its descendants, a <code>Provider</code> included, like any
+bean of the scope. Before that, resolving it fails when <code>get()</code> is called, not
+when the <code>Provider</code> is injected, so <code>RenameDialogCommands</code> above is built while
+the dialog is. A second call through the same host fails: the product exists
+once per host. Its <code>@PreDestroy</code> runs when its host closes. Creating it through
+an injector with no host of its scope fails with a
+<code>ScopeResolutionException</code>, and a product whose scope has a <code>Scope</code> service,
+such as <code>@Singleton</code>, fails when the injector is created.</p>
+<h3 id="provides-recipes"><code>@Provides</code> recipes</h3>
+<p>The recipe can also be a <code>@Provides</code> method, for types whose construction
+needs logic or that cannot carry annotations themselves. The factory then
+names its host class and method:</p>
+<pre><code class="language-java">public class StampConfig {
+    @Provides
+    public static LegacyStamp stamp(@Named(&quot;greeting&quot;) String greeting, @Assisted String suffix) {
+        return new LegacyStamp(greeting + &quot; &quot; + suffix);
+    }
+}
+
+public interface StampFactory {
+    @AssistedFactory(value = StampConfig.class, method = &quot;stamp&quot;)
+    LegacyStamp create(String suffix);
+}
+</code></pre>
+<h2 id="generated-types">Generated types</h2>
+<p>A factory and its product can reach the processor in different rounds of one
+compilation: the product's constructor may name a type another processor
+generates, or another processor may generate the factory interface itself.
+The processor keeps the recipes of earlier rounds, and a factory waits for a
+product of the same compilation until its recipe is known. A product that
+still has no assisted constructor after the last round is an error.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><code>@Assisted</code> is valid on constructor and <code>@Provides</code> parameters only — not on
+<code>@Inject</code> methods or fields.</li>
+<li>A factory method returns the built type directly; it cannot return a
+<a href="provider-injection.html"><code>Provider</code></a> of it.</li>
+<li>Assisted beans without a child-local scope are effectively prototype: every
+factory call constructs, and the built instances are not cached.</li>
+<li>The factory is the only door: a type with assisted parameters is not
+resolvable directly through the injector, since the container cannot supply
+the assisted values — except a scoped product, once its host created it.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

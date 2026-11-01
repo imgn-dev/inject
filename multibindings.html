@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multibindings · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html" aria-current="page">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="multibindings">Multibindings</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Plugin-style designs need &quot;all implementations of X&quot;, assembled without a
+central class that lists them. With one-key-one-binding, a second <code>Notifier</code>
+is a duplicate, and something must still know every implementation to collect
+them — the coupling just moves.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>A bean or <code>@Provides</code> method marks itself as a <strong>contribution</strong> to a
+collection. Contributions from the whole classpath/module path are aggregated
+into a single injectable collection; adding an element means adding one class,
+touching nothing else.</p>
+<p><code>@IntoSet(E.class)</code> contributes to <code>Set&lt;E&gt;</code>:</p>
+<pre><code class="language-java">@IntoSet(Notifier.class)
+public final class EmailNotifier implements Notifier {
+    @Inject
+    public EmailNotifier() {}
+}
+
+@IntoSet(Notifier.class)
+public final class SmsNotifier implements Notifier {
+    @Inject
+    public SmsNotifier() {}
+}
+</code></pre>
+<p><code>@IntoMap(value = E.class, key = &quot;...&quot;)</code> contributes to <code>Map&lt;String, E&gt;</code>:</p>
+<pre><code class="language-java">@IntoMap(value = Formatter.class, key = &quot;json&quot;)
+public final class JsonFormatter implements Formatter {
+    @Inject
+    public JsonFormatter() {}
+}
+</code></pre>
+<p>Consumers inject the collection like any other dependency:</p>
+<pre><code class="language-java">public final class NotificationCenter {
+    @Inject
+    public NotificationCenter(Set&lt;Notifier&gt; notifiers, Map&lt;String, Formatter&gt; formatters) { ... }
+}
+</code></pre>
+<p>Contributions compose with the rest of the framework: each element keeps its
+own <a href="scopes.html">scope</a>, and a <a href="conditional-beans.html">conditional</a> contribution
+simply drops out of the collection when its condition does not match:</p>
+<pre><code class="language-java">@IntoSet(Notifier.class)
+@ConditionalOnProperty(value = &quot;examples.push&quot;, havingValue = &quot;true&quot;)
+public final class PushNotifier implements Notifier {
+    @Inject
+    public PushNotifier() {}
+}
+</code></pre>
+<p>The collection itself is rebuilt per resolution (an unmodifiable snapshot);
+whether elements are shared across snapshots is each element's scope's
+decision. The processor verifies at compile time that every contribution is
+assignable to its declared element type.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Collection shapes are exactly <code>Set&lt;E&gt;</code> and <code>Map&lt;String, E&gt;</code>. Map keys are
+<code>String</code> only.</li>
+<li>Collections are unqualified — a qualifier on a contribution is a compile
+error — so there is one collection per element type.</li>
+<li>No ordering: <code>Set</code> iteration order is unspecified, and there is no priority
+attribute.</li>
+<li>A collection with zero live contributions is not an empty collection — the
+key is simply unbound, and a bean injecting it makes injector creation fail
+with <code>UnsatisfiedDependencyException</code>. At least one contribution must match.</li>
+<li>Duplicate <code>@IntoMap</code> keys are rejected at compile time within one
+compilation; across separately compiled artifacts they surface at injector
+creation.</li>
+<li>A contribution is reachable only through its collection: it cannot combine
+with <code>@ExposeAs</code>, and it is not injectable standalone.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

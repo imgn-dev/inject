@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qualifiers · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html" aria-current="page">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="qualifiers">Qualifiers</h1>
+<h2 id="the-problem">The problem</h2>
+<p>A type alone is often not a sufficient address. Two <code>String</code> values — a
+greeting and a database URL — share a type but must never be confused. Binding
+by type only would make the second <code>String</code> a duplicate.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>A binding key is a <strong>type plus an optional qualifier annotation</strong>. Qualifier
+identity is the annotation type <em>and its attribute values</em>: <code>@Named(&quot;db&quot;)</code> and
+<code>@Named(&quot;cache&quot;)</code> are two distinct keys; a marker qualifier with no attributes
+matches by type alone.</p>
+<p><code>@Named</code> is the built-in string qualifier:</p>
+<pre><code class="language-java">public final class Config {
+    @Provides
+    @Named(&quot;greeting&quot;)
+    static String greeting() {
+        return &quot;Hello&quot;;
+    }
+}
+
+public final class GreetingService {
+    @Inject
+    public GreetingService(@Named(&quot;greeting&quot;) String greeting) { ... }
+}
+</code></pre>
+<p>Custom qualifiers are ordinary annotations meta-annotated with
+<code>@QualifyingAnnotation</code>. Attributes participate in identity automatically:</p>
+<pre><code class="language-java">@QualifyingAnnotation
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
+public @interface Flavor {
+    String value();
+}
+</code></pre>
+<p>For programmatic lookups, <code>Key</code> carries the qualifier and <code>Names.named</code> builds
+the <code>@Named</code> instance:</p>
+<pre><code class="language-java">String greeting = injector.getInstance(Key.of(String.class, Names.named(&quot;greeting&quot;)));
+</code></pre>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>One qualifier per binding or injection point; qualifiers do not stack.</li>
+<li><a href="multibindings.html">Collection bindings</a> are unqualified — a qualifier on an
+<code>@IntoSet</code>/<code>@IntoMap</code> contribution is a compile error, so there can be only
+one collection per element type.</li>
+<li>Qualifier matching is exact. There is no wildcard, no &quot;any <code>@Named</code>&quot;, and no
+fallback from a qualified request to an unqualified binding.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

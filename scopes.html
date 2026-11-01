@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scopes · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html" aria-current="page">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="scopes">Scopes</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Some objects are cheap and stateless — a fresh one per use is correct and
+avoids shared-state bugs. Others are expensive or must be shared — a
+connection pool, a registry. One instantiation policy cannot fit both, and
+hand-managing &quot;the shared ones&quot; reintroduces the global variables injection
+was meant to remove.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>The default is <strong>prototype</strong>: every resolution builds a new instance. Sharing
+is opt-in, declared where the bean is declared.</p>
+<p><code>@Singleton</code> is built in — one instance per injector, created on first use
+(or when the injector is created, for an <a href="eager-singletons.html">eager</a> one),
+exactly once even under concurrent resolution:</p>
+<pre><code class="language-java">@Singleton
+public final class Registry {
+    @Inject
+    public Registry() {}
+}
+</code></pre>
+<pre><code class="language-java">Injector injector = Injector.create();
+assert injector.getInstance(Registry.class) == injector.getInstance(Registry.class);
+</code></pre>
+<p><code>@Provides</code> methods scope the same way — put <code>@Singleton</code> on the method.</p>
+<h3 id="inherited-scopes">Inherited scopes</h3>
+<p>A bean class that declares no scope inherits the one its supertypes declare,
+through the superclass chain and every superinterface, at any depth. A
+framework can then scope every implementation of one of its interfaces:</p>
+<pre><code class="language-java">@ViewScoped
+public interface View {}
+
+public final class Editor implements View { // @ViewScoped
+    @Inject
+    public Editor() {}
+}
+</code></pre>
+<p>Along each path, the nearest declaration wins: an interface that declares its
+own scope hides the scopes of the interfaces it extends. A scope declared on
+the bean itself always wins. Different scopes inherited along different paths
+are a compile error, which asks to declare one on the bean. Supertypes compiled
+elsewhere count too: the processor reads their scope from the class file, so
+the scoping annotation needs <code>CLASS</code> or <code>RUNTIME</code> retention.</p>
+<h3 id="custom-scopes">Custom scopes</h3>
+<p>A scope is a pair: an annotation meta-annotated with <code>@ScopingAnnotation</code>, and
+a <code>Scope</code> implementation that wraps the bean's provider with a caching policy.
+Implementations are discovered through <code>ServiceLoader</code>.</p>
+<pre><code class="language-java">@ScopingAnnotation
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface ThreadScoped {}
+
+public final class ThreadScope implements Scope {
+    @Override
+    public Class&lt;? extends Annotation&gt; annotationType() {
+        return ThreadScoped.class;
+    }
+
+    @Override
+    public &lt;T&gt; Provider&lt;T&gt; wrap(Provider&lt;T&gt; provider) {
+        return new ThreadScopedProvider&lt;&gt;(provider); // caches per thread
+    }
+}
+</code></pre>
+<pre><code class="language-java">@ThreadScoped
+public final class RequestScopedToken {
+    @Inject
+    public RequestScopedToken() {}
+}
+</code></pre>
+<p>The wrap-a-provider contract keeps custom scopes small: the framework hands the
+scope the raw building provider once, at registry construction, and every
+resolution goes through the returned wrapper.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Scopes control instantiation. Releasing scoped instances is a separate
+concern, handled by <a href="lifecycle-callbacks.html">lifecycle callbacks</a>: a
+<code>@PreDestroy</code> method runs when the owning injector closes.</li>
+<li>A bean carries at most one scoping annotation.</li>
+<li>A <code>@Provides</code> method's scope is never inherited from its return type: only
+the method's own annotation counts.</li>
+<li>A scoping annotation has exactly one <code>Scope</code>: two discovered implementations
+for the same annotation are an error at injector creation
+(<code>ScopeResolutionException</code>), so a jar cannot silently replace a scope,
+built-in <code>@Singleton</code> included.</li>
+<li>Scopes are declared on the bean, not chosen at the injection point; a
+consumer cannot request &quot;a fresh instance&quot; of a singleton (though injecting a
+<a href="provider-injection.html"><code>Provider</code></a> of a prototype bean gives fresh instances
+on demand).</li>
+<li>A scoping annotation with no <code>Scope</code> service is child-local: the
+<a href="child-injectors.html#child-local-scopes">child injectors</a> that host it cache
+its instances, and resolving such a bean elsewhere fails. Other scoped beans
+anchor to the injector whose registry declared them.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

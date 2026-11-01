@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction listeners · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html" aria-current="page">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="construction-listeners">Construction listeners</h1>
+<h2 id="the-problem">The problem</h2>
+<p>A framework built on the container often needs to act on every instance of
+some kind as soon as it exists: register each window-scoped bean implementing a
+veto interface, attach generated commands to the view they belong to. Asking
+every bean to register itself spreads that duty across user code, and scanning
+the graph after the fact misses instances created later.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>A <code>ConstructionListener</code> contributed with <code>@IntoSet</code> is called with every
+instance the container builds, and the injector it belongs to:</p>
+<pre><code class="language-java">@Singleton
+@IntoSet(ConstructionListener.class)
+public final class VetoRegistrar implements ConstructionListener {
+    @Inject
+    public VetoRegistrar() {}
+
+    @Override
+    public void constructed(Object instance, Injector injector) {
+        if (instance instanceof ExitVeto veto) {
+            injector.getInstance(ExitVetoes.class).add(veto);
+        }
+    }
+}
+</code></pre>
+<p>The root injector resolves every listener when it is created. From then on,
+the generated factories call each listener synchronously, on the constructing
+thread, once an instance is fully built: after its constructor, member
+injection and <code>@PostConstruct</code>. That covers singletons, unscoped beans,
+<a href="child-injectors.html#child-local-scopes">child-local</a> beans, <code>@Provides</code>
+results, <a href="interception.html">interception</a> proxies and
+<a href="assisted-injection.html">assisted</a> products.</p>
+<p><a href="eager-singletons.html">Eager singletons</a> are built right after the listeners
+are resolved, so the listeners see them and their dependencies.</p>
+<p>The injector passed along is the one the instance belongs to: the root for a
+singleton, the child that built an unscoped bean, and for a child-local bean or
+a scoped assisted product, the child that hosts it.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Listeners are root beans: a child injector cannot add its own.</li>
+<li>The listeners themselves, and the instances built while they are being
+resolved (their dependencies), are not reported.</li>
+<li>Instances bound with <code>bind(...)</code> on a builder are not reported: the
+container did not build them.</li>
+<li>A listener that throws fails the construction of that instance: it is neither
+cached nor destroyed, and the next resolution builds it again.</li>
+<li>A listener that fails to build fails the injector's creation, after the
+singletons already built are destroyed.</li>
+<li>Every listener sees every instance: filtering, by type or otherwise, is the
+listener's job.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

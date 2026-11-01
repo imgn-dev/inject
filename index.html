@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html" aria-current="page">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="imgn-inject">imgn inject</h1>
+<p>imgn inject is a dependency injection framework for Java 21 or later that uses
+no reflection: an annotation processor generates a factory for each bean at
+compile time, and the injector finds those factories through <code>ServiceLoader</code>,
+on the class path and on the module path. Every class is documented in the
+<a href="https://imgn-dev.github.io/inject/api/latest/">API documentation</a>.</p>
+<h2 id="artifacts">Artifacts</h2>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Module</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inject</code></td>
+<td><code>be.imgn.inject</code></td>
+<td>The annotations and the injector</td>
+</tr>
+<tr>
+<td><code>inject-processor</code></td>
+<td><code>be.imgn.inject.processor</code></td>
+<td>The annotation processor, and its <a href="processor-plugins.html">plugin SPI</a></td>
+</tr>
+<tr>
+<td><code>inject-maven-plugin</code></td>
+<td></td>
+<td><a href="module-path.html">Registers the generated factories</a> in <code>module-info.class</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="setting-up">Setting up</h2>
+<p>Depend on <code>inject</code>, and run <code>inject-processor</code> as an annotation processor:</p>
+<pre><code class="language-xml">&lt;dependencies&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;be.imgn.inject&lt;/groupId&gt;
+    &lt;artifactId&gt;inject&lt;/artifactId&gt;
+    &lt;version&gt;${inject.version}&lt;/version&gt;
+  &lt;/dependency&gt;
+&lt;/dependencies&gt;
+
+&lt;build&gt;
+  &lt;plugins&gt;
+    &lt;plugin&gt;
+      &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+      &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+      &lt;configuration&gt;
+        &lt;annotationProcessorPaths&gt;
+          &lt;path&gt;
+            &lt;groupId&gt;be.imgn.inject&lt;/groupId&gt;
+            &lt;artifactId&gt;inject-processor&lt;/artifactId&gt;
+            &lt;version&gt;${inject.version}&lt;/version&gt;
+          &lt;/path&gt;
+        &lt;/annotationProcessorPaths&gt;
+      &lt;/configuration&gt;
+    &lt;/plugin&gt;
+  &lt;/plugins&gt;
+&lt;/build&gt;
+</code></pre>
+<p>The processor claims no annotation, so a build compiling with
+<code>-Xlint:all -Werror</code> needs <code>-Xlint:all,-processing</code> (see
+<a href="injection.html#limitations">injection</a>). On the module path, require
+<code>be.imgn.inject</code> and declare the generated factories, by hand or with the
+Maven plugin (see <a href="module-path.html">module path</a>).</p>
+<h2 id="features">Features</h2>
+<p>One page per feature. Each page states the problem the feature solves, how it
+solves it, examples per use case, and its limitations.</p>
+<h3 id="declaring-beans">Declaring beans</h3>
+<ul>
+<li><a href="injection.html">Zero-reflection injection</a> — <code>@Inject</code> constructors, methods,
+and fields, wired by compile-time generated factories.</li>
+<li><a href="provides-methods.html"><code>@Provides</code> methods</a> — bindings for types you do not
+own or that need assembly logic.</li>
+<li><a href="qualifiers.html">Qualifiers</a> — distinguishing bindings of the same type;
+<code>@Named</code> and custom qualifier annotations.</li>
+<li><a href="type-exposure.html">Type exposure and <code>@ExposeAs</code></a> — which types a bean is
+injectable as.</li>
+<li><a href="scopes.html">Scopes</a> — prototype by default, <code>@Singleton</code>, and the custom
+scope SPI.</li>
+<li><a href="conditional-beans.html">Conditional beans</a> — beans present only when a
+condition matches; <code>@ConditionalOnProperty</code> and the condition SPI.</li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a> — <code>@PostConstruct</code> after full
+injection and <code>@PreDestroy</code> on injector close.</li>
+<li><a href="construction-listeners.html">Construction listeners</a> — <code>ConstructionListener</code>
+contributions called with every instance the container builds.</li>
+<li><a href="eager-singletons.html">Eager singletons</a> — <code>@Eager</code> singletons built when the
+root injector is created.</li>
+<li><a href="interception.html">Method interception</a> — <code>@InterceptingAnnotation</code> triggers
+and <code>@Intercepts</code> beans running around method calls, wired by a generated
+subclass.</li>
+</ul>
+<h3 id="consuming-beans">Consuming beans</h3>
+<ul>
+<li><a href="provider-injection.html"><code>Provider&lt;T&gt;</code> injection</a> — deferred and repeated
+resolution.</li>
+<li><a href="keys-and-generics.html">Keys and generic types</a> — <code>Key</code>, <code>TypeLiteral</code>, and
+<code>Types</code> for qualified and parameterized lookups.</li>
+<li><a href="multibindings.html">Multibindings</a> — <code>@IntoSet</code> / <code>@IntoMap</code> contributions
+aggregated into injectable <code>Set</code> and <code>Map</code> bindings.</li>
+<li><a href="assisted-injection.html">Assisted injection</a> — factories mixing container
+dependencies with caller-supplied values.</li>
+<li><a href="injector-injection.html">Injector injection and introspection</a> — resolving
+through the <code>Injector</code> itself; probing and enumerating bean definitions.</li>
+</ul>
+<h3 id="structuring-graphs">Structuring graphs</h3>
+<ul>
+<li><a href="child-injectors.html">Child injectors</a> — request- or tenant-scoped binding
+layers over a shared parent graph, and child-local scopes cached per child.</li>
+<li><a href="builder-overrides.html">Builder overrides</a> — replacing discovered bindings
+with explicit instances or providers, primarily for tests.</li>
+</ul>
+<h3 id="safety-and-tooling">Safety and tooling</h3>
+<ul>
+<li><a href="cycle-detection.html">Cycle detection</a> — compile-time rejection plus a
+runtime guard with readable cycle paths.</li>
+<li><a href="processor-plugins.html">Processor plugins</a> — site-derived injected values via
+the <code>@InjectingAnnotation</code> / <code>InjectPlugin</code> SPI.</li>
+<li><a href="module-path.html">Classpath and module path support</a> — <code>ServiceLoader</code>
+discovery in both worlds, and the Maven plugin for module descriptors.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

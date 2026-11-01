@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Child Injectors · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html" aria-current="page">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="child-injectors">Child Injectors</h1>
+<h2 id="the-problem">The problem</h2>
+<p>An application graph is mostly stable, but some bindings are contextual: the
+current request's data, a tenant's configuration. Rebuilding a whole injector
+per request is wasteful; mutating the shared one is unsafe and wrong for
+concurrent contexts.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p><code>childBuilder()</code> derives a lightweight child injector: a small layer of
+explicit bindings over the parent's full graph. Resolution checks the nearest
+child layer first, walking up through intermediate children, and falls back to
+the parent. The parent is never modified and keeps serving its own resolutions
+unchanged.</p>
+<pre><code class="language-java">Injector app = Injector.create();
+
+Injector requestA = app.childBuilder()
+        .bind(RequestContext.class, new RequestContext(&quot;ada&quot;))
+        .build();
+Injector requestB = app.childBuilder()
+        .bind(RequestContext.class, new RequestContext(&quot;bob&quot;))
+        .build();
+
+requestA.getInstance(RequestGreeter.class).request().user(); // &quot;ada&quot;
+requestB.getInstance(RequestGreeter.class).request().user(); // &quot;bob&quot;
+app.getInstance(RequestGreeter.class).request().user();      // the app-level default
+</code></pre>
+<p>Shadowing works through dependencies, not just direct lookups: an unscoped
+parent bean resolved through a child is rebuilt at the child, so its own
+dependencies see the child's bindings (that is why <code>RequestGreeter</code> above
+picks up each request's <code>RequestContext</code>). Scoped beans anchor to the
+injector that declared them — the parent's <code>@Singleton</code> stays one instance,
+shared by parent and all children.</p>
+<p>Besides instances, a child can bind a provider, evaluated on every resolution
+through the child:</p>
+<pre><code class="language-java">Injector session = app.childBuilder()
+        .bindProvider(Token.class, tokenSource::current)
+        .build();
+</code></pre>
+<p>Children nest: a child's <code>childBuilder()</code> layers again, and lookups honor the
+nearest binding.</p>
+<h3 id="child-local-scopes">Child-local scopes</h3>
+<p>A scoping annotation with no <code>Scope</code> service is child-local: its beans live in
+the children that host it. <code>scopedChildBuilder(scope)</code> builds such a child:</p>
+<pre><code class="language-java">@ScopingAnnotation
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.TYPE)
+public @interface WindowScoped {}
+
+@WindowScoped
+public final class Toolbar {
+    @Inject
+    public Toolbar(Window window) {}
+}
+</code></pre>
+<pre><code class="language-java">Injector window = app.scopedChildBuilder(WindowScoped.class)
+        .bind(Window.class, frame)
+        .build();
+Injector view = window.scopedChildBuilder(ViewScoped.class).build();
+
+window.getInstance(Toolbar.class) == view.getInstance(Toolbar.class); // true
+</code></pre>
+<p>Each bean of the scope is created once per hosting child, the first time it is
+resolved through that child or one of its descendants, and cached there. It is
+built through its host, so its dependencies see the host's bindings and those
+above it, never those of the descendant that asked for it. Hosts nest: the
+nearest one in the chain hosts the bean, so another window opened below a view
+gets its own <code>Toolbar</code>. A <code>Provider</code> injected into a bean resolves through the
+injector that built the bean, so a <code>@ViewScoped</code> bean's <code>Provider&lt;Owner&gt;</code>
+returns the <code>Owner</code> of its own view, and cycles broken by a <code>Provider</code> work as
+for singletons.</p>
+<p>A child-local bean may depend on keys the root does not bind, such as <code>Window</code>
+above: its hosts supply them. The root checks them when a host is built
+instead: building a child that hosts a scope fails with an
+<code>UnsatisfiedDependencyException</code> when one of the scope's beans depends on a key
+that neither the root, nor that child, nor one of its parents binds. The
+message names each bean, key and injection point. A key bound by several hosts
+of the chain, such as a <code>Scope</code> object each window and each view binds,
+resolves to the nearest one.</p>
+<p>A bean must not depend directly on one that lives shorter than itself. A
+<code>@Singleton</code> (or any bean whose scope has a <code>Scope</code> service) is built in the
+root, where no child-local instance exists, so its direct dependency on a
+child-local bean is an error at injector creation. A child-local bean's direct
+dependency on a bean of another child-local scope needs a host of that scope
+above its own host: building a host without one fails with a
+<code>ScopeResolutionException</code> naming the bean and the injection point. A
+<code>@WindowScoped</code> bean may thus depend on a <code>@ViewScoped</code> one only in windows
+opened below a view, like dialogs. Dependencies through a <code>Provider</code> are never
+checked, and unscoped beans are rebuilt where they are resolved, so they may
+depend on any scope.</p>
+<p>Closing a child closes its live children first, then runs <code>@PreDestroy</code> on the
+instances it hosts, in reverse creation order (see
+<a href="lifecycle-callbacks.html">lifecycle callbacks</a>). Closing the root closes its live
+children the same way.</p>
+<p>Resolving a child-local bean through an injector with no host of its scope in
+its chain fails with a <code>ScopeResolutionException</code> naming the bean and the
+scope. When no child ever hosted the scope, the message also points out that a
+<code>Scope</code> service may be missing.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Child bindings are explicit instances and providers only. A child does not
+discover annotated beans, load factories, or accept <code>@Provides</code> classes of
+its own.</li>
+<li>A child hosts at most one scope, and only a child-local one: hosting a
+scope that a <code>Scope</code> service handles, such as <code>@Singleton</code>, is an error.</li>
+<li>A child-local bean cannot contribute to a <a href="multibindings.html">collection</a>:
+collections are resolved in the root injector, where it has no instance.
+The root injector reports it at creation.</li>
+<li>Other scoped beans belong to the injector whose registry declared them.</li>
+<li>Child bindings cannot contribute to the parent's
+<a href="multibindings.html">collections</a>; a <code>Set</code> or <code>Map</code> binding resolved through a
+child has the parent's contents.</li>
+<li>Binding the same key twice in one builder is an error, and framework keys
+(<code>Injector</code>, <code>Context</code>, <code>Factory</code>) are not bindable — each injector always
+resolves <code>Injector</code> to itself.</li>
+<li>A child holds a reference to its parent; it is a view over the parent's
+graph, not a detachable copy.</li>
+<li>Outside child-local scopes, a child shadows bindings; it cannot supply one
+the root lacks. The root injector checks at creation that every bean's
+dependencies are bound, so a dependency meant to vary per child needs a
+root-level binding too — an app-level default, as <code>RequestContext</code> has
+above.</li>
+<li>A child binding for an <a href="interception.html">interceptor</a> bean's own key shadows
+direct resolution through the child, but not the interceptor chain:
+<code>ChildContext.interceptor</code> always delegates to the parent, so intercepted
+methods keep running the parent's interceptor instance regardless of a
+child's override.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

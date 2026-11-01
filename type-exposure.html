@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Type Exposure and @ExposeAs · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html" aria-current="page">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="type-exposure-and-exposeas">Type Exposure and <code>@ExposeAs</code></h1>
+<h2 id="the-problem">The problem</h2>
+<p>A bean has one implementation type but is usually consumed through an
+interface. Consumers should depend on <code>Engine</code>, not <code>V8Engine</code> — and a codebase
+that <em>can</em> inject <code>V8Engine</code> eventually will, welding callers to the
+implementation.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>By default a bean is injectable under <strong>all of its types</strong>: its own class and
+every supertype and interface it implements, all resolving to the same
+binding (and, if scoped, the same instance):</p>
+<pre><code class="language-java">@Singleton
+public final class Registry implements Cataloged {
+    @Inject
+    public Registry() {}
+}
+</code></pre>
+<pre><code class="language-java">// both resolve to the same singleton
+Registry byClass = injector.getInstance(Registry.class);
+Cataloged byInterface = injector.getInstance(Cataloged.class);
+</code></pre>
+<p>Universal contracts are excluded from that default so they never become
+accidental binding keys: <code>Object</code>, <code>Serializable</code>, <code>Cloneable</code>, <code>Comparable</code>,
+<code>Runnable</code>, <code>AutoCloseable</code>, <code>Closeable</code>, <code>Iterable</code>, <code>EventListener</code>,
+<code>MethodInterceptor</code>, and the framework's own types.</p>
+<p>JDK types (<code>java.*</code> and <code>javax.*</code>) are exposed only as interfaces your own
+code names. A JDK interface stays exposed when the bean, or one of its own
+supertypes, implements or extends it directly. A JDK superclass is left out,
+and so is every type a JDK type brings in:</p>
+<pre><code class="language-java">public final class Scene extends JPanel implements View { ... }
+// Scene and View: not JPanel, JComponent, Container, Accessible, ...
+
+public final class Pool implements DataSource { ... }
+// Pool and DataSource: not CommonDataSource or Wrapper
+</code></pre>
+<p><code>@ExposeAs</code> can still list any JDK type.</p>
+<p>Several beans may share a supertype: two views implementing <code>View</code> are both
+valid beans. A key a bean has only through its supertypes binds it when no
+other binding claims that key. When several beans have it this way, it is left
+unbound rather than being an error:</p>
+<pre><code class="language-java">injector.getInstance(Editor.class);  // works
+injector.getInstance(View.class);    // UnsatisfiedDependencyException:
+// No unique binding for Key[View]: implemented by Key[Editor], Key[Preview]. ...
+</code></pre>
+<p>Injecting such a key is an error when the injector is created, naming the
+injection point and every bean that has the key. A bean's own class, the types
+<code>@ExposeAs</code> lists, and any other explicit binding always win over a key a bean
+has through its supertypes; two explicit bindings of one key are still a
+<code>DuplicateBindingException</code>. A <a href="qualifiers.html">qualifier</a> makes all of a bean's
+keys explicit: two beans with the same qualifier on a shared interface are a
+duplicate.</p>
+<p><code>@ExposeAs</code> replaces the default with an explicit allowlist. The bean is then
+injectable <strong>only</strong> as the listed types — its concrete class included only if
+listed:</p>
+<pre><code class="language-java">@Singleton
+@ExposeAs(Engine.class)
+public final class V8Engine implements Engine {
+    @Inject
+    public V8Engine() {}
+}
+</code></pre>
+<pre><code class="language-java">injector.getInstance(Engine.class);   // works, returns the V8Engine singleton
+injector.getInstance(V8Engine.class); // UnsatisfiedDependencyException
+</code></pre>
+<p>That turns &quot;depend on the interface&quot; from a convention into a rule the
+injector enforces: the implementation type is not a key at all.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>An interface several beans implement cannot be injected until one of them
+is chosen: with <a href="qualifiers.html">qualifiers</a>, an <code>@ExposeAs</code> allowlist, or a
+<a href="multibindings.html">collection binding</a> for all of them.</li>
+<li>The excluded-contracts list is fixed; the only way to change what a bean
+exposes is <code>@ExposeAs</code>.</li>
+<li>A <a href="multibindings.html">collection contribution</a> (<code>@IntoSet</code>/<code>@IntoMap</code>) cannot
+also use <code>@ExposeAs</code> — a contribution is reachable through its collection
+only.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

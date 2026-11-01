@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eager singletons · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html" aria-current="page">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="eager-singletons">Eager singletons</h1>
+<h2 id="the-problem">The problem</h2>
+<p>A singleton is built the first time something resolves it. Some singletons are
+never resolved by anyone, yet must exist: an event subscriber that only
+listens, a registrar that wires itself into a framework, a service that starts
+a background task from <code>@PostConstruct</code>. Left lazy, they are never built, and
+resolving each of them by hand at startup spreads a list of classes across the
+application's entry point.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p><code>@Eager</code> on a <code>@Singleton</code> bean, or on a <code>@Singleton</code> <code>@Provides</code> method, builds
+it when the root injector is created:</p>
+<pre><code class="language-java">@Eager
+@Singleton
+public final class AuditSubscriber {
+    @Inject
+    public AuditSubscriber(AuditLog log) {
+        ...
+    }
+}
+</code></pre>
+<pre><code class="language-java">public final class Telemetry {
+    @Provides
+    @Eager
+    @Singleton
+    static Exporter exporter(TelemetryConfig config) {
+        ...
+    }
+}
+</code></pre>
+<p><code>@Eager</code> makes a concrete class a bean on its own: like any bean, it is built
+through its <code>@Inject</code> constructor, or else its accessible no-argument
+constructor. <code>@Singleton</code> may be declared on the class or inherited from a
+supertype.</p>
+<p><code>Injector.create()</code> and <code>Injector.builder().build()</code> build the eager singletons
+before returning the injector:</p>
+<ol>
+<li>The registry is built and every bean's dependencies are checked.</li>
+<li>The <a href="construction-listeners.html">construction listeners</a> are resolved.</li>
+<li>Each eager singleton is built, after its dependencies: constructor, member
+injection, <code>@PostConstruct</code>. The listeners see it and its dependencies.</li>
+</ol>
+<p>A later resolution returns the same instance. An eager singleton can already
+use an injected <code>Injector</code> or <code>Provider</code>: the injector is attached before step 2.</p>
+<p>Only beans still in the graph are built: a bean whose
+<a href="conditional-beans.html">condition</a> fails, a <code>@Default</code>
+binding that lost its key, and a bean every key of which a
+<a href="builder-overrides.html">builder override</a> shadows are not. A bean contributing
+to a <a href="multibindings.html">multibinding</a> is built.</p>
+<p>If building an eager singleton, or a listener, fails, the injector is not
+created: the singletons already built are destroyed (their <code>@PreDestroy</code> runs,
+newest first) and the exception propagates.</p>
+<p>The processor rejects <code>@Eager</code> where it cannot apply: on a bean or <code>@Provides</code>
+method that is not <code>@Singleton</code>, on a method without <code>@Provides</code>, on an
+interface, abstract class or enum, and on an
+<a href="assisted-injection.html">assisted</a> product or recipe.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Only <code>@Singleton</code> beans can be eager. A child-local bean is not built when a
+child hosting its scope is created, and a custom scope's lifetime is unknown
+to the container.</li>
+<li>Eager singletons are built in no specified order beyond their dependencies:
+one that must exist before another should depend on it.</li>
+<li>They are built on the thread that creates the injector. A singleton that must
+be built on a particular thread, such as a UI toolkit's event thread, needs
+the injector created on that thread.</li>
+<li>An eager singleton that a listener depends on is built while the listeners
+are resolved, before any of them exists, so it is not reported.</li>
+<li>Eagerness cannot be turned off for one injector, for example in a test:
+override the bean's keys with the builder instead.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

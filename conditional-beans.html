@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conditional Beans · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html" aria-current="page">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="conditional-beans">Conditional Beans</h1>
+<h2 id="the-problem">The problem</h2>
+<p>Some beans should exist only in some deployments — a feature behind a flag, an
+integration only configured environments use. Without support for this, the
+choice is between shipping separate artifacts per environment or writing
+wiring code that consults configuration by hand.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>A bean or <code>@Provides</code> method can carry a <strong>conditioning annotation</strong>. When the
+injector is created, each factory's conditions are evaluated; an unmatched
+condition removes the bean from the graph entirely — no binding, no
+<a href="injector-injection.html">bean definition</a>, no
+<a href="multibindings.html">collection contribution</a>.</p>
+<p><code>@ConditionalOnProperty</code> is built in:</p>
+<pre><code class="language-java">@ConditionalOnProperty(value = &quot;examples.premium&quot;, havingValue = &quot;true&quot;)
+public final class PremiumFeature {
+    @Inject
+    public PremiumFeature() {}
+}
+</code></pre>
+<pre><code class="language-java">// property unset: the bean does not exist
+Injector.create().getBeanDefinition(Key.of(PremiumFeature.class)); // Optional.empty()
+
+System.setProperty(&quot;examples.premium&quot;, &quot;true&quot;);
+Injector.create().getInstance(PremiumFeature.class); // resolves
+</code></pre>
+<p>Its attributes: <code>value</code> names the property, <code>havingValue</code> is the required
+value (empty means &quot;any value&quot;), and <code>matchIfMissing</code> makes an absent property
+count as a match. Properties are read from system properties.</p>
+<h3 id="custom-conditions">Custom conditions</h3>
+<p>A condition is a pair, mirroring how <a href="scopes.html">scopes</a> work: an annotation
+meta-annotated with <code>@ConditioningAnnotation</code>, and a <code>Condition</code>
+implementation discovered through <code>ServiceLoader</code>. The condition receives the
+annotation's attribute values and decides <code>matches</code>.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Conditions are evaluated once, at injector creation. A property change
+afterwards has no effect on an existing injector; conditions are for
+deployment-time shape, not runtime toggling.</li>
+<li>There is no fallback mechanism: when a condition removes a bean, nothing
+takes its place, and a consumer that hard-depends on it makes injector
+creation fail with <code>UnsatisfiedDependencyException</code>. Consumers must treat the bean as optional —
+via a <a href="multibindings.html">collection</a> or an
+<a href="injector-injection.html">injector probe</a>.</li>
+<li>A conditioning annotation with no registered <code>Condition</code> implementation, or
+with more than one, is an error at injector creation
+(<code>ConditionResolutionException</code>), so a jar cannot silently replace a
+condition.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>

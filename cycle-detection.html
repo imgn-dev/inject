@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle Detection · imgn inject</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<a class="brand" href="index.html">imgn inject</a>
+<a href="api/latest/">API</a>
+<a href="https://github.com/imgn-dev/inject">GitHub</a>
+</header>
+<div class="layout">
+<nav aria-label="Guide">
+<ul>
+<li><a href="index.html">imgn inject</a></li>
+<li><a href="injection.html">Zero-Reflection Injection</a></li>
+<li><a href="provides-methods.html">@Provides Methods</a></li>
+<li><a href="qualifiers.html">Qualifiers</a></li>
+<li><a href="type-exposure.html">Type Exposure and @ExposeAs</a></li>
+<li><a href="scopes.html">Scopes</a></li>
+<li><a href="conditional-beans.html">Conditional Beans</a></li>
+<li><a href="lifecycle-callbacks.html">Lifecycle callbacks</a></li>
+<li><a href="construction-listeners.html">Construction listeners</a></li>
+<li><a href="eager-singletons.html">Eager singletons</a></li>
+<li><a href="interception.html">Method Interception</a></li>
+<li><a href="provider-injection.html">Provider&lt;T&gt; Injection</a></li>
+<li><a href="keys-and-generics.html">Keys and Generic Types</a></li>
+<li><a href="multibindings.html">Multibindings</a></li>
+<li><a href="assisted-injection.html">Assisted Injection</a></li>
+<li><a href="injector-injection.html">Injector Injection and Introspection</a></li>
+<li><a href="child-injectors.html">Child Injectors</a></li>
+<li><a href="builder-overrides.html">Builder Overrides</a></li>
+<li><a href="cycle-detection.html" aria-current="page">Cycle Detection</a></li>
+<li><a href="processor-plugins.html">Processor Plugins</a></li>
+<li><a href="module-path.html">Classpath and Module Path Support</a></li>
+</ul>
+</nav>
+<main>
+<h1 id="cycle-detection">Cycle Detection</h1>
+<h2 id="the-problem">The problem</h2>
+<p>If <code>A</code> needs <code>B</code> and <code>B</code> needs <code>A</code>, neither can be constructed first.
+Undetected, a dependency cycle becomes infinite recursion and a stack
+overflow, far from the code that caused it and with no hint of the loop's
+shape.</p>
+<h2 id="how-it-solves-it">How it solves it</h2>
+<p>Two layers, both reporting the cycle as a readable path.</p>
+<p><strong>Compile time.</strong> The processor builds the dependency graph of the classes it
+compiles and rejects constructor cycles it can see as compile errors — the
+loop is reported before anything runs.</p>
+<p><strong>Runtime.</strong> Because the graph is assembled from factories loaded at runtime,
+compilation cannot see across separately built artifacts. Every resolution
+therefore runs through a per-thread resolution stack: entering a key that is
+already being resolved on that thread fails immediately with
+<code>CircularDependencyException</code> and the full chain:</p>
+<pre><code>CircularDependencyException: Dependency cycle: Key[A] -&gt; Key[B] -&gt; Key[A]
+</code></pre>
+<p>The guard is per-thread, adds a stack push/pop per resolution, and never
+produces a stack overflow or a deadlock — detection is immediate on the first
+repeated key.</p>
+<h3 id="breaking-a-legitimate-cycle">Breaking a legitimate cycle</h3>
+<p>A cycle where one participant only needs the other <em>later</em> is expressed with
+<a href="provider-injection.html"><code>Provider&lt;T&gt;</code></a>: injecting the provider defers that
+edge past construction, so resolution completes.</p>
+<pre><code class="language-java">public final class A {
+    @Inject
+    public A(Provider&lt;B&gt; b) { // no B is built while A is being built
+        this.b = b;
+    }
+}
+</code></pre>
+<p>The deferral must be real: calling <code>provider.get()</code> while construction is
+still on the stack re-enters the cycle and fails the same way.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Compile-time detection covers constructor cycles among classes visible to
+one compilation. Cycles that cross separately compiled artifacts surface at
+runtime, on the first resolution that closes the loop — not at injector
+creation.</li>
+<li>There is no automatic cycle breaking: no proxies, no partially-constructed
+instances. Every cycle is an error until a <code>Provider</code> edge makes the
+deferral explicit.</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>
