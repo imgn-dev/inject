@@ -7,7 +7,7 @@
     <parent>
         <groupId>be.imgn.parent</groupId>
         <artifactId>parent</artifactId>
-        <version>2026-11-SNAPSHOT</version>
+        <version>2026-11-01</version>
         <relativePath/>
     </parent>
 
@@ -52,8 +52,8 @@
         <asm.version>9.10.1</asm.version>
         <groovy.version>5.0.6</groovy.version>
         <!-- The version of be.imgn.parent, whose bom is imported below; it must match the parent version above. -->
-        <imgn-parent.version>2026-11-SNAPSHOT</imgn-parent.version>
-        <gaia.version>0.1.2-SNAPSHOT</gaia.version>
+        <imgn-parent.version>2026-11-01</imgn-parent.version>
+        <gaia.version>0.1.2</gaia.version>
     </properties>
 
     <dependencyManagement>
