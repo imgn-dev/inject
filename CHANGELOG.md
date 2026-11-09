@@ -13,6 +13,7 @@ the order the changes landed, each referencing its commits.
   [a355896](https://github.com/imgn-dev/inject/commit/a355896))
 - **Breaking: Java 25 or later.** Every artifact is compiled for Java 25, so
   projects that use inject must build and run on Java 25 or later.
+  ([28875e6](https://github.com/imgn-dev/inject/commit/28875e6))
 
 ## 0.1.1 — 2026-11-01
 
