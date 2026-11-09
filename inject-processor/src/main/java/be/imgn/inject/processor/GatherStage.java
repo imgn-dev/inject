@@ -134,7 +134,7 @@ final class GatherStage {
                 models.lifecycleCallbacks(bean, models.scope(bean).isPresent(), true);
                 String key = bean.getQualifiedName().toString();
                 assistedRecipes
-                        .computeIfAbsent(key, unused -> new ArrayList<>())
+                        .computeIfAbsent(key, _ -> new ArrayList<>())
                         .add(new AssistedRecipe(bean, null, constructor.get()));
                 assistedBeanNames.add(key);
                 List<TypeElement> containerParams = models.containerDependencies(constructor.get());
@@ -183,7 +183,7 @@ final class GatherStage {
     }
 
     private static void addBean(Map<TypeElement, Set<Element>> beanTypes, TypeElement bean, Element element) {
-        beanTypes.computeIfAbsent(bean, unused -> new LinkedHashSet<>()).add(element);
+        beanTypes.computeIfAbsent(bean, _ -> new LinkedHashSet<>()).add(element);
     }
 
     /**
@@ -205,9 +205,7 @@ final class GatherStage {
                 diagnostics.on(method).error("The @AssistedFactory annotation belongs on an interface method.");
                 continue;
             }
-            byInterface
-                    .computeIfAbsent(enclosing.get(), unused -> new ArrayList<>())
-                    .add(method);
+            byInterface.computeIfAbsent(enclosing.get(), _ -> new ArrayList<>()).add(method);
         }
         for (String name : pendingFactories) {
             TypeElement pending = context.elements().getTypeElement(name);
@@ -397,7 +395,7 @@ final class GatherStage {
                     diagnostics.on(method).error("@Eager cannot mark an assisted recipe.");
                 }
                 assistedRecipes
-                        .computeIfAbsent(key, unused -> new ArrayList<>())
+                        .computeIfAbsent(key, _ -> new ArrayList<>())
                         .add(new AssistedRecipe(host, method, method));
                 List<TypeElement> containerParams = models.containerDependencies(method);
                 seeds.addAll(containerParams);

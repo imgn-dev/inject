@@ -178,7 +178,7 @@ produces `Retry → Secured → Timed → place`.
 virtually into the override.
 
 **Calls made from the bean's own constructor are not intercepted.** The chain fields are assigned after `super(…)`
-returns, and Java 21 has no statements before `super`. The generated override null-checks its chain field and falls
+returns. The generated override null-checks its chain field and falls
 through to `super` when it is unset, making the rule deterministic instead of an NPE.
 
 **Providers are resolved when the proxy is constructed; interceptor instantiation waits for the first intercepted
@@ -359,5 +359,4 @@ Shape rules for overrides:
   An `order` attribute remains addable later.
 - Immutable `MethodInvocation` with `proceed(Object...)` over a live mutable argument array: same power, no aliasing
   footgun, and substitution is validated where it happens.
-- Constructor-time calls fall through to `super` rather than NPE-ing on an unset chain — the only honest option
-  while Java 21 forbids statements before `super`.
+- Constructor-time calls fall through to `super` rather than NPE-ing on an unset chain.

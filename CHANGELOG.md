@@ -11,6 +11,8 @@ the order the changes landed, each referencing its commits.
   release, and `api/snapshot/` for `main`. New API carries `@since`.
   ([77d5959](https://github.com/imgn-dev/inject/commit/77d5959),
   [a355896](https://github.com/imgn-dev/inject/commit/a355896))
+- **Breaking: Java 25 or later.** Every artifact is compiled for Java 25, so
+  projects that use inject must build and run on Java 25 or later.
 
 ## 0.1.1 — 2026-11-01
 

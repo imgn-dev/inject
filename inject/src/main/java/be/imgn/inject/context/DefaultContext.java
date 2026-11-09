@@ -165,9 +165,7 @@ public final class DefaultContext implements Context {
             List<Key<?>> supertypeKeys = factory.supertypeKeys();
             for (Key<?> key : factory.exposedKeys()) {
                 if (supertypeKeys.contains(key)) {
-                    supertypeClaims
-                            .computeIfAbsent(key, unused -> new ArrayList<>())
-                            .add(new Claim(factory, provider));
+                    supertypeClaims.computeIfAbsent(key, _ -> new ArrayList<>()).add(new Claim(factory, provider));
                 } else if (built.putIfAbsent(key, provider) != null) {
                     throw new DuplicateBindingException("Duplicate binding for " + key);
                 } else {
@@ -285,7 +283,7 @@ public final class DefaultContext implements Context {
                     continue;
                 }
                 if (childLocal.isPresent()) {
-                    byScope.computeIfAbsent(childLocal.get(), unused -> new ArrayList<>())
+                    byScope.computeIfAbsent(childLocal.get(), _ -> new ArrayList<>())
                             .add(new HostRequirement(
                                     dependency.key(),
                                     "  " + bean.key() + " (@" + childLocal.get().getSimpleName() + ") depends on "
@@ -341,7 +339,7 @@ public final class DefaultContext implements Context {
                             + scope.getSimpleName() + " bean is built in the root injector, where no @" + narrower
                             + " instance exists. Make it @" + narrower + " or unscoped.");
                 } else {
-                    byScope.computeIfAbsent(scope, unused -> new ArrayList<>())
+                    byScope.computeIfAbsent(scope, _ -> new ArrayList<>())
                             .add(new HostScopeRequirement(
                                     target.get(),
                                     "  " + bean.key() + " (@" + scope.getSimpleName() + ") depends directly on "

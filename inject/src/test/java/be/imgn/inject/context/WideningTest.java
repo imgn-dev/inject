@@ -142,7 +142,7 @@ class WideningTest {
         @Override
         protected Clipboard createInstance(Context context) {
             if (throughProvider) {
-                Provider<Selection> unused = this.getProviderForConstructor(0, Selection.class, context);
+                Provider<Selection> _ = this.getProviderForConstructor(0, Selection.class, context);
                 return new Clipboard(null);
             }
             return new Clipboard(this.<Selection>getInstanceForConstructor(0, Selection.class, context));

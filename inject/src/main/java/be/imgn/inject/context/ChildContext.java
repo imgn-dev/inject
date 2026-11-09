@@ -254,7 +254,7 @@ public final class ChildContext implements Context {
      */
     private Provider<?> hosted(Factory<?> factory) {
         requireOpen(factory.key());
-        return hosted.computeIfAbsent(factory, unused -> new SingletonProvider<>(hostedBuilder(factory)));
+        return hosted.computeIfAbsent(factory, _ -> new SingletonProvider<>(hostedBuilder(factory)));
     }
 
     private <T> Provider<T> hostedBuilder(Factory<T> factory) {

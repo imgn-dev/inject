@@ -114,7 +114,7 @@ jobs:
         name: Build the documentation
         run: main/scripts/javadoc.sh source "$RUNNER_TEMP/site-input/javadoc"
 
-      # Versions before 0.1.2 have no guide: their docs directory is not a module.
+      # Versions before 0.2.0 have no guide: their docs directory is not a module.
       - if: env.ACTION == 'publish' || env.ACTION == 'guide'
         id: guide
         name: Build the guide

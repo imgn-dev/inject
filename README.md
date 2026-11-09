@@ -1,6 +1,6 @@
 # imgn inject
 
-A dependency injection framework for Java 21 or later that uses no reflection: an annotation processor generates a
+A dependency injection framework for Java 25 or later that uses no reflection: an annotation processor generates a
 factory for each bean at compile time, and the injector finds those factories through `ServiceLoader`, on the class
 path and on the module path.
 

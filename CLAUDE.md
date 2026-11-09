@@ -1,6 +1,6 @@
 # CLAUDE.md — `be.imgn.inject`
 
-A zero-reflection dependency injection framework for Java 21 (classpath + module
+A zero-reflection dependency injection framework for Java 25 (classpath + module
 path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-design.md`.
 
 ## Build
@@ -40,9 +40,9 @@ path). Design spec: `docs/superpowers/specs/2026-07-18-imgn-inject-di-framework-
   and `api/latest/` when `release.yml` calls it.
 - `WONTDO.md` lists rejected features, with the reason and what to use
   instead. Read it before proposing API; add to it when a feature is rejected.
-- Javadoc: `@since <version>` on every new public type or member, from 0.1.2
+- Javadoc: `@since <version>` on every new public type or member, from 0.2.0
   on; the API of earlier versions has none. JDK links are offline, from
-  `scripts/jdk-21/element-list`, so no build reaches docs.oracle.com.
+  `scripts/jdk-25/element-list`, so no build reaches docs.oracle.com.
 
 ## Changelog
 

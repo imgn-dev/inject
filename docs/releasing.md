@@ -3,12 +3,8 @@
 ## CI
 
 `.github/workflows/ci.yml` runs `./mvnw clean verify` on every push to `main`,
-every pull request, and on demand, against JDK 25 and JDK 26. The code targets
-Java 21, but the build needs JDK 24+ (the test JVMs run with
-`--sun-misc-unsafe-memory-access=allow`). The newest JDK is built too because
-Error Prone reflects into javac internals and is the first thing to break on a
-new release. When a build fails, the Surefire reports and the invoker
-integration-test logs are uploaded as an artifact.
+every pull request, and on demand, on JDK 25. When a build fails, the Surefire
+reports and the invoker integration-test logs are uploaded as an artifact.
 
 The `inject-maven-plugin` integration tests run child Maven builds whose
 `src/it/settings.xml` mirrors every remote repository to `~/.m2`, so they never
@@ -38,7 +34,7 @@ https://imgn-dev.github.io/inject/:
 `inject-processor` in one javadoc run, from the sources of any tag;
 `scripts/docs-site.sh` maintains the `gh-pages` tree. Run the workflow by hand
 to publish a version again (`replace`), to remove one that was never published
-to Central, or to publish the guide alone. Versions before 0.1.2 have no guide.
+to Central, or to publish the guide alone. Versions before 0.2.0 have no guide.
 The repository's Pages settings serve the `gh-pages` branch, which the first
 run creates.
 
@@ -95,7 +91,7 @@ scripts/release.sh --dry-run 0.1.0 0.2.0   # every prompt and the same build; up
 scripts/release.sh 0.1.0 0.2.0             # the release
 ```
 
-It needs JDK 24+, `curl`, a clean tree on `main` in sync with `origin`, and a
+It needs JDK 25+, `curl`, a clean tree on `main` in sync with `origin`, and a
 free `vX` tag. It walks through choosing the signing key, the same step as
 `publish.sh`, and prompts for the Central token and the key passphrase without
 echoing them. They are kept only in the Maven process's environment:

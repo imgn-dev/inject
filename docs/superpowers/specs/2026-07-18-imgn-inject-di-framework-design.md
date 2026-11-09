@@ -5,7 +5,7 @@
 
 ## 1. Overview
 
-A dependency injection framework for Java 21 that runs on both the classpath and
+A dependency injection framework for Java 25 that runs on both the classpath and
 the module path. It performs **zero reflection**: all injection is done through
 `Factory` subclasses generated at compile time by an annotation processor, one
 factory per injectable class. Because there is no reflection, member visibility
@@ -36,7 +36,7 @@ annotations (e.g. `@Log`) are handled by plugins discovered through
 
 | Module | Coordinates | Contents |
 |--------|-------------|----------|
-| parent | `be.imgn.inject:inject-parent` | pom aggregator; inherits `be.imgn.parent:parent`, imports `be.imgn.parent:bom`; Java 21 |
+| parent | `be.imgn.inject:inject-parent` | pom aggregator; inherits `be.imgn.parent:parent`, imports `be.imgn.parent:bom`; Java 25 |
 | runtime | `be.imgn.inject:inject` | public API + annotations + runtime engine. `module be.imgn.inject` |
 | processor | `be.imgn.inject:inject-processor` | annotation processor (gaia-processing); depends on `inject` |
 | log | `be.imgn.inject:inject-log` | the `@Log` plugin annotation; depends on `inject` only |

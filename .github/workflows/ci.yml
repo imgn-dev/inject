@@ -16,22 +16,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # The code targets Java 21, but the build itself needs JDK 24+: the test
-        # JVMs run with --sun-misc-unsafe-memory-access=allow. 25 is the LTS the
-        # release is built with; the newest JDK is built too, because Error Prone
-        # reflects into javac internals and breaks on new releases.
-        java: ['25', '26']
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: ${{ matrix.java }}
+          java-version: '25'
           cache: maven
 
       # verify runs the whole quality pipeline, including the inject-maven-plugin
@@ -44,7 +36,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: reports-jdk${{ matrix.java }}
+          name: reports
           path: |
             */target/surefire-reports/
             inject-maven-plugin/target/it/*/build.log

@@ -18,11 +18,11 @@
 set -euo pipefail
 
 # The JDK whose API the documentation links to: the release inject compiles for.
-JDK=21
+JDK=25
 # The element-list of its documentation, committed beside this script, so that
 # building the documentation does not depend on docs.oracle.com being reachable:
 # with -Werror, javadoc fails when it cannot fetch it. Copied from
-# https://docs.oracle.com/en/java/javase/21/docs/api/element-list; the links
+# https://docs.oracle.com/en/java/javase/25/docs/api/element-list; the links
 # still go to docs.oracle.com.
 JDK_ELEMENT_LIST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/jdk-$JDK
 MODULE_DIRS=(inject inject-processor)
