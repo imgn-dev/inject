@@ -79,3 +79,10 @@ javadoc -d "$output" -quiet -notimestamp -Werror -Xdoclint:all \
     -linkoffline "https://docs.oracle.com/en/java/javase/$JDK/docs/api/" "$JDK_ELEMENT_LIST_DIR" \
     -doctitle "imgn inject $version API" \
     -windowtitle "imgn inject $version API"
+
+# A Markdown link that javadoc cannot parse, such as one whose signature has
+# unescaped array brackets, is printed as its raw text, without a warning.
+# Code is left out, as `a[i][j]` is valid there.
+broken=$(find "$output" -name "*.html" -exec perl -0777 -ne \
+    's#<(code|pre)\b.*?</\1>##gs; print "$ARGV\n" if /\]\[|\[#/' {} +)
+[[ -z $broken ]] || die "Raw Markdown links in the documentation, in:"$'\n'"$broken"
